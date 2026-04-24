@@ -148,6 +148,38 @@ def cmd_store_clear(args: argparse.Namespace) -> int:
     return 0
 
 
+# ─── Commande : lineage ───────────────────────────────────────────────────────
+
+def cmd_lineage(args: argparse.Namespace) -> int:
+    """Affiche le graphe de dépendances (Exomap) et les incohérences."""
+    from src.ecosystem import lineage_text, lineage_dict, check_consistency
+    import json as _json
+
+    file_id = getattr(args, "id", None)
+
+    if getattr(args, "json", False):
+        print(_json.dumps(lineage_dict(), ensure_ascii=False, indent=2))
+        return 0
+
+    _header(f"ExoSync — Lineage (Exomap v2)")
+
+    text = lineage_text(file_id=file_id)
+    print(text)
+
+    # Vérification de cohérence
+    warnings = check_consistency()
+    if warnings:
+        print(f"\n  --- {len(warnings)} avertissement(s) ---")
+        for w in warnings:
+            _warn(f"[{w.code}] {w.message}")
+            if w.details:
+                print(f"       {w.details}")
+    else:
+        print("\n  Aucune incoherence detectee.")
+
+    return 0
+
+
 # ─── Commande : generate ──────────────────────────────────────────────────────
 
 def cmd_generate(args: argparse.Namespace) -> int:
@@ -246,6 +278,17 @@ exemples :
 
     store_sub.add_parser("clear", help="Vider toutes les variables du store")
 
+    # ── lineage ───────────────────────────────────────────────────────────────
+    p_lin = sub.add_parser("lineage", help="Affiche le graphe de dependances (Exomap)")
+    p_lin.add_argument(
+        "--id", metavar="FILE_ID",
+        help="Filtrer sur un fichier (ex: UO-001)"
+    )
+    p_lin.add_argument(
+        "--json", action="store_true",
+        help="Sortie JSON brute"
+    )
+
     # ── generate ──────────────────────────────────────────────────────────────
     p_gen = sub.add_parser("generate", help="Génère les fichiers Excel UO")
     p_gen.add_argument(
@@ -281,6 +324,9 @@ def main(argv=None) -> int:
             return cmd_store_delete(args)
         if args.store_command == "clear":
             return cmd_store_clear(args)
+
+    if args.command == "lineage":
+        return cmd_lineage(args)
 
     if args.command == "generate":
         return cmd_generate(args)
