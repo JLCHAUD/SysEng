@@ -570,6 +570,21 @@ def _eval_formula(formula: str, ctx: Dict[str, Any]) -> Any:
         default = _resolve_scalar(args[1], ctx) if len(args) > 1 else None
         return default if val is None else val
 
+    # ─ GROUP_BY ───────────────────────────────────────────────────────────────
+    if formula.upper().startswith("GROUP_BY("):
+        inner = formula[len("GROUP_BY("):-1]
+        return _eval_group_by(inner, ctx)
+
+    # ─ SORT ───────────────────────────────────────────────────────────────────
+    if formula.upper().startswith("SORT("):
+        inner = formula[len("SORT("):-1]
+        return _eval_sort(inner, ctx)
+
+    # ─ TOP_N ──────────────────────────────────────────────────────────────────
+    if formula.upper().startswith("TOP_N("):
+        inner = formula[len("TOP_N("):-1]
+        return _eval_top_n(inner, ctx)
+
     # ─ Littéral string entre guillemets ──────────────────────────────────────
     if (formula.startswith('"') and formula.endswith('"')) or \
        (formula.startswith("'") and formula.endswith("'")):
@@ -582,6 +597,178 @@ def _eval_formula(formula: str, ctx: Dict[str, Any]) -> Any:
         pass
 
     raise ValueError(f"Fonction COMPUTE inconnue : '{formula}'")
+
+
+def _eval_agg_on_rows(expr: str, rows: List[Dict]) -> Any:
+    """
+    Évalue une fonction d'agrégation (SUM, COUNT, AVG, MIN, MAX, MEAN_WEIGHTED,
+    COUNT_IF) sur une liste de dicts. Les colonnes sont des noms simples (pas
+    de préfixe $table).
+    """
+    expr = expr.strip()
+
+    def _col(name: str) -> List[Any]:
+        return [row.get(name) for row in rows]
+
+    up = expr.upper()
+
+    if up.startswith("SUM("):
+        col = expr[4:-1].strip()
+        return sum(v for v in _col(col) if v is not None)
+
+    if up.startswith("COUNT("):
+        col = expr[6:-1].strip()
+        return sum(1 for v in _col(col) if v is not None)
+
+    if up.startswith("COUNT_IF("):
+        inner = expr[9:-1]
+        col, raw_val = [s.strip() for s in inner.split(",", 1)]
+        target = raw_val.strip('"').strip("'")
+        return sum(1 for v in _col(col) if str(v) == target)
+
+    if up.startswith("AVG("):
+        col = expr[4:-1].strip()
+        vals = [v for v in _col(col) if v is not None]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    if up.startswith("MIN("):
+        col = expr[4:-1].strip()
+        vals = [v for v in _col(col) if v is not None]
+        return min(vals) if vals else None
+
+    if up.startswith("MAX("):
+        col = expr[4:-1].strip()
+        vals = [v for v in _col(col) if v is not None]
+        return max(vals) if vals else None
+
+    if up.startswith("MEAN_WEIGHTED("):
+        inner = expr[len("MEAN_WEIGHTED("):-1]
+        val_col, wgt_col = [s.strip() for s in inner.split(",", 1)]
+        pairs = [
+            (row.get(val_col), row.get(wgt_col))
+            for row in rows
+            if row.get(val_col) is not None and row.get(wgt_col) is not None
+        ]
+        total_w = sum(w for _, w in pairs)
+        if total_w == 0:
+            return 0.0
+        return sum(v * w for v, w in pairs) / total_w
+
+    raise ValueError(f"Agrégation inconnue dans GROUP_BY : '{expr}'")
+
+
+def _eval_group_by(inner: str, ctx: Dict[str, Any]) -> List[Dict]:
+    """
+    GROUP_BY($table, group_col, out_col = AGG(col), ...)
+
+    Groupe les lignes de $table par la valeur de group_col, puis applique les
+    fonctions d'agrégation spécifiées. Retourne une List[Dict] avec une ligne
+    par groupe distinct, dans l'ordre d'apparition.
+    """
+    args = _split_args(inner)
+    if len(args) < 3:
+        raise ValueError(
+            f"GROUP_BY attend au moins 3 arguments, {len(args)} trouvé(s)"
+        )
+
+    table_ref = args[0].strip()
+    group_col  = args[1].strip()
+    agg_specs  = args[2:]
+
+    table = ctx.get(table_ref)
+    if table is None:
+        raise ValueError(f"GROUP_BY : table '{table_ref}' non définie")
+    if not isinstance(table, list):
+        raise ValueError(f"GROUP_BY : '{table_ref}' n'est pas une table")
+
+    # Parser les specs : "out_col = AGG(col)"
+    parsed: List[Tuple[str, str]] = []
+    for spec in agg_specs:
+        m = re.match(r'^([\w_]+)\s*=\s*(.+)$', spec.strip())
+        if not m:
+            raise ValueError(f"GROUP_BY : spécification invalide '{spec}'")
+        parsed.append((m.group(1).strip(), m.group(2).strip()))
+
+    # Regrouper dans l'ordre d'apparition
+    groups: Dict[Any, List[Dict]] = {}
+    order: List[Any] = []
+    for row in table:
+        key = row.get(group_col)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+
+    # Construire le résultat
+    result: List[Dict] = []
+    for key in order:
+        out_row: Dict[str, Any] = {group_col: key}
+        for out_col, agg_expr in parsed:
+            out_row[out_col] = _eval_agg_on_rows(agg_expr, groups[key])
+        result.append(out_row)
+
+    return result
+
+
+def _eval_sort(inner: str, ctx: Dict[str, Any]) -> List[Dict]:
+    """
+    SORT($table, col, ASC|DESC)
+
+    Trie la table selon la colonne indiquée. Les valeurs None sont placées en
+    dernier quelle que soit la direction.
+    """
+    args = [s.strip() for s in _split_args(inner)]
+    if len(args) < 3:
+        raise ValueError(f"SORT attend 3 arguments, {len(args)} trouvé(s)")
+
+    table_ref, sort_col, direction = args[0], args[1], args[2].upper()
+
+    table = ctx.get(table_ref)
+    if table is None:
+        raise ValueError(f"SORT : table '{table_ref}' non définie")
+    if not isinstance(table, list):
+        raise ValueError(f"SORT : '{table_ref}' n'est pas une table")
+    if direction not in ("ASC", "DESC"):
+        raise ValueError(f"SORT : direction inconnue '{direction}' (ASC ou DESC)")
+
+    reverse = direction == "DESC"
+    none_rows = [r for r in table if r.get(sort_col) is None]
+    non_none  = [r for r in table if r.get(sort_col) is not None]
+    sorted_rows = sorted(non_none, key=lambda r: r[sort_col], reverse=reverse)
+    return sorted_rows + none_rows
+
+
+def _eval_top_n(inner: str, ctx: Dict[str, Any]) -> List[Dict]:
+    """
+    TOP_N($table, n, col, ASC|DESC)
+
+    Trie la table par col dans la direction donnée, puis retourne les n
+    premières lignes. Les valeurs None sont placées en dernier.
+    """
+    args = [s.strip() for s in _split_args(inner)]
+    if len(args) < 4:
+        raise ValueError(f"TOP_N attend 4 arguments, {len(args)} trouvé(s)")
+
+    table_ref, n_str, sort_col, direction = args[0], args[1], args[2], args[3].upper()
+
+    try:
+        n = int(n_str)
+    except ValueError:
+        raise ValueError(f"TOP_N : n='{n_str}' n'est pas un entier")
+
+    table = ctx.get(table_ref)
+    if table is None:
+        raise ValueError(f"TOP_N : table '{table_ref}' non définie")
+    if not isinstance(table, list):
+        raise ValueError(f"TOP_N : '{table_ref}' n'est pas une table")
+    if direction not in ("ASC", "DESC"):
+        raise ValueError(f"TOP_N : direction inconnue '{direction}' (ASC ou DESC)")
+
+    reverse = direction == "DESC"
+    none_rows = [r for r in table if r.get(sort_col) is None]
+    non_none  = [r for r in table if r.get(sort_col) is not None]
+    sorted_rows = sorted(non_none, key=lambda r: r[sort_col], reverse=reverse) + none_rows
+    return sorted_rows[:n]
 
 
 def _split_args(text: str) -> List[str]:
