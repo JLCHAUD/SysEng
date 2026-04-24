@@ -42,6 +42,7 @@ class FileHeader:
     file_type: str = ""
     file_id: str = ""
     version: str = "1"
+    doc: str = ""
 
 
 @dataclass
@@ -95,6 +96,11 @@ class PullNode:
 
 
 @dataclass
+class ExtendsNode:
+    template_name: str   # "uo_generique"  (sans extension .mxl)
+
+
+@dataclass
 class ValidateNode:
     var_ref: str            # "$activites.avancement"  ou  "$total_heures"
     rule: str               # "RANGE(0, 100)" | "NOT_NULL" | "IN(...)" | ...
@@ -111,6 +117,7 @@ class ParseError:
 @dataclass
 class PasserelleAST:
     header: FileHeader = field(default_factory=FileHeader)
+    extends: Optional["ExtendsNode"] = None
     defs: List[DefNode] = field(default_factory=list)
     cols: List[ColNode] = field(default_factory=list)
     binds: List[BindNode] = field(default_factory=list)
@@ -185,16 +192,18 @@ def _parse_kv_attrs(text: str) -> Dict[str, str]:
 
 def _parse_header_line(line: str, ast: PasserelleAST) -> bool:
     """Tente de parser une ligne d'en-tête. Retourne True si consommée."""
-    for key in ("FILE_TYPE", "FILE_ID", "VERSION"):
+    for key in ("FILE_TYPE", "FILE_ID", "VERSION", "DOC"):
         m = re.match(rf'^{key}\s*:\s*(.+)$', line, re.IGNORECASE)
         if m:
-            val = m.group(1).strip()
+            val = m.group(1).strip().strip('"').strip("'")
             if key == "FILE_TYPE":
                 ast.header.file_type = val
             elif key == "FILE_ID":
                 ast.header.file_id = val
             elif key == "VERSION":
                 ast.header.version = val
+            elif key == "DOC":
+                ast.header.doc = val
             return True
     return False
 
@@ -447,6 +456,14 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
             else:
                 ast.errors.append(ParseError(line_num, instr, "Syntaxe VALIDATE invalide"))
 
+        elif keyword == "EXTENDS":
+            # EXTENDS <nom_template>
+            parts = instr.split()
+            if len(parts) == 2:
+                ast.extends = ExtendsNode(template_name=parts[1].strip())
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe EXTENDS invalide"))
+
         else:
             ast.errors.append(ParseError(line_num, instr,
                                           f"Mot-clé inconnu : '{keyword}'"))
@@ -484,6 +501,121 @@ def parse_sheet(ws) -> PasserelleAST:
 
 MANIFESTE_SHEET  = "_Manifeste"
 _LEGACY_SHEET    = "_Passerelle"   # rétro-compat ADR-001
+TEMPLATES_DIR    = Path(__file__).parent.parent / "config" / "templates"
+
+
+# ─── EXTENDS — résolution et fusion ──────────────────────────────────────────
+
+def parse_mxl_file(filepath: Path, substitutions: Dict[str, str] = None) -> PasserelleAST:
+    """
+    Parse un fichier .mxl texte (template) et retourne un AST.
+    Chaque ligne non vide et non commentaire est une instruction (pas d'ancre).
+    Substitue les variables {{FILE_ID}}, {{DOC}} si substitutions est fourni.
+    """
+    substitutions = substitutions or {}
+    lines: List[Tuple[str, str]] = []
+    with open(filepath, encoding="utf-8") as f:
+        for raw in f:
+            instr = raw.strip()
+            # Substituer les variables template
+            for placeholder, value in substitutions.items():
+                instr = instr.replace(f"{{{{{placeholder}}}}}", value)
+            lines.append((instr, ""))  # ancre vide pour les templates
+    return parse_lines(lines)
+
+
+def merge_asts(child: PasserelleAST, template: PasserelleAST) -> PasserelleAST:
+    """
+    Fusionne un AST enfant avec un AST template selon les règles de fusion MXL :
+
+      Header (FILE_TYPE, FILE_ID, VERSION, DOC) : l'enfant remplace le template
+      DEF $var                                  : l'enfant remplace par même nom
+      PULL, COL, VALIDATE, BIND, PUSH           : additifs (template + enfant)
+      errors                                    : additifs
+    """
+    merged = PasserelleAST()
+
+    # ── Header : l'enfant prime ────────────────────────────────────────────────
+    merged.header = FileHeader(
+        file_type = child.header.file_type or template.header.file_type,
+        file_id   = child.header.file_id   or template.header.file_id,
+        version   = child.header.version   or template.header.version,
+        doc       = child.header.doc       or template.header.doc,
+    )
+
+    # ── DEF : l'enfant remplace le template si même var_name ─────────────────
+    template_defs: Dict[str, DefNode] = {d.var_name: d for d in template.defs}
+    child_defs:    Dict[str, DefNode] = {d.var_name: d for d in child.defs}
+    merged_defs = {**template_defs, **child_defs}   # child gagne
+
+    # Reconstruire en préservant l'ordre : template d'abord, puis nouveaux enfant
+    seen: set = set()
+    ordered: List[DefNode] = []
+    for d in template.defs:
+        node = merged_defs[d.var_name]
+        ordered.append(node)
+        seen.add(d.var_name)
+    for d in child.defs:
+        if d.var_name not in seen:
+            ordered.append(d)
+    merged.defs = ordered
+    merged._defs_index = {d.var_name: d for d in ordered}
+
+    # ── Listes additives ──────────────────────────────────────────────────────
+    merged.pulls     = template.pulls     + child.pulls
+    merged.cols      = template.cols      + child.cols
+    merged.validates = template.validates + child.validates
+    merged.binds     = template.binds     + child.binds
+    merged.pushes    = template.pushes    + child.pushes
+
+    # ── COL index ────────────────────────────────────────────────────────────
+    for col in merged.cols:
+        if col.table_var not in merged._cols_index:
+            merged._cols_index[col.table_var] = []
+        merged._cols_index[col.table_var].append(col)
+
+    # ── Erreurs ───────────────────────────────────────────────────────────────
+    merged.errors = template.errors + child.errors
+
+    return merged
+
+
+def resolve_extends(
+    ast: PasserelleAST,
+    templates_dir: Path = TEMPLATES_DIR,
+) -> PasserelleAST:
+    """
+    Si l'AST contient une instruction EXTENDS, charge le template .mxl,
+    substitue les variables et retourne l'AST fusionné.
+    Sinon, retourne l'AST inchangé.
+    """
+    if ast.extends is None:
+        return ast
+
+    template_path = templates_dir / f"{ast.extends.template_name}.mxl"
+    if not template_path.exists():
+        ast.errors.append(ParseError(
+            line_num=0,
+            raw=f"EXTENDS {ast.extends.template_name}",
+            message=f"Template introuvable : {template_path}",
+        ))
+        return ast
+
+    substitutions = {
+        "FILE_ID": ast.header.file_id,
+        "DOC":     ast.header.doc,
+    }
+    try:
+        template_ast = parse_mxl_file(template_path, substitutions)
+    except Exception as exc:
+        ast.errors.append(ParseError(
+            line_num=0,
+            raw=f"EXTENDS {ast.extends.template_name}",
+            message=f"Erreur lecture template : {exc}",
+        ))
+        return ast
+
+    return merge_asts(child=ast, template=template_ast)
 
 
 def parse_file(filepath: Path) -> Optional[PasserelleAST]:
@@ -507,7 +639,7 @@ def parse_file(filepath: Path) -> Optional[PasserelleAST]:
     ast = parse_sheet(wb[sheet_name])
     ast.header.file_id = ast.header.file_id or filepath.stem
     wb.close()
-    return ast
+    return resolve_extends(ast)
 
 
 # ─── Enrichissement de l'écosystème ──────────────────────────────────────────
