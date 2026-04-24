@@ -14,6 +14,7 @@ from typing import List, Optional
 
 from src import store as Store
 from src import ecosystem as Ecosystem
+from src import history as History
 from src.config_loader import load_registre, save_registre
 from src.executor import execute_ast
 from src.models import EntreeRegistre
@@ -195,6 +196,11 @@ def synchroniser(
 
     fin = datetime.now()
     rapport_path = _generer_rapport(resultats, debut, fin)
+
+    # M04 — Historique : run + snapshot du store
+    History.save_run_history(resultats, debut, fin)
+    History.save_store_snapshot()
+    History.purge_old_files(max_runs=30, max_snapshots=30)
 
     nb_ok = sum(1 for r in resultats if r["statut"] == "ok")
     nb_skip = sum(1 for r in resultats if r["statut"] == "skip_verrouille")

@@ -928,11 +928,70 @@ def _validate_rule(rule: str, values: List[Any]) -> List[str]:
         bad = [v for v in values if str(v) not in allowed]
         if bad:
             violations.append(
-                f"IN({', '.join(sorted(allowed))}) : {len(bad)} valeur(s) non autorisée(s) ({bad[:3]})"
+                f"IN({', '.join(sorted(allowed))}) : {len(bad)} valeur(s) non autorisee(s) ({bad[:3]})"
             )
 
+    # ── NOT_EMPTY ────────────────────────────────────────────────────────────
+    elif rule.upper() == "NOT_EMPTY":
+        bad = [v for v in values if v is None or str(v).strip() == ""]
+        if bad:
+            violations.append(f"NOT_EMPTY : {len(bad)} valeur(s) vide(s)")
+
+    # ── MAX_LENGTH(n) ────────────────────────────────────────────────────────
+    elif rule.upper().startswith("MAX_LENGTH("):
+        m = re.match(r'MAX_LENGTH\(\s*(\d+)\s*\)', rule, re.IGNORECASE)
+        if m:
+            n = int(m.group(1))
+            bad = [v for v in values if v is not None and len(str(v)) > n]
+            if bad:
+                violations.append(
+                    f"MAX_LENGTH({n}) : {len(bad)} valeur(s) trop longue(s) ({[str(v)[:20] for v in bad[:3]]})"
+                )
+
+    # ── MIN_LENGTH(n) ────────────────────────────────────────────────────────
+    elif rule.upper().startswith("MIN_LENGTH("):
+        m = re.match(r'MIN_LENGTH\(\s*(\d+)\s*\)', rule, re.IGNORECASE)
+        if m:
+            n = int(m.group(1))
+            bad = [v for v in values if v is None or len(str(v)) < n]
+            if bad:
+                violations.append(
+                    f"MIN_LENGTH({n}) : {len(bad)} valeur(s) trop courte(s)"
+                )
+
+    # ── MATCHES(regex) ───────────────────────────────────────────────────────
+    elif rule.upper().startswith("MATCHES("):
+        inner = rule[len("MATCHES("):-1].strip().strip('"').strip("'")
+        try:
+            pattern = re.compile(inner)
+            bad = [v for v in values if v is None or not pattern.match(str(v))]
+            if bad:
+                violations.append(
+                    f"MATCHES({inner!r}) : {len(bad)} valeur(s) non conformes ({[str(v)[:20] for v in bad[:3]]})"
+                )
+        except re.error as e:
+            violations.append(f"MATCHES : regex invalide : {e}")
+
+    # ── MAX(n) ───────────────────────────────────────────────────────────────
+    elif rule.upper().startswith("MAX("):
+        m = re.match(r'MAX\(\s*([\d.+-]+)\s*\)', rule, re.IGNORECASE)
+        if m:
+            hi = float(m.group(1))
+            bad = [v for v in values if v is not None and v > hi]
+            if bad:
+                violations.append(f"MAX({hi}) : {len(bad)} valeur(s) > {hi} ({bad[:3]})")
+
+    # ── MIN(n) ───────────────────────────────────────────────────────────────
+    elif rule.upper().startswith("MIN("):
+        m = re.match(r'MIN\(\s*([\d.+-]+)\s*\)', rule, re.IGNORECASE)
+        if m:
+            lo = float(m.group(1))
+            bad = [v for v in values if v is not None and v < lo]
+            if bad:
+                violations.append(f"MIN({lo}) : {len(bad)} valeur(s) < {lo} ({bad[:3]})")
+
     else:
-        violations.append(f"Règle inconnue : '{rule}'")
+        violations.append(f"Regle inconnue : '{rule}'")
 
     return violations
 
@@ -1096,8 +1155,14 @@ def execute_ast(
         # Phase 4 — BIND
         execute_binds(ast, wb, ctx, result)
 
-        # Sauvegarder le fichier modifié
-        wb.save(str(filepath))
+        # Phase 4b — NOTIFY (M09)
+        execute_notifies(ast, ctx, result)
+
+        # Phase 5 — _Log (M08)
+        _write_log_sheet(wb, result)
+
+        # Sauvegarde avec backup préalable (M08)
+        _safe_save(wb, filepath)
 
     except Exception as exc:
         result.errors.append(f"Erreur inattendue : {exc}")
@@ -1105,3 +1170,156 @@ def execute_ast(
         wb.close()
 
     return result
+
+
+# ─── M09 — NOTIFY ────────────────────────────────────────────────────────────
+
+def execute_notifies(ast: "PasserelleAST", ctx: Dict[str, Any],
+                     result: ExecutionResult) -> None:
+    """
+    Phase 4b — Exécute les instructions NOTIFY.
+
+    Canaux supportés :
+      log     → ajoute un message dans result.warnings (toujours disponible)
+      email   → déclenche un envoi SMTP si SMTP_HOST est configuré dans l'env
+      webhook → POST HTTP vers l'URL cible si disponible
+
+    La condition IF est évaluée comme une expression Python simple ;
+    les variables $x sont remplacées par leur valeur dans ctx.
+    """
+    import os
+    import re as _re
+
+    for nnode in ast.notifies:
+        # Évaluer la condition IF (si présente)
+        if nnode.condition:
+            cond_expr = nnode.condition
+            for var, val in ctx.items():
+                cond_expr = cond_expr.replace(var, repr(val))
+            try:
+                if not eval(cond_expr, {"__builtins__": {}}):  # noqa: S307
+                    result.skipped.append(f"NOTIFY {nnode.channel} — condition non satisfaite")
+                    continue
+            except Exception as exc:
+                result.warnings.append(f"NOTIFY {nnode.channel} — erreur condition : {exc}")
+                continue
+
+        # Interpoler les variables dans le message
+        msg = nnode.message
+        for var, val in ctx.items():
+            msg = msg.replace(var, str(val))
+
+        if nnode.channel == "log":
+            result.warnings.append(f"[NOTIFY] {msg}")
+
+        elif nnode.channel == "email":
+            smtp_host = os.environ.get("SMTP_HOST", "")
+            if not smtp_host:
+                result.warnings.append(
+                    f"[NOTIFY email] SMTP_HOST non configure — message non envoye : {msg}"
+                )
+            else:
+                try:
+                    import smtplib
+                    from email.message import EmailMessage
+                    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+                    smtp_user = os.environ.get("SMTP_USER", "")
+                    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+                    from_addr = os.environ.get("SMTP_FROM", smtp_user)
+                    to_addr   = nnode.target or os.environ.get("SMTP_TO", "")
+                    if to_addr:
+                        em = EmailMessage()
+                        em["Subject"] = "[ExoSync] Notification"
+                        em["From"]    = from_addr
+                        em["To"]      = to_addr
+                        em.set_content(msg)
+                        with smtplib.SMTP(smtp_host, smtp_port) as s:
+                            if smtp_user:
+                                s.starttls()
+                                s.login(smtp_user, smtp_pass)
+                            s.send_message(em)
+                        result.warnings.append(f"[NOTIFY email] Envoye a {to_addr}")
+                    else:
+                        result.warnings.append("[NOTIFY email] SMTP_TO non configure")
+                except Exception as exc:
+                    result.warnings.append(f"[NOTIFY email] Erreur envoi : {exc}")
+
+        elif nnode.channel == "webhook":
+            url = nnode.target
+            if not url:
+                result.warnings.append("[NOTIFY webhook] URL cible manquante")
+            else:
+                try:
+                    import urllib.request
+                    import json as _json
+                    payload = _json.dumps({"text": msg, "source": "ExoSync"}).encode()
+                    req = urllib.request.Request(
+                        url, data=payload,
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        result.warnings.append(f"[NOTIFY webhook] HTTP {resp.status}")
+                except Exception as exc:
+                    result.warnings.append(f"[NOTIFY webhook] Erreur : {exc}")
+
+
+# ─── M08 — Résilience ─────────────────────────────────────────────────────────
+
+LOG_SHEET_NAME = "_Log"
+LOG_MAX_ROWS   = 500   # nombre max de lignes conservées dans _Log
+
+
+def _write_log_sheet(wb, result: ExecutionResult) -> None:
+    """
+    Crée ou met à jour la feuille `_Log` dans le classeur avec les résultats
+    de l'exécution courante. Conserve les MAX_ROWS lignes les plus récentes.
+    """
+    from datetime import datetime as _dt
+    now = _dt.now().isoformat(timespec="seconds")
+
+    # Créer la feuille si absente
+    if LOG_SHEET_NAME not in wb.sheetnames:
+        ws = wb.create_sheet(LOG_SHEET_NAME)
+        ws.append(["timestamp", "niveau", "message"])
+    else:
+        ws = wb[LOG_SHEET_NAME]
+
+    # Ajouter les nouvelles lignes
+    for msg in result.errors:
+        ws.append([now, "ERROR", msg])
+    for msg in getattr(result, "warnings", []):
+        ws.append([now, "WARNING", msg])
+    for msg in result.skipped:
+        ws.append([now, "SKIP", msg])
+
+    # Résumé de run
+    ws.append([now, "INFO",
+               f"PULL={len(result.pulled)} PUSH={len(result.pushed)} "
+               f"BIND={len(result.bound)} err={len(result.errors)}"])
+
+    # Purge : ne garder que les LOG_MAX_ROWS dernières lignes de données
+    data_rows = ws.max_row - 1   # header = ligne 1
+    if data_rows > LOG_MAX_ROWS:
+        excess = data_rows - LOG_MAX_ROWS
+        ws.delete_rows(2, excess)
+
+
+def _safe_save(wb, filepath: Path) -> None:
+    """
+    Sauvegarde le classeur avec backup préalable (M08).
+    1. Copie filepath → filepath.bak (écrase le backup précédent)
+    2. Sauvegarde le classeur dans filepath
+    Si la sauvegarde échoue, le backup est conservé intact.
+    """
+    import shutil
+    backup = filepath.with_suffix(".bak")
+    if filepath.exists():
+        shutil.copy2(filepath, backup)
+    try:
+        wb.save(str(filepath))
+    except Exception:
+        # En cas d'échec, restaurer le backup
+        if backup.exists():
+            shutil.copy2(backup, filepath)
+        raise

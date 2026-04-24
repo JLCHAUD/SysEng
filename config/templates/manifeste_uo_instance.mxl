@@ -1,0 +1,34 @@
+# Template Manifeste — UO Instance
+# Copier cette feuille dans _Manifeste et adapter les valeurs {id}, {nom}
+
+MANIFESTE_V=1
+FILE_TYPE  uo_instance
+FILE_ID    {id}
+VERSION    1
+
+# ── Definition de la table des activites ─────────────────────────────────────
+DEF  $activites  GET_TABLE  Activites  TabActivites
+
+COL  $activites.id           type=str   header="ID Activite"
+COL  $activites.libelle      type=str   header="Libelle"
+COL  $activites.avancement   type=float header="% Avancement"  write=engineer
+COL  $activites.heures       type=float header="Heures"        write=engineer
+
+# ── Import depuis le store ────────────────────────────────────────────────────
+# PULL  $types_uo  FROM  ref.types_uo  INTO  TabTypesUO
+
+# ── Calculs ───────────────────────────────────────────────────────────────────
+DEF  $avancement_global  COMPUTE  MEAN_WEIGHTED($activites.avancement, $activites.heures)
+DEF  $total_heures       COMPUTE  SUM($activites.heures)
+
+# ── Validation ───────────────────────────────────────────────────────────────
+VALIDATE  $activites.avancement  :  RANGE(0, 100)
+VALIDATE  $activites.heures      :  NON_NEGATIVE
+VALIDATE  $activites.libelle     :  NOT_EMPTY
+
+# ── Export vers le store ──────────────────────────────────────────────────────
+PUSH  $avancement_global  TO  uo.{id}.avancement
+PUSH  $total_heures       TO  uo.{id}.heures_totales
+
+# ── Liaison Dashboard ─────────────────────────────────────────────────────────
+# BIND  $avancement_global  TO  Dashboard.AvancementGlobal

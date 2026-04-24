@@ -1,0 +1,19 @@
+# Template Manifeste — Cockpit / Consolidation
+
+MANIFESTE_V=1
+FILE_TYPE  cockpit
+FILE_ID    COCKPIT
+VERSION    1
+
+# ── Import des avancements UO ─────────────────────────────────────────────────
+# PULL  $av_uo001  FROM  uo.UO-001.avancement
+# PULL  $av_uo002  FROM  uo.UO-002.avancement
+
+# ── Calculs de consolidation ─────────────────────────────────────────────────
+# DEF  $avancement_moyen  COMPUTE  AVG($av_uo001, $av_uo002)
+
+# ── Export ───────────────────────────────────────────────────────────────────
+# PUSH  $avancement_moyen  TO  cockpit.avancement_global
+
+# ── Liaison Dashboard ─────────────────────────────────────────────────────────
+# BIND  $avancement_moyen  TO  Dashboard.AvancementGlobal
