@@ -95,6 +95,13 @@ class PullNode:
 
 
 @dataclass
+class ValidateNode:
+    var_ref: str            # "$activites.avancement"  ou  "$total_heures"
+    rule: str               # "RANGE(0, 100)" | "NOT_NULL" | "IN(...)" | ...
+    severity: str = "error" # "error" (bloquant) | "warning" (non bloquant)
+
+
+@dataclass
 class ParseError:
     line_num: int
     raw: str
@@ -109,6 +116,7 @@ class PasserelleAST:
     binds: List[BindNode] = field(default_factory=list)
     pushes: List[PushNode] = field(default_factory=list)
     pulls: List[PullNode] = field(default_factory=list)
+    validates: List[ValidateNode] = field(default_factory=list)
     errors: List[ParseError] = field(default_factory=list)
 
     # Index rapide : nom de variable → DefNode
@@ -296,6 +304,40 @@ def _parse_push(line: str) -> Optional[PushNode]:
     )
 
 
+def _parse_validate(line: str) -> Optional[ValidateNode]:
+    """
+    VALIDATE $table.col  : RULE
+    VALIDATE $table.col  : RULE  SEVERITY=warning
+
+    Règles supportées :
+      NOT_NULL, POSITIVE, NON_NEGATIVE, UNIQUE
+      RANGE(min, max)
+      IN("a", "b", ...)
+    """
+    m = re.match(
+        r'^VALIDATE\s+(\$[\w.]+)\s*:\s*(.+)$',
+        line.strip(), re.IGNORECASE,
+    )
+    if not m:
+        return None
+
+    var_ref  = m.group(1).strip()
+    rest     = m.group(2).strip()
+
+    # Extraire SEVERITY= en fin de ligne
+    severity = "error"
+    sev_m = re.search(r'\bSEVERITY\s*=\s*(\w+)', rest, re.IGNORECASE)
+    if sev_m:
+        severity = sev_m.group(1).lower()
+        rest = rest[:sev_m.start()].strip()
+
+    rule = rest.strip()
+    if not rule:
+        return None
+
+    return ValidateNode(var_ref=var_ref, rule=rule, severity=severity)
+
+
 def _parse_pull(line: str, anchor: str) -> Optional[PullNode]:
     """
     PULL global.var -> FILL_TABLE(sheet, table)  MODE=x [KEY=col]
@@ -397,6 +439,13 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
                 ast.pulls.append(node)
             else:
                 ast.errors.append(ParseError(line_num, instr, "Syntaxe PULL invalide"))
+
+        elif keyword == "VALIDATE":
+            node = _parse_validate(instr)
+            if node:
+                ast.validates.append(node)
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe VALIDATE invalide"))
 
         else:
             ast.errors.append(ParseError(line_num, instr,
