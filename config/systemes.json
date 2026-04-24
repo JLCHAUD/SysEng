@@ -1,0 +1,52 @@
+{
+  "climatisation": {
+    "name": "Climatisation",
+    "rex_prefill": [
+      "Vérifier conformité norme EN 13129 (qualité d'air en matériel roulant)",
+      "Coordonner avec fournisseur HVAC dès la phase d'analyse",
+      "Attention aux contraintes d'encombrement en toiture",
+      "Prévoir essais climatiques en chambre froide/chaude",
+      "Interface critique avec le système électrique (alimentation compresseurs)"
+    ]
+  },
+  "frein": {
+    "name": "Système de Freinage",
+    "rex_prefill": [
+      "Appliquer norme EN 15595 (freinage sur adhérence roue/rail)",
+      "Vérifier compatibilité avec le système de signalisation (frein d'urgence)",
+      "Documenter les distances de freinage pour chaque configuration de charge",
+      "Coordonner avec l'équipe sécurité pour analyse FMEA du système de frein",
+      "Prévoir essais de freinage d'urgence sur site"
+    ]
+  },
+  "eclairage": {
+    "name": "Éclairage",
+    "rex_prefill": [
+      "Respecter niveaux d'éclairement EN 13272 pour le matériel ferroviaire",
+      "Prévoir mode dégradé en cas de défaillance alimentation principale",
+      "Attention aux interférences électromagnétiques avec systèmes de signalisation",
+      "Valider rendu colorimétrique (IRC) pour confort voyageur",
+      "Intégrer éclairage de sécurité (issues de secours)"
+    ]
+  },
+  "portes": {
+    "name": "Système de Portes",
+    "rex_prefill": [
+      "Appliquer EN 14752 (systèmes d'accès latéral pour matériel roulant)",
+      "Définir procédure de condamnation manuelle des portes défaillantes",
+      "Vérifier détection d'obstacle (personnes coincées)",
+      "Coordonner avec le gestionnaire d'infrastructure pour les quais",
+      "Prévoir essais de cycles d'ouverture/fermeture (endurance)"
+    ]
+  },
+  "traction": {
+    "name": "Système de Traction",
+    "rex_prefill": [
+      "Vérifier compatibilité électromagnétique avec les systèmes de signalisation",
+      "Documenter les modes de récupération d'énergie au freinage",
+      "Coordonner avec le gestionnaire d'infrastructure (caténaire, rail de contact)",
+      "Analyser les transitoires de démarrage (appels de courant)",
+      "Prévoir protections contre surtensions et courts-circuits"
+    ]
+  }
+}

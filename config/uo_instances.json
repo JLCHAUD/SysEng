@@ -1,0 +1,67 @@
+[
+  {
+    "id": "UO-001",
+    "uo_type_id": "spec_fonctionnelle",
+    "system_id": "climatisation",
+    "project_id": "MI20_RATP",
+    "engineer_name": "Alice Dubois",
+    "total_hours": 32,
+    "start_date": "2026-04-01",
+    "end_date": "2026-05-30",
+    "statut": "EN_COURS",
+    "degrade": false,
+    "degrade_note": ""
+  },
+  {
+    "id": "UO-002",
+    "uo_type_id": "spec_systeme",
+    "system_id": "frein",
+    "project_id": "MI20_RATP",
+    "engineer_name": "Alice Dubois",
+    "total_hours": 48,
+    "start_date": "2026-04-15",
+    "end_date": "2026-06-30",
+    "statut": "BROUILLON",
+    "degrade": false,
+    "degrade_note": ""
+  },
+  {
+    "id": "UO-003",
+    "uo_type_id": "spec_technique",
+    "system_id": "portes",
+    "project_id": "MI20_RATP",
+    "engineer_name": "Bruno Lecomte",
+    "total_hours": 40,
+    "start_date": "2026-04-10",
+    "end_date": "2026-06-15",
+    "statut": "EN_COURS",
+    "degrade": false,
+    "degrade_note": ""
+  },
+  {
+    "id": "UO-004",
+    "uo_type_id": "dossier_justification",
+    "system_id": "eclairage",
+    "project_id": "RER_NG",
+    "engineer_name": "Bruno Lecomte",
+    "total_hours": 24,
+    "start_date": "2026-05-01",
+    "end_date": "2026-06-30",
+    "statut": "BROUILLON",
+    "degrade": true,
+    "degrade_note": "Phase analyse déjà réalisée sur projet précédent"
+  },
+  {
+    "id": "UO-005",
+    "uo_type_id": "spec_fonctionnelle",
+    "system_id": "traction",
+    "project_id": "RER_NG",
+    "engineer_name": "Camille Vidal",
+    "total_hours": 36,
+    "start_date": "2026-04-20",
+    "end_date": "2026-07-15",
+    "statut": "EN_COURS",
+    "degrade": false,
+    "degrade_note": ""
+  }
+]

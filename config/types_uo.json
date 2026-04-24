@@ -1,0 +1,60 @@
+{
+  "spec_fonctionnelle": {
+    "name": "Spécification Fonctionnelle",
+    "activities": [
+      {"id": "analyse_besoin", "name": "Analyse du besoin", "default_hours": 8},
+      {"id": "redaction_sf", "name": "Rédaction SF", "default_hours": 16},
+      {"id": "revue_interne", "name": "Revue interne", "default_hours": 4},
+      {"id": "integration_commentaires", "name": "Intégration commentaires", "default_hours": 4},
+      {"id": "validation_client", "name": "Validation client", "default_hours": 4}
+    ],
+    "deliverables": [
+      {"id": "sf_doc", "name": "Spécification Fonctionnelle"},
+      {"id": "cr_revue_sf", "name": "Compte-rendu de revue interne"},
+      {"id": "fiche_validation", "name": "Fiche de validation client"}
+    ]
+  },
+  "spec_systeme": {
+    "name": "Spécification Système",
+    "activities": [
+      {"id": "analyse_archi", "name": "Analyse architecture système", "default_hours": 12},
+      {"id": "redaction_ss", "name": "Rédaction SS", "default_hours": 20},
+      {"id": "allocation_exigences", "name": "Allocation des exigences", "default_hours": 8},
+      {"id": "revue_interne_ss", "name": "Revue interne", "default_hours": 4},
+      {"id": "integration_commentaires_ss", "name": "Intégration commentaires", "default_hours": 4}
+    ],
+    "deliverables": [
+      {"id": "ss_doc", "name": "Spécification Système"},
+      {"id": "matrice_exigences", "name": "Matrice d'allocation des exigences"},
+      {"id": "cr_revue_ss", "name": "Compte-rendu de revue"}
+    ]
+  },
+  "spec_technique": {
+    "name": "Spécification Technique",
+    "activities": [
+      {"id": "analyse_technique", "name": "Analyse technique", "default_hours": 10},
+      {"id": "redaction_st", "name": "Rédaction ST", "default_hours": 24},
+      {"id": "interface_fournisseur", "name": "Interface fournisseur", "default_hours": 8},
+      {"id": "revue_interne_st", "name": "Revue interne", "default_hours": 4},
+      {"id": "integration_commentaires_st", "name": "Intégration commentaires", "default_hours": 4}
+    ],
+    "deliverables": [
+      {"id": "st_doc", "name": "Spécification Technique"},
+      {"id": "icd_doc", "name": "Interface Control Document (ICD)"},
+      {"id": "cr_revue_st", "name": "Compte-rendu de revue"}
+    ]
+  },
+  "dossier_justification": {
+    "name": "Dossier de Justification",
+    "activities": [
+      {"id": "collecte_preuves", "name": "Collecte des preuves", "default_hours": 8},
+      {"id": "redaction_dj", "name": "Rédaction DJ", "default_hours": 16},
+      {"id": "analyse_conformite", "name": "Analyse de conformité", "default_hours": 8},
+      {"id": "revue_interne_dj", "name": "Revue interne", "default_hours": 4}
+    ],
+    "deliverables": [
+      {"id": "dj_doc", "name": "Dossier de Justification"},
+      {"id": "matrice_conformite", "name": "Matrice de conformité"}
+    ]
+  }
+}

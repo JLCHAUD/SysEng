@@ -1,0 +1,131 @@
+{
+  "version": "1",
+  "fichiers": [
+    {
+      "id": "REF-TYPE-SF",
+      "type_fichier": "referentiel_uo",
+      "chemin": "referentiels/UO_Generique_spec_fonctionnelle.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "REF-TYPE-SS",
+      "type_fichier": "referentiel_uo",
+      "chemin": "referentiels/UO_Generique_spec_systeme.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "REF-TYPE-ST",
+      "type_fichier": "referentiel_uo",
+      "chemin": "referentiels/UO_Generique_spec_technique.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "REF-PROJ-MI20",
+      "type_fichier": "referentiel_projet",
+      "chemin": "referentiels/Projet_MI20_RATP.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "REF-PROJ-RENG",
+      "type_fichier": "referentiel_projet",
+      "chemin": "referentiels/Projet_RER_NG.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "UO-001",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/UO-001_spec_fonctionnelle_climatisation.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": "2026-04-17T16:00:16",
+      "statut_dernier_synchro": "ok",
+      "genere_par_script": true
+    },
+    {
+      "id": "UO-002",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/UO-002_spec_systeme_frein.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "UO-003",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/UO-003_spec_technique_portes.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "UO-004",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/UO-004_dossier_justification_eclairage.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "UO-005",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/UO-005_spec_fonctionnelle_traction.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "COCKPIT-ALICE",
+      "type_fichier": "cockpit",
+      "chemin": "output/cockpits/Cockpit_Alice_Dubois.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "COCKPIT-BRUNO",
+      "type_fichier": "cockpit",
+      "chemin": "output/cockpits/Cockpit_Bruno_Lecomte.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "COCKPIT-CAMILLE",
+      "type_fichier": "cockpit",
+      "chemin": "output/cockpits/Cockpit_Camille_Vidal.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    },
+    {
+      "id": "CONSOLIDATION",
+      "type_fichier": "consolidation",
+      "chemin": "output/consolidation.xlsx",
+      "synchro_periodicite": "quotidien",
+      "derniere_synchro": null,
+      "statut_dernier_synchro": null,
+      "genere_par_script": true
+    }
+  ]
+}

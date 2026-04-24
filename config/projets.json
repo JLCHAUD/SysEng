@@ -1,0 +1,24 @@
+{
+  "MI20_RATP": {
+    "name": "Métro MI20 RATP",
+    "actors": [
+      {"name": "Pierre Lefebvre", "role": "Chef de Projet", "email": "p.lefebvre@corp.fr"},
+      {"name": "Marie Martin", "role": "Responsable Technique", "email": "m.martin@corp.fr"},
+      {"name": "Jean-Luc Bernard", "role": "Pilote Technique IS", "email": "jl.bernard@corp.fr"},
+      {"name": "Sophie Durand", "role": "Expert Sécurité", "email": "s.durand@corp.fr"},
+      {"name": "Thomas Petit", "role": "Expert EMC", "email": "t.petit@corp.fr"},
+      {"name": "Claire Rousseau", "role": "Représentant Client RATP", "email": "c.rousseau@ratp.fr"},
+      {"name": "Marc Fontaine", "role": "Expert Fournisseur HVAC", "email": "m.fontaine@fournisseur.fr"}
+    ]
+  },
+  "RER_NG": {
+    "name": "RER Nouvelle Génération",
+    "actors": [
+      {"name": "Isabelle Moreau", "role": "Chef de Projet", "email": "i.moreau@corp.fr"},
+      {"name": "François Leroy", "role": "Responsable Technique", "email": "f.leroy@corp.fr"},
+      {"name": "Nathalie Simon", "role": "Pilote Technique IS", "email": "n.simon@corp.fr"},
+      {"name": "David Laurent", "role": "Expert Sécurité", "email": "d.laurent@corp.fr"},
+      {"name": "Hélène Michel", "role": "Représentant Client SNCF", "email": "h.michel@sncf.fr"}
+    ]
+  }
+}

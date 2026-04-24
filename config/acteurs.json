@@ -1,0 +1,74 @@
+[
+  {
+    "id": "USR001",
+    "nom": "Alice Dubois",
+    "role": "ingenieur_sys",
+    "filtre_type": "ingenieur",
+    "filtre_valeur": "Alice Dubois",
+    "acces": "read/write",
+    "email": "a.dubois@corp.fr"
+  },
+  {
+    "id": "USR002",
+    "nom": "Bruno Lecomte",
+    "role": "ingenieur_sys",
+    "filtre_type": "ingenieur",
+    "filtre_valeur": "Bruno Lecomte",
+    "acces": "read/write",
+    "email": "b.lecomte@corp.fr"
+  },
+  {
+    "id": "USR003",
+    "nom": "Camille Vidal",
+    "role": "ingenieur_sys",
+    "filtre_type": "ingenieur",
+    "filtre_valeur": "Camille Vidal",
+    "acces": "read/write",
+    "email": "c.vidal@corp.fr"
+  },
+  {
+    "id": "USR004",
+    "nom": "Jean-Luc Bernard",
+    "role": "pilote_tech",
+    "filtre_type": "ingenieur",
+    "filtre_valeur": "Alice Dubois,Bruno Lecomte,Camille Vidal",
+    "acces": "read",
+    "email": "jl.bernard@corp.fr"
+  },
+  {
+    "id": "USR005",
+    "nom": "Pierre Legrand",
+    "role": "engagement_mgr",
+    "filtre_type": "ALL",
+    "filtre_valeur": "ALL",
+    "acces": "read",
+    "email": "p.legrand@corp.fr"
+  },
+  {
+    "id": "USR006",
+    "nom": "Admin IT",
+    "role": "it_manager",
+    "filtre_type": "ALL",
+    "filtre_valeur": "ALL",
+    "acces": "admin",
+    "email": "it@corp.fr"
+  },
+  {
+    "id": "USR007",
+    "nom": "Claire Rousseau",
+    "role": "pilote_tech_client",
+    "filtre_type": "projet",
+    "filtre_valeur": "MI20_RATP",
+    "acces": "read_filtered",
+    "email": "c.rousseau@ratp.fr"
+  },
+  {
+    "id": "USR008",
+    "nom": "Donneur Ordre RATP",
+    "role": "donneur_ordre",
+    "filtre_type": "projet",
+    "filtre_valeur": "MI20_RATP",
+    "acces": "read_summary",
+    "email": "do@ratp.fr"
+  }
+]

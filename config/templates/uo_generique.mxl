@@ -1,0 +1,92 @@
+# ============================================================
+# TEMPLATE : uo_generique.mxl
+# ExoSync — Manifest Exchange Language
+# Version : 1.0 — 2026-04-24
+#
+# Template de base pour tous les fichiers de type uo_instance.
+# Chaque feuille _Manifeste d'une UO peut déclarer :
+#   EXTENDS uo_generique
+# pour hériter de ce template et n'écrire que ses spécificités.
+#
+# Variables substituées depuis l'en-tête de l'enfant :
+#   {{FILE_ID}}  → identifiant unique de l'UO (ex: UO-001)
+#   {{DOC}}      → description libre du fichier
+# ============================================================
+
+FILE_TYPE: uo_instance
+FILE_ID:   {{FILE_ID}}
+VERSION:   1
+DOC:       {{DOC}}
+
+# ─── IMPORTS ──────────────────────────────────────────────
+# Importe la liste des acteurs projet dans la feuille Organisation
+PULL projet.acteurs -> FILL_TABLE(Organisation Projet, TabActeurs) MODE=OVERWRITE
+
+# Importe les activités types depuis le référentiel
+# (n'ajoute que les nouvelles, ne touche pas à celles déjà saisies)
+PULL ref.activites_type -> FILL_TABLE(Activites, TabActivites) MODE=APPEND_NEW KEY=id
+
+# ─── LECTURE LOCALE ───────────────────────────────────────
+# Charge les tables depuis ce fichier Excel
+DEF $activites = GET_TABLE(Activites, TabActivites)
+
+# ─── FILTRAGES ────────────────────────────────────────────
+# Sous-ensembles utiles pour les calculs
+# (les activités en cours = non clôturées)
+DEF $actives   = COMPUTE(FILTER($activites, statut != "CLOTUREE"))
+DEF $cloturees = COMPUTE(FILTER($activites, statut = "CLOTUREE"))
+
+# ─── CALCULS ──────────────────────────────────────────────
+# Avancement pondéré par les heures (sur actives uniquement)
+DEF $avancement_global  = COMPUTE(MEAN_WEIGHTED($actives.avancement, $actives.heures))
+# Avancement brut (toutes activités, y compris clôturées)
+DEF $avancement_reel    = COMPUTE(MEAN_WEIGHTED($activites.avancement, $activites.heures))
+# Charge totale
+DEF $total_heures       = COMPUTE(SUM($activites.heures))
+DEF $heures_actives     = COMPUTE(SUM($actives.heures))
+# Comptages
+DEF $nb_total           = COMPUTE(COUNT($activites.id))
+DEF $nb_cloturees       = COMPUTE(COUNT($cloturees.id))
+DEF $taux_cloture       = COMPUTE(DIV($nb_cloturees, $nb_total))
+
+# ─── STATUTS VISUELS ──────────────────────────────────────
+# Feu tricolore standard (rouge < 30%, orange < 70%, vert >= 70%)
+DEF $statut_global = COMPUTE(TRAFFIC_LIGHT($avancement_global, warn=30, ok=70))
+
+# ─── VALIDATION QUALITE ───────────────────────────────────
+VALIDATE $activites.avancement : RANGE(0, 100)
+VALIDATE $activites.id         : NOT_NULL
+VALIDATE $activites.statut     : IN("EN_COURS", "CLOTUREE", "SUSPENDUE", "EN_ATTENTE")
+VALIDATE $total_heures         : NON_NEGATIVE  SEVERITY=warning
+
+# ─── DÉFINITION DES COLONNES ──────────────────────────────
+COL $activites.id              : KEY    HEADER="ID"
+COL $activites.libelle         : DATA   WRITE=creation      HEADER="Libellé"
+COL $activites.type_activite   : DATA   WRITE=creation      HEADER="Type"
+COL $activites.avancement      : DATA   WRITE=engineer      HEADER="% Avancement"
+COL $activites.heures          : DATA   WRITE=creation      HEADER="Heures allouées"
+COL $activites.heures_realisees: DATA   WRITE=engineer      HEADER="Heures réalisées"
+COL $activites.statut          : DATA   WRITE=engineer      HEADER="Statut"
+COL $activites.commentaire     : DATA   WRITE=engineer      HEADER="Commentaire"    OPTIONAL
+
+# ─── LIAISONS DASHBOARD ───────────────────────────────────
+BIND $avancement_global  -> Dashboard.avancement_global
+BIND $avancement_reel    -> Dashboard.avancement_reel
+BIND $total_heures       -> Dashboard.total_heures
+BIND $heures_actives     -> Dashboard.heures_actives
+BIND $nb_total           -> Dashboard.nb_activites
+BIND $nb_cloturees       -> Dashboard.nb_cloturees
+BIND $taux_cloture       -> Dashboard.taux_cloture
+BIND $statut_global      -> Dashboard.statut_global
+
+# ─── EXPORTS VERS L'ÉCOSYSTÈME ────────────────────────────
+# Exporte les résultats vers le store central
+# {{FILE_ID}} est substitué par l'ID réel de l'UO (ex: UO-001)
+PUSH $avancement_global  -> uo.{{FILE_ID}}.avancement_global  ONLY_IF $total_heures > 0
+PUSH $avancement_reel    -> uo.{{FILE_ID}}.avancement_reel
+PUSH $total_heures       -> uo.{{FILE_ID}}.total_heures
+PUSH $heures_actives     -> uo.{{FILE_ID}}.heures_actives
+PUSH $nb_total           -> uo.{{FILE_ID}}.nb_activites
+PUSH $nb_cloturees       -> uo.{{FILE_ID}}.nb_cloturees
+PUSH $taux_cloture       -> uo.{{FILE_ID}}.taux_cloture
+PUSH $statut_global      -> uo.{{FILE_ID}}.statut             ONLY_IF $total_heures > 0
