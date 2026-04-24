@@ -35,20 +35,29 @@ from src.parser import PasserelleAST, PullNode, DefNode, BindNode, PushNode
 
 @dataclass
 class ExecutionResult:
-    pushed:  List[str] = field(default_factory=list)   # clés store mises à jour
-    pulled:  List[str] = field(default_factory=list)   # tables Excel mises à jour
-    bound:   List[str] = field(default_factory=list)   # plages nommées écrites
-    errors:  List[str] = field(default_factory=list)   # erreurs non bloquantes
-    skipped: List[str] = field(default_factory=list)   # instructions ignorées
+    pushed:   List[str] = field(default_factory=list)  # clés store mises à jour
+    pulled:   List[str] = field(default_factory=list)  # tables Excel mises à jour
+    bound:    List[str] = field(default_factory=list)  # plages nommées écrites
+    errors:   List[str] = field(default_factory=list)  # erreurs (SEVERITY=error)
+    warnings: List[str] = field(default_factory=list)  # avertissements (SEVERITY=warning)
+    skipped:  List[str] = field(default_factory=list)  # instructions ignorées
+
+    @property
+    def has_blocking_errors(self) -> bool:
+        """True si des erreurs de validation bloquantes ont été détectées."""
+        return bool(self.errors)
 
     def summary(self) -> str:
         lines = [
-            f"PULL  : {len(self.pulled)} table(s) mise(s) à jour",
-            f"PUSH  : {len(self.pushed)} variable(s) publiée(s)",
-            f"BIND  : {len(self.bound)} plage(s) écrite(s)",
-            f"Skip  : {len(self.skipped)}",
-            f"Erreur: {len(self.errors)}",
+            f"PULL    : {len(self.pulled)} table(s) mise(s) à jour",
+            f"PUSH    : {len(self.pushed)} variable(s) publiée(s)",
+            f"BIND    : {len(self.bound)} plage(s) écrite(s)",
+            f"Skip    : {len(self.skipped)}",
+            f"Warning : {len(self.warnings)}",
+            f"Erreur  : {len(self.errors)}",
         ]
+        if self.warnings:
+            lines += [f"  ⚡ {w}" for w in self.warnings]
         if self.errors:
             lines += [f"  ⚠ {e}" for e in self.errors]
         return "\n".join(lines)
@@ -671,6 +680,119 @@ def execute_computes(ast: PasserelleAST, wb,
     return ctx
 
 
+# ─── Phase 2b — VALIDATE ─────────────────────────────────────────────────────
+
+def _validate_rule(rule: str, values: List[Any]) -> List[str]:
+    """
+    Applique une règle à une liste de valeurs.
+    Retourne la liste des messages de violation (vide = OK).
+    """
+    rule = rule.strip()
+    violations: List[str] = []
+
+    # ── NOT_NULL ────────────────────────────────────────────────────────────
+    if rule.upper() == "NOT_NULL":
+        nulls = [i for i, v in enumerate(values) if v is None]
+        if nulls:
+            violations.append(
+                f"NOT_NULL : {len(nulls)} valeur(s) nulle(s) (lignes {nulls[:5]}{'…' if len(nulls)>5 else ''})"
+            )
+
+    # ── POSITIVE ────────────────────────────────────────────────────────────
+    elif rule.upper() == "POSITIVE":
+        bad = [v for v in values if v is None or v <= 0]
+        if bad:
+            violations.append(f"POSITIVE : {len(bad)} valeur(s) <= 0 ({bad[:3]})")
+
+    # ── NON_NEGATIVE ────────────────────────────────────────────────────────
+    elif rule.upper() == "NON_NEGATIVE":
+        bad = [v for v in values if v is None or v < 0]
+        if bad:
+            violations.append(f"NON_NEGATIVE : {len(bad)} valeur(s) < 0 ({bad[:3]})")
+
+    # ── UNIQUE ──────────────────────────────────────────────────────────────
+    elif rule.upper() == "UNIQUE":
+        seen: set = set()
+        dupes = []
+        for v in values:
+            if v is not None:
+                key = str(v)
+                if key in seen:
+                    dupes.append(v)
+                seen.add(key)
+        if dupes:
+            violations.append(f"UNIQUE : {len(dupes)} doublon(s) ({dupes[:3]})")
+
+    # ── RANGE(min, max) ─────────────────────────────────────────────────────
+    elif rule.upper().startswith("RANGE("):
+        m = re.match(r'RANGE\(\s*([\d.+-]+)\s*,\s*([\d.+-]+)\s*\)', rule, re.IGNORECASE)
+        if m:
+            lo, hi = float(m.group(1)), float(m.group(2))
+            bad = [v for v in values if v is None or not (lo <= v <= hi)]
+            if bad:
+                violations.append(
+                    f"RANGE({lo},{hi}) : {len(bad)} valeur(s) hors plage ({bad[:3]})"
+                )
+
+    # ── IN("a", "b", ...) ───────────────────────────────────────────────────
+    elif rule.upper().startswith("IN("):
+        inner = rule[len("IN("):-1]
+        allowed = {s.strip().strip('"').strip("'") for s in inner.split(",")}
+        bad = [v for v in values if str(v) not in allowed]
+        if bad:
+            violations.append(
+                f"IN({', '.join(sorted(allowed))}) : {len(bad)} valeur(s) non autorisée(s) ({bad[:3]})"
+            )
+
+    else:
+        violations.append(f"Règle inconnue : '{rule}'")
+
+    return violations
+
+
+def execute_validates(ast: "PasserelleAST", ctx: Dict[str, Any],
+                      result: ExecutionResult) -> None:
+    """
+    Phase 2b — Vérifie les règles VALIDATE sur les variables du contexte.
+
+    - SEVERITY=error   → violation ajoutée à result.errors
+    - SEVERITY=warning → violation ajoutée à result.warnings
+    Le sync continue dans les deux cas ; c'est l'appelant qui décide d'aborter.
+    """
+    for vnode in ast.validates:
+        ref = vnode.var_ref    # ex: "$activites.avancement" ou "$total_heures"
+
+        # Résoudre : colonne de table ou scalaire
+        if "." in ref:
+            # Référence de colonne : $table.col
+            table_var, col_name = ref.split(".", 1)
+            table = ctx.get(table_var)
+            if table is None:
+                result.errors.append(
+                    f"VALIDATE {ref} — variable '{table_var}' non définie"
+                )
+                continue
+            if not isinstance(table, list):
+                result.errors.append(
+                    f"VALIDATE {ref} — '{table_var}' n'est pas une table"
+                )
+                continue
+            values = [row.get(col_name) for row in table]
+        else:
+            # Scalaire : $total_heures
+            val = ctx.get(ref)
+            values = [val]
+
+        # Appliquer la règle
+        violations = _validate_rule(vnode.rule, values)
+        for msg in violations:
+            full_msg = f"VALIDATE {ref} : {msg}"
+            if vnode.severity == "warning":
+                result.warnings.append(full_msg)
+            else:
+                result.errors.append(full_msg)
+
+
 # ─── Phase 3 — PUSH ───────────────────────────────────────────────────────────
 
 def execute_pushes(ast: PasserelleAST, ctx: Dict[str, Any],
@@ -777,6 +899,9 @@ def execute_ast(
 
         # Phase 2 — COMPUTE
         ctx = execute_computes(ast, wb, result)
+
+        # Phase 2b — VALIDATE
+        execute_validates(ast, ctx, result)
 
         # Phase 3 — PUSH
         execute_pushes(ast, ctx, store, result)
