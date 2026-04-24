@@ -14,8 +14,10 @@ from typing import List, Optional
 
 from src import store as Store
 from src.config_loader import load_registre, save_registre
+from src.executor import execute_ast
 from src.models import EntreeRegistre
-from src.passerelle import executer_passerelle
+from src.parser import parse_file
+from src.passerelle import executer_passerelle  # conservé pour rétro-compat
 
 ROOT = Path(__file__).parent.parent
 
@@ -102,8 +104,26 @@ def _sync_fichier(entree: EntreeRegistre, force: bool = False) -> dict:
         return resultat
 
     try:
-        pushed = executer_passerelle(chemin, entree.id, log)
-        log.append(f"[OK] {len(pushed)} variable(s) synchronisée(s)")
+        ast = parse_file(chemin)
+        if ast is None:
+            # Pas de feuille _Passerelle → fallback ancien moteur
+            pushed = executer_passerelle(chemin, entree.id, log)
+            log.append(f"[OK] {len(pushed)} variable(s) synchronisée(s) (passerelle)")
+        else:
+            if ast.errors:
+                for err in ast.errors:
+                    log.append(f"[WARN] Parse L{err.line_num}: {err.message}")
+            exec_result = execute_ast(ast, chemin, Store)
+            log.extend(exec_result.errors)
+            log.append(
+                f"[OK] PULL={len(exec_result.pulled)} "
+                f"PUSH={len(exec_result.pushed)} "
+                f"BIND={len(exec_result.bound)} "
+                f"skip={len(exec_result.skipped)} "
+                f"err={len(exec_result.errors)}"
+            )
+            if exec_result.errors:
+                resultat["statut"] = "erreur"
     except Exception as e:
         resultat["statut"] = "erreur"
         log.append(f"[ERREUR] Exception inattendue : {e}")
