@@ -108,6 +108,15 @@ class ValidateNode:
 
 
 @dataclass
+class NotifyNode:
+    """Instruction NOTIFY — envoie une alerte conditionnelle."""
+    channel: str         # "log" | "email" | "webhook"
+    message: str         # message MXL (peut contenir $variables)
+    condition: str = ""  # condition MXL — vide = toujours notifier
+    target: str = ""     # adresse email ou URL webhook
+
+
+@dataclass
 class ParseError:
     line_num: int
     raw: str
@@ -124,6 +133,7 @@ class PasserelleAST:
     pushes: List[PushNode] = field(default_factory=list)
     pulls: List[PullNode] = field(default_factory=list)
     validates: List[ValidateNode] = field(default_factory=list)
+    notifies: List[NotifyNode] = field(default_factory=list)
     errors: List[ParseError] = field(default_factory=list)
 
     # Index rapide : nom de variable → DefNode
@@ -347,6 +357,42 @@ def _parse_validate(line: str) -> Optional[ValidateNode]:
     return ValidateNode(var_ref=var_ref, rule=rule, severity=severity)
 
 
+def _parse_notify(line: str) -> Optional["NotifyNode"]:
+    """
+    NOTIFY  log   "message"
+    NOTIFY  log   "message"  IF $var > seuil
+    NOTIFY  email "message"  TO addr@example.com  IF $var > seuil
+    NOTIFY  webhook "message"  TO https://...  IF $var > seuil
+    """
+    m = re.match(
+        r'^NOTIFY\s+(log|email|webhook)\s+"([^"]+)"(.*)$',
+        line.strip(), re.IGNORECASE,
+    )
+    if not m:
+        return None
+
+    channel = m.group(1).lower()
+    message = m.group(2)
+    rest    = m.group(3).strip()
+
+    condition = ""
+    target    = ""
+
+    # Extraire TO ...
+    to_m = re.search(r'\bTO\s+(\S+)', rest, re.IGNORECASE)
+    if to_m:
+        target = to_m.group(1)
+        rest   = rest[:to_m.start()].strip() + rest[to_m.end():].strip()
+
+    # Extraire IF ...
+    if_m = re.search(r'\bIF\s+(.+)$', rest, re.IGNORECASE)
+    if if_m:
+        condition = if_m.group(1).strip()
+
+    return NotifyNode(channel=channel, message=message,
+                      condition=condition, target=target)
+
+
 def _parse_pull(line: str, anchor: str) -> Optional[PullNode]:
     """
     PULL global.var -> FILL_TABLE(sheet, table)  MODE=x [KEY=col]
@@ -463,6 +509,13 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
                 ast.extends = ExtendsNode(template_name=parts[1].strip())
             else:
                 ast.errors.append(ParseError(line_num, instr, "Syntaxe EXTENDS invalide"))
+
+        elif keyword == "NOTIFY":
+            node = _parse_notify(instr)
+            if node:
+                ast.notifies.append(node)
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe NOTIFY invalide"))
 
         else:
             ast.errors.append(ParseError(line_num, instr,

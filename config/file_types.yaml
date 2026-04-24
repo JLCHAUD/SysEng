@@ -1,0 +1,103 @@
+# ExoSync — Registre des types de fichiers (M05)
+# Chaque type définit les feuilles attendues, le template MXL associé,
+# et les namespaces store autorisés.
+
+file_types:
+
+  uo_instance:
+    label: "Unite d Oeuvre (instance)"
+    description: "Feuille de suivi d une UO de l ingenierie"
+    template: "config/templates/manifeste_uo_instance.mxl"
+    required_sheets:
+      - _Manifeste
+      - Activites
+    optional_sheets:
+      - Dashboard
+      - _Log
+    allowed_namespaces:
+      - "uo."
+      - "ref."
+      - "projet."
+    push_prefix: "uo.{id}."
+
+  referentiel_uo:
+    label: "Referentiel des UO"
+    description: "Tables de reference communes a toutes les UO"
+    template: "config/templates/manifeste_referentiel_uo.mxl"
+    required_sheets:
+      - _Manifeste
+      - TypesUO
+    optional_sheets:
+      - _Log
+    allowed_namespaces:
+      - "ref."
+    push_prefix: "ref."
+
+  referentiel_projet:
+    label: "Referentiel projet"
+    description: "Donnees de reference du projet (acteurs, systemes...)"
+    template: "config/templates/manifeste_referentiel_projet.mxl"
+    required_sheets:
+      - _Manifeste
+    optional_sheets:
+      - _Log
+    allowed_namespaces:
+      - "projet."
+    push_prefix: "projet."
+
+  cockpit:
+    label: "Cockpit de pilotage"
+    description: "Tableau de bord consolide"
+    template: "config/templates/manifeste_cockpit.mxl"
+    required_sheets:
+      - _Manifeste
+      - Dashboard
+    optional_sheets:
+      - _Log
+    allowed_namespaces:
+      - "cockpit."
+      - "uo."
+      - "projet."
+      - "ref."
+    push_prefix: "cockpit."
+
+  pilote:
+    label: "Fiche pilote"
+    description: "Vue pilote d une UO ou d un systeme"
+    template: "config/templates/manifeste_uo_instance.mxl"
+    required_sheets:
+      - _Manifeste
+    optional_sheets:
+      - Dashboard
+      - _Log
+    allowed_namespaces:
+      - "pilote."
+      - "uo."
+    push_prefix: "pilote."
+
+  consolidation:
+    label: "Consolidation"
+    description: "Agregation multi-UO ou multi-projet"
+    template: "config/templates/manifeste_cockpit.mxl"
+    required_sheets:
+      - _Manifeste
+    optional_sheets:
+      - _Log
+    allowed_namespaces:
+      - "consolidation."
+      - "uo."
+      - "cockpit."
+    push_prefix: "consolidation."
+
+  client:
+    label: "Vue client"
+    description: "Livrable client extrait de l ecosysteme"
+    template: "config/templates/manifeste_uo_instance.mxl"
+    required_sheets:
+      - _Manifeste
+    optional_sheets:
+      - _Log
+    allowed_namespaces:
+      - "client."
+      - "uo."
+    push_prefix: "client."

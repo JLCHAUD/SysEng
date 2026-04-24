@@ -210,8 +210,170 @@ def cmd_generate(args: argparse.Namespace) -> int:
             errors.append(uo.id)
 
     print()
-    print(f"  {len(generated)} fichier(s) généré(s), {len(errors)} erreur(s)")
+    print(f"  {len(generated)} fichier(s) genere(s), {len(errors)} erreur(s)")
     return 0 if not errors else 1
+
+
+# ─── Commande : doctor ────────────────────────────────────────────────────────
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnostique la sante de l'ecosysteme ExoSync."""
+    from src.store import DEFAULT_STORE_PATH, JsonStore
+    from src.ecosystem import ECOSYSTEM_PATH, load as eco_load, check_consistency
+    from src.config_loader import load_registre
+    from src.history import list_runs, list_snapshots
+    from pathlib import Path
+
+    _header("ExoSync — Doctor (diagnostic)")
+    ok_count = 0
+    warn_count = 0
+    err_count = 0
+
+    # ── Store ────────────────────────────────────────────────────────────────
+    print("\n  [Store]")
+    if DEFAULT_STORE_PATH.exists():
+        store = JsonStore(DEFAULT_STORE_PATH)
+        nb = len(store.get_all())
+        _ok(f"store.json present ({nb} variables)")
+        ok_count += 1
+    else:
+        _warn("store.json absent (aucune sync effectuee ?)")
+        warn_count += 1
+
+    # ── Ecosystem ────────────────────────────────────────────────────────────
+    print("\n  [Ecosysteme]")
+    if ECOSYSTEM_PATH.exists():
+        schema = eco_load()
+        _ok(f"ecosystem.json present ({len(schema.files)} fichiers, {len(schema.edges)} arcs)")
+        ok_count += 1
+        warnings = check_consistency()
+        if warnings:
+            for w in warnings:
+                _warn(f"[{w.code}] {w.message}")
+                warn_count += 1
+        else:
+            _ok("Aucune incoherence detectee")
+            ok_count += 1
+    else:
+        _warn("ecosystem.json absent")
+        warn_count += 1
+
+    # ── Registre ─────────────────────────────────────────────────────────────
+    print("\n  [Registre]")
+    try:
+        entrees = load_registre()
+        _ok(f"registre.json : {len(entrees)} entree(s)")
+        ok_count += 1
+        for e in entrees:
+            chemin = ROOT / e.chemin
+            if not chemin.exists():
+                _err(f"Fichier manquant : {e.chemin} ({e.id})")
+                err_count += 1
+            elif e.statut_dernier_synchro == "erreur":
+                _warn(f"{e.id} : derniere sync en erreur")
+                warn_count += 1
+    except Exception as exc:
+        _err(f"Impossible de lire le registre : {exc}")
+        err_count += 1
+
+    # ── Historique ───────────────────────────────────────────────────────────
+    print("\n  [Historique]")
+    runs = list_runs()
+    snaps = list_snapshots()
+    _ok(f"{len(runs)} run(s) en historique, {len(snaps)} snapshot(s)")
+    ok_count += 1
+
+    # ── Résumé ───────────────────────────────────────────────────────────────
+    print(f"\n  {'─'*40}")
+    print(f"  OK={ok_count}  WARN={warn_count}  ERR={err_count}")
+
+    if err_count > 0:
+        return 2
+    if warn_count > 0:
+        return 1
+    return 0
+
+
+# ─── Commande : history ───────────────────────────────────────────────────────
+
+def cmd_history(args: argparse.Namespace) -> int:
+    """Affiche l'historique des runs et snapshots."""
+    from src.history import list_runs, list_snapshots, compare_snapshots, history_of_key
+    import json as _json
+
+    if args.key:
+        # Historique d'une cle specifique
+        _header(f"Historique de la cle : {args.key}")
+        vals = history_of_key(args.key)
+        if not vals:
+            print("  Aucun snapshot trouve.")
+            return 0
+        for ts, v in vals:
+            print(f"  {ts}  =  {v!r}")
+        return 0
+
+    if args.compare:
+        # Comparer deux snapshots
+        snaps = list_snapshots()
+        if len(snaps) < 2:
+            _err("Il faut au moins 2 snapshots pour comparer.")
+            return 1
+        a, b = snaps[1], snaps[0]
+        _header(f"Comparaison snapshots")
+        print(f"  Avant  : {a.name}")
+        print(f"  Apres  : {b.name}")
+        diff = compare_snapshots(a, b)
+        if diff["ajouts"]:
+            print(f"\n  Ajouts ({len(diff['ajouts'])}) :")
+            for k, v in diff["ajouts"].items():
+                print(f"    + {k} = {v!r}")
+        if diff["suppressions"]:
+            print(f"\n  Suppressions ({len(diff['suppressions'])}) :")
+            for k, v in diff["suppressions"].items():
+                print(f"    - {k} = {v!r}")
+        if diff["modifications"]:
+            print(f"\n  Modifications ({len(diff['modifications'])}) :")
+            for k, d in diff["modifications"].items():
+                print(f"    ~ {k} : {d['avant']!r} -> {d['apres']!r}")
+        print(f"\n  Inchanges : {diff['inchanges']}")
+        return 0
+
+    # Liste des runs
+    _header("ExoSync — Historique des runs")
+    runs = list_runs()
+    snaps = list_snapshots()
+    print(f"  Runs      : {len(runs)}")
+    print(f"  Snapshots : {len(snaps)}")
+
+    n = min(args.last or 10, len(runs))
+    if runs:
+        print(f"\n  Derniers {n} run(s) :")
+        for r in runs[:n]:
+            print(f"    {r.name}")
+
+    return 0
+
+
+# ─── Commande : doc ──────────────────────────────────────────────────────────
+
+def cmd_doc(args: argparse.Namespace) -> int:
+    """Genere la documentation HTML de l ecosysteme."""
+    from src.doc_generator import generate_html_doc
+
+    _header("ExoSync — Generation documentation HTML")
+    output_dir = Path(args.output) if args.output else None
+
+    try:
+        out = generate_html_doc(output_dir=output_dir)
+        try:
+            display = out.relative_to(ROOT)
+        except ValueError:
+            display = out
+        _ok(f"Documentation generee : {display}")
+        return 0
+    except Exception as exc:
+        _err(f"Erreur : {exc}")
+        return 1
 
 
 # ─── Parseur argparse ─────────────────────────────────────────────────────────
@@ -290,14 +452,39 @@ exemples :
     )
 
     # ── generate ──────────────────────────────────────────────────────────────
-    p_gen = sub.add_parser("generate", help="Génère les fichiers Excel UO")
+    p_gen = sub.add_parser("generate", help="Genere les fichiers Excel UO")
     p_gen.add_argument(
         "--id", nargs="+", metavar="ID",
-        help="IDs des UO à générer (génère tout si absent)"
+        help="IDs des UO a generer (genere tout si absent)"
     )
     p_gen.add_argument(
         "--output", metavar="DIR",
-        help="Répertoire de sortie (défaut: output/UOs/)"
+        help="Repertoire de sortie (defaut: output/UOs/)"
+    )
+
+    # ── doctor ────────────────────────────────────────────────────────────────
+    sub.add_parser("doctor", help="Diagnostique la sante de l ecosysteme")
+
+    # ── doc ───────────────────────────────────────────────────────────────────
+    p_doc = sub.add_parser("doc", help="Genere la documentation HTML de l ecosysteme")
+    p_doc.add_argument(
+        "--output", metavar="DIR",
+        help="Repertoire de sortie (defaut: output/doc/)"
+    )
+
+    # ── history ───────────────────────────────────────────────────────────────
+    p_hist = sub.add_parser("history", help="Historique des runs et snapshots")
+    p_hist.add_argument(
+        "--last", type=int, default=10, metavar="N",
+        help="Nombre de runs a afficher (defaut: 10)"
+    )
+    p_hist.add_argument(
+        "--compare", action="store_true",
+        help="Compare les 2 derniers snapshots"
+    )
+    p_hist.add_argument(
+        "--key", metavar="CLE",
+        help="Historique d une cle specifique dans les snapshots"
     )
 
     return parser
@@ -330,6 +517,15 @@ def main(argv=None) -> int:
 
     if args.command == "generate":
         return cmd_generate(args)
+
+    if args.command == "doctor":
+        return cmd_doctor(args)
+
+    if args.command == "history":
+        return cmd_history(args)
+
+    if args.command == "doc":
+        return cmd_doc(args)
 
     parser.print_help()
     return 0

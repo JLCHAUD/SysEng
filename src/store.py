@@ -50,25 +50,35 @@ class JsonStore:
             return json.load(f)
 
     def _save(self, data: dict) -> None:
+        """Écriture atomique : écrit dans un fichier temporaire puis renomme."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data["derniere_maj"] = datetime.now().isoformat(timespec="seconds")
-        with open(self.path, "w", encoding="utf-8") as f:
+        tmp = self.path.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+        tmp.replace(self.path)  # atomique sur la plupart des OS
 
     # ── API publique ──────────────────────────────────────────────────────────
 
     def get(self, nom_global: str) -> Optional[Any]:
         """Lit une variable du store. Retourne None si absente."""
+        from src.security import validate_store_key
+        validate_store_key(nom_global)
         return self._load()["variables"].get(nom_global)
 
     def set(self, nom_global: str, valeur: Any) -> None:
         """Écrit une variable dans le store."""
+        from src.security import validate_store_key
+        validate_store_key(nom_global)
         data = self._load()
         data["variables"][nom_global] = valeur
         self._save(data)
 
     def set_many(self, variables: Dict[str, Any]) -> None:
         """Écrit plusieurs variables en une seule opération atomique."""
+        from src.security import validate_store_key
+        for k in variables:
+            validate_store_key(k)
         data = self._load()
         data["variables"].update(variables)
         self._save(data)
