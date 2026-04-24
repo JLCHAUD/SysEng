@@ -330,14 +330,17 @@ def _resolve_col(col_ref: str, ctx: Dict[str, Any]) -> List[Any]:
     return [row.get(col) for row in table]
 
 
+_MISSING = object()  # sentinelle pour distinguer "absent" de "None"
+
+
 def _resolve_scalar(ref: str, ctx: Dict[str, Any]) -> Any:
     """Résout un scalaire : variable $x ou littéral numérique."""
     ref = ref.strip()
     if ref.startswith("$"):
-        val = ctx.get(ref)
-        if val is None:
+        val = ctx.get(ref, _MISSING)
+        if val is _MISSING:
             raise ValueError(f"Variable '{ref}' non définie")
-        return val
+        return val  # peut légitimement être None
     try:
         return float(ref) if "." in ref else int(ref)
     except ValueError:
@@ -557,6 +560,17 @@ def _eval_formula(formula: str, ctx: Dict[str, Any]) -> Any:
         val = _resolve_scalar(args[0], ctx)
         default = _resolve_scalar(args[1], ctx) if len(args) > 1 else None
         return default if val is None else val
+
+    # ─ Littéral string entre guillemets ──────────────────────────────────────
+    if (formula.startswith('"') and formula.endswith('"')) or \
+       (formula.startswith("'") and formula.endswith("'")):
+        return formula[1:-1]
+
+    # ─ Littéral numérique ────────────────────────────────────────────────────
+    try:
+        return float(formula) if "." in formula else int(formula)
+    except ValueError:
+        pass
 
     raise ValueError(f"Fonction COMPUTE inconnue : '{formula}'")
 
