@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from src import store as Store
+from src import ecosystem as Ecosystem
 from src.config_loader import load_registre, save_registre
 from src.executor import execute_ast
 from src.models import EntreeRegistre
@@ -125,6 +126,17 @@ def _sync_fichier(entree: EntreeRegistre, force: bool = False) -> dict:
             )
             if exec_result.errors:
                 resultat["statut"] = "erreur"
+
+            # Mise à jour Exomap (M03)
+            status_eco = "error" if exec_result.errors else "ok"
+            Ecosystem.record_file_sync(
+                file_id=entree.id,
+                path_str=entree.chemin,
+                file_type=entree.type_fichier,
+                status=status_eco,
+                manifest_version=ast.header.version,
+            )
+            Ecosystem.record_edges_from_ast(ast, file_id=entree.id)
     except Exception as e:
         resultat["statut"] = "erreur"
         log.append(f"[ERREUR] Exception inattendue : {e}")

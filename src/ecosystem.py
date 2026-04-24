@@ -1,33 +1,42 @@
 """
-Ecosystem Schema Manager.
+ExoSync — Ecosystem Schema Manager (Exomap v2)
+===============================================
+Catalogue vivant de l'exostructure : fichiers, tables, variables, dépendances.
 
-Catalogue vivant de toutes les tables et variables connues de l'écosystème.
-Alimenté par le parser lors de la lecture des passerelles.
+L'Exomap est le reflet de l'exostructure — jamais sa définition.
+Elle est construite dynamiquement à partir des Manifestes lus lors des syncs.
+
 Persisté dans output/ecosystem.json.
+
+Contenu :
+  files     — registre des fichiers connus (path, type, dernier sync)
+  tables    — tables Excel découvertes via GET_TABLE
+  variables — variables COMPUTE/CELL découvertes
+  edges     — arcs PULL/PUSH entre fichiers et store (graphe de dépendances)
 """
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
 ECOSYSTEM_PATH = Path(__file__).parent.parent / "output" / "ecosystem.json"
 
 
-# ─── Schémas ──────────────────────────────────────────────────────────────────
+# ─── Schémas de données ───────────────────────────────────────────────────────
 
 @dataclass
 class ColumnSchema:
     name: str               # identifiant passerelle  ex: "avancement"
     col_type: str           # KEY | string | float | date | pct | int
     header: str             # header Excel affiché    ex: "% Avancement"
-    write: str              # engineer | creation | uo_generique | it_manager | ...
+    write: str              # engineer | creation | uo_generique | it_manager
     description: str = ""
 
 
 @dataclass
 class TableSchema:
-    id: str                 # ex: "uo.activites"
+    id: str                 # ex: "UO-001::TabActivites"
     source_file_id: str     # ex: "UO-001"
     source_sheet: str       # ex: "Activités"
     table_name: str         # nom du tableau Excel nommé  ex: "TabActivites"
@@ -40,7 +49,7 @@ class TableSchema:
 @dataclass
 class VariableSchema:
     id: str                 # ex: "uo.avancement_global"
-    var_type: str           # CELL | CELL_NUM | CELL_DATE | CELL_PCT | COMPUTED
+    var_type: str           # CELL | CELL_NUM | COMPUTED | ...
     source_file_id: str     # ex: "UO-001"
     formula: str = ""       # pour COMPUTED
     description: str = ""
@@ -49,102 +58,153 @@ class VariableSchema:
 
 
 @dataclass
+class FileRecord:
+    """Représente un fichier Excel connu dans l'écosystème."""
+    file_id: str            # ex: "UO-001"
+    path: str               # chemin relatif  ex: "UOs/UO-001_climat.xlsx"
+    file_type: str          # ex: "uo_instance"
+    manifest_version: str = "1"
+    last_sync: Optional[str] = None   # ISO datetime
+    status: str = "unknown"           # "ok" | "error" | "unknown"
+
+
+@dataclass
+class EdgeRecord:
+    """
+    Arc dirigé dans le graphe de dépendances.
+
+    Exemples :
+      PULL  from="store::projet.acteurs"       to="UO-001::TabActeurs"
+      PUSH  from="UO-001::avancement_global"   to="store::uo.UO-001.avancement"
+    """
+    edge_type: str   # "PULL" | "PUSH"
+    from_node: str   # "store::<clé>" ou "<file_id>::<var>"
+    to_node: str     # "<file_id>::<table>" ou "store::<clé>"
+    mode: str = ""   # "OVERWRITE" | "APPEND_NEW" | "UPDATE" | "READ_ONLY"
+
+
+@dataclass
+class ConsistencyWarning:
+    code: str        # "PULL_NEVER_PUSHED" | "PUSH_CONFLICT" | "STALE_FILE"
+    message: str
+    details: str = ""
+
+
+@dataclass
 class EcosystemSchema:
-    version: str = "1"
+    version: str = "2.0"
+    last_scan: Optional[str] = None
+    files: Dict[str, FileRecord] = field(default_factory=dict)
     tables: Dict[str, TableSchema] = field(default_factory=dict)
     variables: Dict[str, VariableSchema] = field(default_factory=dict)
+    edges: List[EdgeRecord] = field(default_factory=list)
 
 
 # ─── Sérialisation ────────────────────────────────────────────────────────────
 
-def _schema_to_dict(schema: EcosystemSchema) -> dict:
-    def _col(c: ColumnSchema) -> dict:
-        return asdict(c)
-
-    def _tbl(t: TableSchema) -> dict:
-        d = asdict(t)
-        d["columns"] = {k: _col(v) for k, v in t.columns.items()}
-        return d
-
-    def _var(v: VariableSchema) -> dict:
-        return asdict(v)
-
+def _to_dict(schema: EcosystemSchema) -> dict:
     return {
-        "version": schema.version,
-        "tables": {k: _tbl(v) for k, v in schema.tables.items()},
-        "variables": {k: _var(v) for k, v in schema.variables.items()},
+        "version":   schema.version,
+        "last_scan": schema.last_scan,
+        "files":     {k: asdict(v) for k, v in schema.files.items()},
+        "tables":    {
+            k: {**asdict(v), "columns": {cn: asdict(cv) for cn, cv in v.columns.items()}}
+            for k, v in schema.tables.items()
+        },
+        "variables": {k: asdict(v) for k, v in schema.variables.items()},
+        "edges":     [asdict(e) for e in schema.edges],
     }
 
 
-def _schema_from_dict(d: dict) -> EcosystemSchema:
+def _from_dict(d: dict) -> EcosystemSchema:
+    files = {
+        fid: FileRecord(**fdata)
+        for fid, fdata in d.get("files", {}).items()
+    }
     tables = {}
     for tid, tdata in d.get("tables", {}).items():
         cols = {
             cname: ColumnSchema(**cdata)
             for cname, cdata in tdata.get("columns", {}).items()
         }
-        tdata_copy = {k: v for k, v in tdata.items() if k != "columns"}
-        tables[tid] = TableSchema(**tdata_copy, columns=cols)
+        base = {k: v for k, v in tdata.items() if k != "columns"}
+        tables[tid] = TableSchema(**base, columns=cols)
 
     variables = {
         vid: VariableSchema(**vdata)
         for vid, vdata in d.get("variables", {}).items()
     }
+    edges = [EdgeRecord(**e) for e in d.get("edges", [])]
 
     return EcosystemSchema(
-        version=d.get("version", "1"),
+        version=d.get("version", "2.0"),
+        last_scan=d.get("last_scan"),
+        files=files,
         tables=tables,
         variables=variables,
+        edges=edges,
     )
 
 
 # ─── Persistence ──────────────────────────────────────────────────────────────
 
-def load() -> EcosystemSchema:
-    if not ECOSYSTEM_PATH.exists():
+def load(path: Path = ECOSYSTEM_PATH) -> EcosystemSchema:
+    if not path.exists():
         return EcosystemSchema()
-    with open(ECOSYSTEM_PATH, encoding="utf-8") as f:
-        return _schema_from_dict(json.load(f))
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    # Migration v1 → v2
+    if raw.get("version", "1") == "1":
+        raw["version"] = "2.0"
+        raw.setdefault("files", {})
+        raw.setdefault("edges", [])
+        raw.setdefault("last_scan", None)
+    return _from_dict(raw)
 
 
-def save(schema: EcosystemSchema) -> None:
-    ECOSYSTEM_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(ECOSYSTEM_PATH, "w", encoding="utf-8") as f:
-        json.dump(_schema_to_dict(schema), f, ensure_ascii=False, indent=2)
+def save(schema: EcosystemSchema, path: Path = ECOSYSTEM_PATH) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    schema.last_scan = datetime.now().isoformat(timespec="seconds")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_to_dict(schema), f, ensure_ascii=False, indent=2)
 
 
-# ─── API publique ─────────────────────────────────────────────────────────────
+# ─── API publique — enregistrement ───────────────────────────────────────────
 
-def register_table(table: TableSchema) -> None:
+def register_table(table: TableSchema, path: Path = ECOSYSTEM_PATH) -> None:
     """Enregistre ou met à jour une table dans l'écosystème."""
-    schema = load()
-    table.last_seen = str(date.today())
+    schema = load(path)
+    today = datetime.now().isoformat(timespec="seconds")
+    table.last_seen = today
     existing = schema.tables.get(table.id)
     if existing:
-        # Fusion : on enrichit les colonnes existantes sans écraser
         for col_name, col in table.columns.items():
             if col_name not in existing.columns:
                 existing.columns[col_name] = col
-        existing.last_seen = table.last_seen
+        existing.last_seen = today
         if table.source_file_id:
             existing.source_file_id = table.source_file_id
     else:
         schema.tables[table.id] = table
-    save(schema)
+    save(schema, path)
 
 
-def register_variable(variable: VariableSchema) -> None:
+def register_variable(variable: VariableSchema, path: Path = ECOSYSTEM_PATH) -> None:
     """Enregistre ou met à jour une variable dans l'écosystème."""
-    schema = load()
-    variable.last_seen = str(date.today())
+    schema = load(path)
+    variable.last_seen = datetime.now().isoformat(timespec="seconds")
     schema.variables[variable.id] = variable
-    save(schema)
+    save(schema, path)
 
 
-def register_many(tables: List[TableSchema], variables: List[VariableSchema]) -> None:
+def register_many(
+    tables: List[TableSchema],
+    variables: List[VariableSchema],
+    path: Path = ECOSYSTEM_PATH,
+) -> None:
     """Enregistre un lot de tables et variables en une seule opération."""
-    schema = load()
-    today = str(date.today())
+    schema = load(path)
+    today = datetime.now().isoformat(timespec="seconds")
 
     for table in tables:
         table.last_seen = today
@@ -161,8 +221,217 @@ def register_many(tables: List[TableSchema], variables: List[VariableSchema]) ->
         variable.last_seen = today
         schema.variables[variable.id] = variable
 
-    save(schema)
+    save(schema, path)
 
+
+def record_file_sync(
+    file_id: str,
+    path_str: str,
+    file_type: str,
+    status: str,
+    manifest_version: str = "1",
+    ecosystem_path: Path = ECOSYSTEM_PATH,
+) -> None:
+    """
+    Enregistre (ou met à jour) la trace d'un sync de fichier dans l'Exomap.
+    Appelé par sync.py après chaque execute_ast().
+    """
+    schema = load(ecosystem_path)
+    schema.files[file_id] = FileRecord(
+        file_id=file_id,
+        path=path_str,
+        file_type=file_type,
+        manifest_version=manifest_version,
+        last_sync=datetime.now().isoformat(timespec="seconds"),
+        status=status,
+    )
+    save(schema, ecosystem_path)
+
+
+def record_edges_from_ast(
+    ast,           # PasserelleAST — import circulaire évité
+    file_id: str,
+    ecosystem_path: Path = ECOSYSTEM_PATH,
+) -> None:
+    """
+    Extrait les arcs PULL/PUSH du Manifeste et les ajoute à l'Exomap.
+    Remplace les anciens arcs du même fichier (re-sync = re-découverte).
+    Appelé par sync.py après execute_ast().
+    """
+    schema = load(ecosystem_path)
+
+    # Retirer les arcs existants de ce fichier
+    schema.edges = [
+        e for e in schema.edges
+        if not (e.from_node.startswith(f"{file_id}::") or
+                e.to_node.startswith(f"{file_id}::"))
+    ]
+
+    # Arcs PULL : store → fichier
+    for pull in ast.pulls:
+        schema.edges.append(EdgeRecord(
+            edge_type="PULL",
+            from_node=f"store::{pull.global_name}",
+            to_node=f"{file_id}::{pull.table}",
+            mode=pull.mode,
+        ))
+
+    # Arcs PUSH : fichier → store
+    for push in ast.pushes:
+        schema.edges.append(EdgeRecord(
+            edge_type="PUSH",
+            from_node=f"{file_id}::{push.var_name}",
+            to_node=f"store::{push.global_name}",
+        ))
+
+    save(schema, ecosystem_path)
+
+
+# ─── Détection d'incohérences ─────────────────────────────────────────────────
+
+def check_consistency(path: Path = ECOSYSTEM_PATH) -> List[ConsistencyWarning]:
+    """
+    Analyse l'Exomap et retourne la liste des incohérences détectées.
+
+    Règles vérifiées :
+      1. PULL_NEVER_PUSHED  — une clé store est consommée mais jamais produite
+      2. PUSH_CONFLICT      — deux fichiers pushent vers la même clé store
+      3. STALE_FILE         — fichier connu mais jamais synchronisé
+    """
+    schema = load(path)
+    warnings: List[ConsistencyWarning] = []
+
+    pushed_keys  = {e.to_node for e in schema.edges if e.edge_type == "PUSH"}
+    pulled_keys  = {e.from_node for e in schema.edges if e.edge_type == "PULL"}
+
+    # 1. PULL de clés jamais PUSHées
+    for key in pulled_keys:
+        if key not in pushed_keys:
+            warnings.append(ConsistencyWarning(
+                code="PULL_NEVER_PUSHED",
+                message=f"{key} est consommée (PULL) mais jamais produite (PUSH)",
+                details=f"Clé store '{key.replace('store::', '')}' introuvable dans les PUSH",
+            ))
+
+    # 2. Conflits PUSH — plusieurs fichiers pushent vers la même clé
+    push_edges = [e for e in schema.edges if e.edge_type == "PUSH"]
+    target_count: Dict[str, List[str]] = {}
+    for e in push_edges:
+        target_count.setdefault(e.to_node, []).append(e.from_node)
+    for target, sources in target_count.items():
+        if len(sources) > 1:
+            warnings.append(ConsistencyWarning(
+                code="PUSH_CONFLICT",
+                message=f"Conflit : {target} est pushé par {len(sources)} fichiers",
+                details=f"Sources : {', '.join(sources)}",
+            ))
+
+    # 3. Fichiers jamais synchronisés
+    for fid, frec in schema.files.items():
+        if frec.last_sync is None:
+            warnings.append(ConsistencyWarning(
+                code="STALE_FILE",
+                message=f"{fid} ({frec.file_type}) n'a jamais été synchronisé",
+                details=f"Chemin : {frec.path}",
+            ))
+
+    return warnings
+
+
+# ─── Lineage — représentation textuelle du graphe ────────────────────────────
+
+def lineage_text(
+    file_id: Optional[str] = None,
+    path: Path = ECOSYSTEM_PATH,
+) -> str:
+    """
+    Retourne une représentation textuelle du graphe de dépendances.
+
+    Si file_id est fourni, n'affiche que les arcs de ce fichier.
+    """
+    schema = load(path)
+    edges = schema.edges
+
+    if file_id:
+        edges = [
+            e for e in edges
+            if e.from_node.startswith(f"{file_id}::") or
+               e.to_node.startswith(f"{file_id}::")
+        ]
+
+    if not edges and not schema.files:
+        return "  (Exomap vide — lancez au moins un sync)"
+
+    lines = []
+
+    # Grouper les fichiers connus
+    files_with_edges = set()
+    for e in schema.edges:
+        for part in (e.from_node, e.to_node):
+            fid = part.split("::")[0]
+            if fid != "store":
+                files_with_edges.add(fid)
+
+    # Afficher les PUSH par fichier source
+    pushes_by_file: Dict[str, List[EdgeRecord]] = {}
+    pulls_by_file:  Dict[str, List[EdgeRecord]] = {}
+    for e in edges:
+        if e.edge_type == "PUSH":
+            fid = e.from_node.split("::")[0]
+            pushes_by_file.setdefault(fid, []).append(e)
+        else:
+            fid = e.to_node.split("::")[0]
+            pulls_by_file.setdefault(fid, []).append(e)
+
+    all_fids = sorted(
+        files_with_edges | set(schema.files.keys()),
+        key=lambda f: (schema.files.get(f, FileRecord(f, "", "")).file_type, f)
+    )
+
+    if file_id:
+        all_fids = [f for f in all_fids if f == file_id]
+
+    for fid in all_fids:
+        frec = schema.files.get(fid)
+        ftype = frec.file_type if frec else "?"
+        status = frec.status if frec else "unknown"
+        status_tag = "[OK]" if status == "ok" else f"[{status.upper()}]"
+        lines.append(f"\n{fid} ({ftype}) {status_tag}")
+
+        for e in pulls_by_file.get(fid, []):
+            store_key = e.from_node.replace("store::", "")
+            table = e.to_node.split("::")[-1]
+            mode = f"  MODE={e.mode}" if e.mode else ""
+            lines.append(f"  <-- PULL  store::{store_key} -> {table}{mode}")
+
+        for e in pushes_by_file.get(fid, []):
+            store_key = e.to_node.replace("store::", "")
+            var = e.from_node.split("::")[-1]
+            lines.append(f"  --> PUSH  {var} -> store::{store_key}")
+
+    return "\n".join(lines) if lines else "  (aucun arc enregistré)"
+
+
+def lineage_dict(path: Path = ECOSYSTEM_PATH) -> dict:
+    """Retourne l'Exomap complète sous forme de dict (pour JSON export ou CLI)."""
+    schema = load(path)
+    return {
+        "version":    schema.version,
+        "last_scan":  schema.last_scan,
+        "files":      {k: asdict(v) for k, v in schema.files.items()},
+        "edges":      [asdict(e) for e in schema.edges],
+        "stats": {
+            "nb_files":     len(schema.files),
+            "nb_tables":    len(schema.tables),
+            "nb_variables": len(schema.variables),
+            "nb_edges":     len(schema.edges),
+            "nb_pull_edges": sum(1 for e in schema.edges if e.edge_type == "PULL"),
+            "nb_push_edges": sum(1 for e in schema.edges if e.edge_type == "PUSH"),
+        },
+    }
+
+
+# ─── API publique historique (rétro-compat v1) ───────────────────────────────
 
 def get_table(table_id: str) -> Optional[TableSchema]:
     return load().tables.get(table_id)
@@ -180,11 +449,13 @@ def list_variables() -> List[VariableSchema]:
     return list(load().variables.values())
 
 
-def summary() -> dict:
-    schema = load()
+def summary(ecosystem_path: Optional[Path] = None) -> dict:
+    schema = load(ecosystem_path or ECOSYSTEM_PATH)
     return {
-        "nb_tables": len(schema.tables),
+        "nb_tables":    len(schema.tables),
         "nb_variables": len(schema.variables),
-        "tables": list(schema.tables.keys()),
-        "variables": list(schema.variables.keys()),
+        "nb_files":     len(schema.files),
+        "nb_edges":     len(schema.edges),
+        "tables":       list(schema.tables.keys()),
+        "variables":    list(schema.variables.keys()),
     }
