@@ -1,4 +1,4 @@
-"""Generates one Excel file per UO instance (7 sheets + _Passerelle)."""
+"""Generates one Excel file per UO instance (7 sheets + _Manifeste)."""
 from datetime import date
 from pathlib import Path
 
@@ -426,12 +426,12 @@ def _add_named_table(ws, ref: str, name: str, style: str = "TableStyleMedium2"):
     ws.add_table(tbl)
 
 
-def _sheet_passerelle(wb: Workbook, uo: UOInstance):
+def _sheet_manifeste(wb: Workbook, uo: UOInstance):
     """
-    Génère la feuille _Passerelle avec le nouveau méta-langage.
+    Génère la feuille _Manifeste avec le méta-langage MXL.
     Col A = instruction, Col B = ancre (plage nommée ou cellule réelle).
     """
-    ws = wb.create_sheet("_Passerelle")
+    ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
 
     # ── Styles locaux ──────────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ def _sheet_passerelle(wb: Workbook, uo: UOInstance):
             c.border = THIN_BORDER
 
     # ── Ligne 1 : version ─────────────────────────────────────────────────────
-    ws["A1"] = "PASSERELLE_V=1"
+    ws["A1"] = "MANIFESTE_V=1"
     ws["A1"].fill = solid_fill(BLUE_DARK)
     ws["A1"].font = header_font()
     ws["B1"] = ""
@@ -601,9 +601,9 @@ def generate_uo_file(uo: UOInstance, output_dir: Path = OUTPUT_DIR) -> Path:
     _sheet_rex(wb, uo)
     _sheet_points_ouverts(wb, uo)
     _sheet_dashboard(wb, uo)
-    _sheet_passerelle(wb, uo)
+    _sheet_manifeste(wb, uo)
 
-    # Ajouter les tableaux nommés pour la résolution passerelle
+    # Ajouter les tableaux nommés pour la résolution manifeste
     activities = uo.uo_type.activities if uo.uo_type else []
     deliverables = uo.uo_type.deliverables if uo.uo_type else []
     nb_act = len(activities)

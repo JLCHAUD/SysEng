@@ -1,8 +1,8 @@
 """
-Parser et exécuteur de la feuille _Passerelle.
+Parser et exécuteur de la feuille _Manifeste (legacy : _Passerelle).
 
 Responsabilités :
-- Lire la feuille _Passerelle d'un fichier Excel
+- Lire la feuille _Manifeste d'un fichier Excel
 - Parser les règles (ReglePasserelle)
 - Exécuter les pulls (store → fichier Excel)
 - Exécuter les pushes (fichier Excel → store)
@@ -24,7 +24,8 @@ from src.models import (
     ScopePasserelle, TypePasserelle,
 )
 
-PASSERELLE_SHEET = "_Passerelle"
+MANIFESTE_SHEET  = "_Manifeste"
+PASSERELLE_SHEET = MANIFESTE_SHEET   # alias rétro-compat — ne pas supprimer
 VERSION_CELL = "A1"
 HEADER_ROW = 2
 DATA_START_ROW = 3
@@ -41,9 +42,9 @@ COLONNES_PASSERELLE = [
 def lire_passerelle(ws: Worksheet) -> Passerelle:
     """Parse la feuille _Passerelle et retourne un objet Passerelle."""
     version_raw = str(ws[VERSION_CELL].value or "").strip()
-    if not version_raw.startswith("PASSERELLE_V="):
+    if not (version_raw.startswith("MANIFESTE_V=") or version_raw.startswith("PASSERELLE_V=")):
         raise ValueError(f"En-tête de version manquant ou invalide : '{version_raw}'")
-    version = version_raw.replace("PASSERELLE_V=", "").strip()
+    version = version_raw.replace("MANIFESTE_V=", "").replace("PASSERELLE_V=", "").strip()
 
     # Lire les en-têtes (ligne 2) pour mapper col → champ
     col_index: Dict[str, int] = {}
@@ -93,7 +94,7 @@ def lire_passerelle(ws: Worksheet) -> Passerelle:
 
 
 def ecrire_version(ws: Worksheet, version: str) -> None:
-    ws[VERSION_CELL] = f"PASSERELLE_V={version}"
+    ws[VERSION_CELL] = f"MANIFESTE_V={version}"
 
 
 # ─── Résolution de tableaux ───────────────────────────────────────────────────
