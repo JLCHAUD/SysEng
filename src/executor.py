@@ -675,10 +675,30 @@ def execute_computes(ast: PasserelleAST, wb,
 
 def execute_pushes(ast: PasserelleAST, ctx: Dict[str, Any],
                    store, result: ExecutionResult) -> None:
-    """Phase 3 — Publie les variables calculées dans le store central."""
+    """Phase 3 — Publie les variables calculées dans le store central.
+
+    Si le PushNode a une clause only_if, la condition est évaluée :
+    - condition vraie  → PUSH exécuté
+    - condition fausse → instruction skippée (valeur non écrasée dans le store)
+    """
     to_push: Dict[str, Any] = {}
 
     for push in ast.pushes:
+        # ── Évaluer ONLY_IF si présent ────────────────────────────────────────
+        if push.only_if:
+            try:
+                if not _eval_condition(push.only_if, ctx):
+                    result.skipped.append(
+                        f"PUSH {push.global_name} — ONLY_IF non satisfait "
+                        f"({push.only_if})"
+                    )
+                    continue
+            except Exception as exc:
+                result.errors.append(
+                    f"PUSH {push.global_name} — erreur ONLY_IF : {exc}"
+                )
+                continue
+
         val = ctx.get(push.var_name)
         if val is None:
             result.skipped.append(f"PUSH {push.global_name} — valeur None ignorée")

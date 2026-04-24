@@ -78,6 +78,8 @@ class BindNode:
 class PushNode:
     var_name: str                   # "$activites"
     global_name: str                # "uo.activites"
+    only_if: str = ""               # condition MXL — vide = toujours pousser
+                                    # ex: "$total_heures > 0"
 
 
 @dataclass
@@ -274,11 +276,24 @@ def _parse_bind(line: str, anchor: str) -> Optional[BindNode]:
 
 
 def _parse_push(line: str) -> Optional[PushNode]:
-    """PUSH $var -> global.variable.name"""
-    m = re.match(r'^PUSH\s+(\$[\w]+)\s*->\s*([\w.]+)$', line.strip())
+    """
+    PUSH $var -> global.variable.name
+    PUSH $var -> global.variable.name  ONLY_IF $var > 0
+    PUSH $var -> global.variable.name  ONLY_IF $var != NULL
+    PUSH $var -> global.variable.name  ONLY_IF $var = "VERT"
+    """
+    m = re.match(
+        r'^PUSH\s+(\$[\w]+)\s*->\s*([\w.\-]+)'
+        r'(?:\s+ONLY_IF\s+(.+))?$',
+        line.strip(), re.IGNORECASE,
+    )
     if not m:
         return None
-    return PushNode(var_name=m.group(1), global_name=m.group(2))
+    return PushNode(
+        var_name=m.group(1),
+        global_name=m.group(2),
+        only_if=(m.group(3) or "").strip(),
+    )
 
 
 def _parse_pull(line: str, anchor: str) -> Optional[PullNode]:
