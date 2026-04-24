@@ -1,7 +1,7 @@
 """
-Parser du méta-langage passerelle.
+Parser du méta-langage MXL.
 
-Lit la feuille _Passerelle (colonne A = instruction, colonne B = ancre)
+Lit la feuille _Manifeste (colonne A = instruction, colonne B = ancre)
 et produit un AST structuré + alimente l'ecosystem schema.
 
 Syntaxe supportée :
@@ -23,6 +23,8 @@ Syntaxe supportée :
 
   PULL global.var -> FILL_TABLE(sheet, table)  MODE=<mode> [KEY=col] [COLS=c1;c2]
   PULL global.var -> UPDATE_CELLS(sheet, table, KEY=col, COLS=c1;c2)
+
+Note : la feuille s'appelait auparavant _Passerelle (ADR-001).
 """
 import re
 from dataclasses import dataclass, field
@@ -390,15 +392,19 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
 
 def parse_sheet(ws) -> PasserelleAST:
     """
-    Parse une feuille openpyxl _Passerelle.
+    Parse une feuille openpyxl _Manifeste.
     Colonne A = instruction, Colonne B = ancre.
     Ligne 1 = VERSION (traitée par parse_lines via FILE_TYPE/FILE_ID/VERSION).
     """
     lines: List[Tuple[str, str]] = []
 
-    # Ligne 1 : version (ex: "PASSERELLE_V=1" → on la convertit en "VERSION: 1")
+    # Ligne 1 : version (ex: "MANIFESTE_V=1" → on la convertit en "VERSION: 1")
+    # Rétro-compat : accepte aussi l'ancien format "PASSERELLE_V="
     v_raw = str(ws["A1"].value or "").strip()
-    if v_raw.startswith("PASSERELLE_V="):
+    if v_raw.startswith("MANIFESTE_V="):
+        version = v_raw.replace("MANIFESTE_V=", "").replace("-MOD", "").strip()
+        lines.append((f"VERSION: {version}", ""))
+    elif v_raw.startswith("PASSERELLE_V="):
         version = v_raw.replace("PASSERELLE_V=", "").replace("-MOD", "").strip()
         lines.append((f"VERSION: {version}", ""))
 
@@ -412,19 +418,29 @@ def parse_sheet(ws) -> PasserelleAST:
     return parse_lines(lines)
 
 
+MANIFESTE_SHEET  = "_Manifeste"
+_LEGACY_SHEET    = "_Passerelle"   # rétro-compat ADR-001
+
+
 def parse_file(filepath: Path) -> Optional[PasserelleAST]:
     """
-    Ouvre un fichier Excel, cherche la feuille _Passerelle et la parse.
-    Retourne None si la feuille est absente.
+    Ouvre un fichier Excel, cherche la feuille _Manifeste et la parse.
+    Accepte aussi l'ancien nom _Passerelle (rétro-compat ADR-001).
+    Retourne None si aucune des deux feuilles n'est présente.
     """
     from openpyxl import load_workbook
     if not filepath.exists():
         return None
     wb = load_workbook(filepath, read_only=True, data_only=True)
-    if "_Passerelle" not in wb.sheetnames:
+    sheet_name = None
+    if MANIFESTE_SHEET in wb.sheetnames:
+        sheet_name = MANIFESTE_SHEET
+    elif _LEGACY_SHEET in wb.sheetnames:
+        sheet_name = _LEGACY_SHEET
+    if sheet_name is None:
         wb.close()
         return None
-    ast = parse_sheet(wb["_Passerelle"])
+    ast = parse_sheet(wb[sheet_name])
     ast.header.file_id = ast.header.file_id or filepath.stem
     wb.close()
     return ast
@@ -470,7 +486,7 @@ def enrich_ecosystem(ast: PasserelleAST) -> Tuple[int, int]:
                 source_sheet=def_node.sheet,
                 table_name=def_node.table_name,
                 columns=columns,
-                discovered_from=f"{file_id}/_Passerelle",
+                discovered_from=f"{file_id}/_Manifeste",
             ))
 
         elif def_node.source_type in ("GET_CELL", "COMPUTE"):
@@ -480,7 +496,7 @@ def enrich_ecosystem(ast: PasserelleAST) -> Tuple[int, int]:
                 var_type=var_type,
                 source_file_id=file_id,
                 formula=def_node.formula if var_type == "COMPUTED" else "",
-                discovered_from=f"{file_id}/_Passerelle",
+                discovered_from=f"{file_id}/_Manifeste",
             ))
 
     Ecosystem.register_many(new_tables, new_variables)

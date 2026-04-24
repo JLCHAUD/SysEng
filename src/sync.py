@@ -17,7 +17,8 @@ from src.config_loader import load_registre, save_registre
 from src.executor import execute_ast
 from src.models import EntreeRegistre
 from src.parser import parse_file
-from src.passerelle import executer_passerelle  # conservé pour rétro-compat
+from src.parser import MANIFESTE_SHEET
+from src.passerelle import executer_passerelle  # conservé pour rétro-compat (legacy _Passerelle)
 
 ROOT = Path(__file__).parent.parent
 
@@ -106,9 +107,9 @@ def _sync_fichier(entree: EntreeRegistre, force: bool = False) -> dict:
     try:
         ast = parse_file(chemin)
         if ast is None:
-            # Pas de feuille _Passerelle → fallback ancien moteur
+            # Pas de feuille _Manifeste (ni _Passerelle) → fallback ancien moteur
             pushed = executer_passerelle(chemin, entree.id, log)
-            log.append(f"[OK] {len(pushed)} variable(s) synchronisée(s) (passerelle)")
+            log.append(f"[OK] {len(pushed)} variable(s) synchronisée(s) (legacy)")
         else:
             if ast.errors:
                 for err in ast.errors:
@@ -197,11 +198,12 @@ def synchroniser(
 def auditer_fichier(chemin_str: str) -> dict:
     """
     Audit d'onboarding pour un fichier Excel créé manuellement.
-    Vérifie la présence des feuilles requises, des tableaux, de la passerelle.
-    Génère un template _Passerelle vide si absente.
+    Vérifie la présence des feuilles requises, des tableaux, du manifeste.
+    Génère un template _Manifeste vide si absent.
     """
     from openpyxl import load_workbook
-    from src.passerelle import PASSERELLE_SHEET, COLONNES_PASSERELLE
+    from src.passerelle import MANIFESTE_SHEET, COLONNES_PASSERELLE
+    PASSERELLE_SHEET = MANIFESTE_SHEET  # alias local
 
     chemin = Path(chemin_str)
     rapport = {"chemin": chemin_str, "ok": True, "alertes": [], "actions": []}
@@ -223,15 +225,15 @@ def auditer_fichier(chemin_str: str) -> dict:
 
     if PASSERELLE_SHEET not in feuilles:
         rapport["alertes"].append(f"Feuille '{PASSERELLE_SHEET}' absente")
-        rapport["actions"].append("Template _Passerelle genere")
+        rapport["actions"].append("Template _Manifeste genere")
 
-        # Générer un template _Passerelle vide
+        # Générer un template _Manifeste vide
         ws = wb.create_sheet(PASSERELLE_SHEET)
-        ws["A1"] = "PASSERELLE_V=1"
+        ws["A1"] = "MANIFESTE_V=1"
         for col, nom in enumerate(COLONNES_PASSERELLE, 1):
             ws.cell(row=2, column=col, value=nom)
         wb.save(chemin)
     else:
-        rapport["actions"].append("Feuille _Passerelle existante conservee")
+        rapport["actions"].append("Feuille _Manifeste existante conservee")
 
     return rapport
