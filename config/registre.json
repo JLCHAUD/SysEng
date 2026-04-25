@@ -8,7 +8,8 @@
       "synchro_periodicite": "hebdomadaire",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR006"
     },
     {
       "id": "REF-TYPE-SS",
@@ -17,7 +18,8 @@
       "synchro_periodicite": "hebdomadaire",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR006"
     },
     {
       "id": "REF-TYPE-ST",
@@ -26,7 +28,8 @@
       "synchro_periodicite": "hebdomadaire",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR006"
     },
     {
       "id": "REF-PROJ-MI20",
@@ -35,7 +38,8 @@
       "synchro_periodicite": "hebdomadaire",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR005"
     },
     {
       "id": "REF-PROJ-RENG",
@@ -44,7 +48,8 @@
       "synchro_periodicite": "hebdomadaire",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR005"
     },
     {
       "id": "UO-001",
@@ -53,7 +58,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": "2026-04-17T16:00:16",
       "statut_dernier_synchro": "ok",
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR001"
     },
     {
       "id": "UO-002",
@@ -62,7 +68,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR001"
     },
     {
       "id": "UO-003",
@@ -71,7 +78,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR002"
     },
     {
       "id": "UO-004",
@@ -80,7 +88,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR002"
     },
     {
       "id": "UO-005",
@@ -89,7 +98,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR003"
     },
     {
       "id": "COCKPIT-ALICE",
@@ -98,7 +108,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR004"
     },
     {
       "id": "COCKPIT-BRUNO",
@@ -107,7 +118,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR004"
     },
     {
       "id": "COCKPIT-CAMILLE",
@@ -116,7 +128,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR004"
     },
     {
       "id": "CONSOLIDATION",
@@ -125,7 +138,8 @@
       "synchro_periodicite": "quotidien",
       "derniere_synchro": null,
       "statut_dernier_synchro": null,
-      "genere_par_script": true
+      "genere_par_script": true,
+      "owner_id": "USR005"
     }
   ]
 }

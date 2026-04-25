@@ -153,6 +153,7 @@ def cmd_store_clear(args: argparse.Namespace) -> int:
 def cmd_lineage(args: argparse.Namespace) -> int:
     """Affiche le graphe de dépendances (Exomap) et les incohérences."""
     from src.ecosystem import lineage_text, lineage_dict, check_consistency
+    from src.config_loader import load_registre, load_acteurs, load_file_types
     import json as _json
 
     file_id = getattr(args, "id", None)
@@ -176,6 +177,29 @@ def cmd_lineage(args: argparse.Namespace) -> int:
                 print(f"       {w.details}")
     else:
         print("\n  Aucune incoherence detectee.")
+
+    # Ownership summary
+    try:
+        entrees = load_registre()
+        acteurs_idx = {a.id: a for a in load_acteurs()}
+        file_types = load_file_types()
+        # Filtrer si --id
+        if file_id:
+            entrees = [e for e in entrees if e.id == file_id]
+        if entrees:
+            print(f"\n  --- Owners ---")
+            for e in entrees:
+                owner_str = "<non assigné>"
+                if e.owner_id:
+                    a = acteurs_idx.get(e.owner_id)
+                    if a:
+                        owner_str = f"{a.nom} ({a.role.value})  [{e.owner_id}]"
+                    else:
+                        owner_str = f"<inconnu: {e.owner_id}>"
+                expected = file_types.get(e.type_fichier, {}).get("owner_role", "—")
+                print(f"    {e.id:25s}  owner={owner_str}  role_attendu={expected}")
+    except Exception:
+        pass  # pas bloquant
 
     return 0
 
@@ -220,7 +244,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     """Diagnostique la sante de l'ecosysteme ExoSync."""
     from src.store import DEFAULT_STORE_PATH, JsonStore
     from src.ecosystem import ECOSYSTEM_PATH, load as eco_load, check_consistency
-    from src.config_loader import load_registre
+    from src.config_loader import load_registre, validate_owner_roles
     from src.history import list_runs, list_snapshots
     from pathlib import Path
 
@@ -260,6 +284,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     # ── Registre ─────────────────────────────────────────────────────────────
     print("\n  [Registre]")
+    entrees = []
     try:
         entrees = load_registre()
         _ok(f"registre.json : {len(entrees)} entree(s)")
@@ -275,6 +300,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     except Exception as exc:
         _err(f"Impossible de lire le registre : {exc}")
         err_count += 1
+
+    # ── Ownership ────────────────────────────────────────────────────────────
+    print("\n  [Ownership]")
+    try:
+        violations = validate_owner_roles(entrees if entrees else None)
+        if not violations:
+            _ok("Tous les owners ont le bon role")
+            ok_count += 1
+        else:
+            for v in violations:
+                _warn(str(v))
+                warn_count += 1
+    except Exception as exc:
+        _warn(f"Validation ownership impossible : {exc}")
+        warn_count += 1
 
     # ── Historique ───────────────────────────────────────────────────────────
     print("\n  [Historique]")
