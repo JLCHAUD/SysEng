@@ -1,8 +1,11 @@
 import json
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+import yaml
 
 from src.models import (
     Activity, Actor, Deliverable, EntreeRegistre, ProfilActeur,
@@ -13,9 +16,39 @@ from src.models import (
 CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 
+# ─── Ownership ────────────────────────────────────────────────────────────────
+
+@dataclass
+class OwnerRoleViolation:
+    """Incohérence entre le rôle attendu pour un type de fichier et celui de l'owner."""
+    file_id: str
+    type_fichier: str
+    owner_id: str
+    owner_nom: str
+    owner_role: str
+    expected_role: str
+
+    def __str__(self) -> str:
+        return (
+            f"{self.file_id} ({self.type_fichier}) : owner {self.owner_nom} "
+            f"a le rôle '{self.owner_role}' mais '{self.expected_role}' est attendu"
+        )
+
+
 def _load_json(filename: str) -> dict | list:
     with open(CONFIG_DIR / filename, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _load_yaml(filename: str) -> dict:
+    with open(CONFIG_DIR / filename, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_file_types() -> Dict[str, dict]:
+    """Charge file_types.yaml → dict {type_id: {label, owner_role, ...}}."""
+    raw = _load_yaml("file_types.yaml")
+    return raw.get("file_types", {})
 
 
 # ─── Référentiels ─────────────────────────────────────────────────────────────
@@ -96,6 +129,7 @@ def load_uo_instances() -> List[UOInstance]:
             statut=StatutUO(item.get("statut", "BROUILLON")),
             degrade=item.get("degrade", False),
             degrade_note=item.get("degrade_note", ""),
+            owner_id=item.get("owner_id"),
             uo_type=resolved_type,
             system=system,
             project=project,
@@ -134,9 +168,72 @@ def load_registre() -> List[EntreeRegistre]:
             derniere_synchro=f.get("derniere_synchro"),
             statut_dernier_synchro=f.get("statut_dernier_synchro"),
             genere_par_script=f.get("genere_par_script", True),
+            owner_id=f.get("owner_id"),
         )
         for f in raw.get("fichiers", [])
     ]
+
+
+def validate_owner_roles(
+    registre: Optional[List[EntreeRegistre]] = None,
+) -> List[OwnerRoleViolation]:
+    """
+    Vérifie que chaque fichier du registre a un owner dont le rôle correspond
+    au rôle attendu par son type de fichier (owner_role dans file_types.yaml).
+
+    Retourne la liste des violations détectées (liste vide = tout est cohérent).
+    """
+    if registre is None:
+        registre = load_registre()
+
+    acteurs_index: Dict[str, ProfilActeur] = {a.id: a for a in load_acteurs()}
+    file_types = load_file_types()
+    violations: List[OwnerRoleViolation] = []
+
+    for entree in registre:
+        type_def = file_types.get(entree.type_fichier)
+        if not type_def:
+            continue  # type inconnu → ignoré (pas de contrainte)
+
+        expected_role: Optional[str] = type_def.get("owner_role")
+        if not expected_role:
+            continue  # pas de contrainte de rôle pour ce type
+
+        if not entree.owner_id:
+            # Owner absent mais rôle attendu → violation légère (pas bloquant)
+            violations.append(OwnerRoleViolation(
+                file_id=entree.id,
+                type_fichier=entree.type_fichier,
+                owner_id="",
+                owner_nom="<non assigné>",
+                owner_role="",
+                expected_role=expected_role,
+            ))
+            continue
+
+        acteur = acteurs_index.get(entree.owner_id)
+        if not acteur:
+            violations.append(OwnerRoleViolation(
+                file_id=entree.id,
+                type_fichier=entree.type_fichier,
+                owner_id=entree.owner_id,
+                owner_nom="<inconnu>",
+                owner_role="",
+                expected_role=expected_role,
+            ))
+            continue
+
+        if acteur.role.value != expected_role:
+            violations.append(OwnerRoleViolation(
+                file_id=entree.id,
+                type_fichier=entree.type_fichier,
+                owner_id=entree.owner_id,
+                owner_nom=acteur.nom,
+                owner_role=acteur.role.value,
+                expected_role=expected_role,
+            ))
+
+    return violations
 
 
 def save_registre(entrees: List[EntreeRegistre]) -> None:

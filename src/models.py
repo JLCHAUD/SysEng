@@ -165,6 +165,7 @@ class UOInstance:
     statut: StatutUO = StatutUO.BROUILLON
     degrade: bool = False           # marqueur UO★ (périmètre réduit / non standard)
     degrade_note: str = ""
+    owner_id: Optional[str] = None  # ID acteur propriétaire (référence acteurs.json)
 
     # Références résolues (remplies par config_loader)
     uo_type: Optional[UOType] = None
@@ -214,3 +215,4 @@ class EntreeRegistre:
     derniere_synchro: Optional[str] = None
     statut_dernier_synchro: Optional[str] = None
     genere_par_script: bool = True
+    owner_id: Optional[str] = None   # ID acteur propriétaire (référence acteurs.json)

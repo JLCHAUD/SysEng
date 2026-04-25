@@ -8,6 +8,7 @@ file_types:
     label: "Unite d Oeuvre (instance)"
     description: "Feuille de suivi d une UO de l ingenierie"
     template: "config/templates/manifeste_uo_instance.mxl"
+    owner_role: "ingenieur_sys"
     required_sheets:
       - _Manifeste
       - Activites
@@ -24,6 +25,7 @@ file_types:
     label: "Referentiel des UO"
     description: "Tables de reference communes a toutes les UO"
     template: "config/templates/manifeste_referentiel_uo.mxl"
+    owner_role: "it_manager"
     required_sheets:
       - _Manifeste
       - TypesUO
@@ -37,6 +39,7 @@ file_types:
     label: "Referentiel projet"
     description: "Donnees de reference du projet (acteurs, systemes...)"
     template: "config/templates/manifeste_referentiel_projet.mxl"
+    owner_role: "engagement_mgr"
     required_sheets:
       - _Manifeste
     optional_sheets:
@@ -47,8 +50,9 @@ file_types:
 
   cockpit:
     label: "Cockpit de pilotage"
-    description: "Tableau de bord consolide"
+    description: "Tableau de bord consolide pour le pilote technique"
     template: "config/templates/manifeste_cockpit.mxl"
+    owner_role: "pilote_tech"
     required_sheets:
       - _Manifeste
       - Dashboard
@@ -65,6 +69,7 @@ file_types:
     label: "Fiche pilote"
     description: "Vue pilote d une UO ou d un systeme"
     template: "config/templates/manifeste_uo_instance.mxl"
+    owner_role: "pilote_tech"
     required_sheets:
       - _Manifeste
     optional_sheets:
@@ -79,6 +84,7 @@ file_types:
     label: "Consolidation"
     description: "Agregation multi-UO ou multi-projet"
     template: "config/templates/manifeste_cockpit.mxl"
+    owner_role: "engagement_mgr"
     required_sheets:
       - _Manifeste
     optional_sheets:
@@ -91,8 +97,9 @@ file_types:
 
   client:
     label: "Vue client"
-    description: "Livrable client extrait de l ecosysteme"
+    description: "Livrable client extrait de l ecosysteme pour le donneur d ordre"
     template: "config/templates/manifeste_uo_instance.mxl"
+    owner_role: "donneur_ordre"
     required_sheets:
       - _Manifeste
     optional_sheets:
