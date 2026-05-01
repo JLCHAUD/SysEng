@@ -136,12 +136,12 @@ def _sheet_planning(wb: Workbook, uo: UOInstance):
 
 
 def _sheet_activites(wb: Workbook, uo: UOInstance):
-    ws = wb.create_sheet("Activités")
+    ws = wb.create_sheet("Activites")
     ws.sheet_view.showGridLines = False
 
     ws.merge_cells("A1:H1")
     title = ws["A1"]
-    title.value = f"Activités — Charge totale : {uo.total_hours}h"
+    title.value = f"Activites — Charge totale : {uo.total_hours}h"
     title.fill = solid_fill(BLUE_DARK)
     title.font = header_font(size=13)
     title.alignment = center()
@@ -339,7 +339,7 @@ def _sheet_dashboard(wb: Workbook, uo: UOInstance):
         if isinstance(value, date):
             val.number_format = "DD/MM/YYYY"
 
-    # ── Avancement global (linked from Activités sheet) ────────────────────────
+    # ── Avancement global (linked from Activites sheet) ────────────────────────
     ws.merge_cells("D3:E3")
     label_av = ws["D3"]
     label_av.value = "Avancement global"
@@ -350,14 +350,47 @@ def _sheet_dashboard(wb: Workbook, uo: UOInstance):
 
     ws.merge_cells("F3:H3")
     av_val = ws["F3"]
-    # Reference weighted average from Activités sheet footer (row 3+len(activities)+2, col 6)
+    # Reference weighted average from Activites sheet footer (row 3+len(activities)+2, col 6)
     activities = uo.uo_type.activities if uo.uo_type else []
     footer_row = 3 + len(activities) + 2
-    av_val.value = f"=Activités!F{footer_row}"
+    av_val.value = f"=Activites!F{footer_row}"
     av_val.number_format = "0%"
     av_val.font = header_font(size=16, color="000000")
     av_val.alignment = center()
     av_val.border = THIN_BORDER
+
+    # ── Heures réalisées (cellule cible pour BIND) ─────────────────────────────
+    ws.merge_cells("D4:E4")
+    label_hr = ws["D4"]
+    label_hr.value = "Heures realisees"
+    label_hr.fill = solid_fill(BLUE_LIGHT)
+    label_hr.font = body_font(bold=True)
+    label_hr.alignment = center()
+    label_hr.border = THIN_BORDER
+
+    ws.merge_cells("F4:H4")
+    hr_val = ws["F4"]
+    hr_val.value = 0.0
+    hr_val.number_format = "0.0"
+    hr_val.font = header_font(size=14, color="000000")
+    hr_val.alignment = center()
+    hr_val.border = THIN_BORDER
+
+    # ── Points ouverts (cellule cible pour BIND) ───────────────────────────────
+    ws.merge_cells("D5:E5")
+    label_po = ws["D5"]
+    label_po.value = "Points ouverts"
+    label_po.fill = solid_fill(BLUE_LIGHT)
+    label_po.font = body_font(bold=True)
+    label_po.alignment = center()
+    label_po.border = THIN_BORDER
+
+    ws.merge_cells("F5:H5")
+    po_val = ws["F5"]
+    po_val.value = 0
+    po_val.font = header_font(size=14, color="000000")
+    po_val.alignment = center()
+    po_val.border = THIN_BORDER
 
     # ── Progress bar (row 10) ──────────────────────────────────────────────────
     ws.merge_cells("A9:H9")
@@ -611,7 +644,7 @@ def generate_uo_file(uo: UOInstance, output_dir: Path = OUTPUT_DIR) -> Path:
 
     if nb_act > 0:
         last_act = 2 + nb_act
-        _add_named_table(wb["Activités"], f"A2:H{last_act}", "TabActivites")
+        _add_named_table(wb["Activites"], f"A2:H{last_act}", "TabActivites")
     if nb_del > 0:
         last_del = 2 + nb_del
         _add_named_table(wb["Livrables"], f"A2:E{last_del}", "TabLivrables")
@@ -621,6 +654,18 @@ def generate_uo_file(uo: UOInstance, output_dir: Path = OUTPUT_DIR) -> Path:
     actors = uo.project.actors if uo.project else []
     nb_act_proj = max(len(actors), 1)
     _add_named_table(wb["Organisation Projet"], f"A2:D{2 + nb_act_proj}", "TabActeurs")
+
+    # ── Plages nommées pour BIND (executor écrit les valeurs calculées) ──────────
+    from openpyxl.workbook.defined_name import DefinedName
+    wb.defined_names["avancement_global"] = DefinedName(
+        "avancement_global", attr_text="Dashboard!$F$3"
+    )
+    wb.defined_names["heures_realisees"] = DefinedName(
+        "heures_realisees", attr_text="Dashboard!$F$4"
+    )
+    wb.defined_names["nb_po_ouverts"] = DefinedName(
+        "nb_po_ouverts", attr_text="Dashboard!$F$5"
+    )
 
     # Statut UO sur le Dashboard
     degrade_label = f" [DEGRADE{': ' + uo.degrade_note if uo.degrade_note else ''}]" if uo.degrade else ""
