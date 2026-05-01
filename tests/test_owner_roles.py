@@ -111,21 +111,23 @@ class TestLoadRegistreOwner:
         entrees = {e.id: e for e in load_registre()}
         assert entrees["UO-003"].owner_id == "USR002"
 
-    def test_cockpit_owner_est_pilote_tech(self):
+    def test_registre_contient_5_uo(self):
+        """Le registre ne contient que les 5 UO actives (référentiels/cockpits supprimés)."""
         from src.config_loader import load_registre
-        entrees = {e.id: e for e in load_registre()}
-        assert entrees["COCKPIT-ALICE"].owner_id == "USR004"
-        assert entrees["COCKPIT-BRUNO"].owner_id == "USR004"
+        entrees = load_registre()
+        assert len(entrees) == 5
+        ids = {e.id for e in entrees}
+        assert ids == {"UO-001", "UO-002", "UO-003", "UO-004", "UO-005"}
 
-    def test_consolidation_owner_est_engagement_mgr(self):
+    def test_uo002_owner_alice(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert entrees["CONSOLIDATION"].owner_id == "USR005"
+        assert entrees["UO-002"].owner_id == "USR001"
 
-    def test_ref_uo_owner_est_it_manager(self):
+    def test_uo004_owner_bruno(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert entrees["REF-TYPE-SF"].owner_id == "USR006"
+        assert entrees["UO-004"].owner_id == "USR002"
 
 
 # ─── load_uo_instances — owner_id lu ─────────────────────────────────────────
@@ -246,12 +248,12 @@ class TestValidateOwnerRoles:
         assert "pilote_tech" in s
         assert "ingenieur_sys" in s
 
-    def test_tous_les_cockpits_valides(self):
-        """Les 3 cockpits du registre sont attribués à USR004 (pilote_tech) → pas de violation."""
+    def test_registre_reel_uniquement_uo(self):
+        """Le registre actif ne contient que des uo_instance — tous valides."""
         from src.config_loader import load_registre, validate_owner_roles
-        cockpits = [e for e in load_registre() if e.type_fichier == "cockpit"]
-        assert len(cockpits) == 3
-        violations = validate_owner_roles(cockpits)
+        entrees = load_registre()
+        assert all(e.type_fichier == "uo_instance" for e in entrees)
+        violations = validate_owner_roles(entrees)
         assert violations == []
 
     def test_toutes_uo_instances_valides(self):
