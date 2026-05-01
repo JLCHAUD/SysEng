@@ -399,7 +399,7 @@ def _parse_pull(line: str, anchor: str) -> Optional[PullNode]:
     PULL global.var -> UPDATE_CELLS(sheet, table, KEY=col, COLS=c1;c2)
     """
     m = re.match(
-        r'^PULL\s+([\w.*]+)\s*->\s*(FILL_TABLE|UPDATE_CELLS)\(([^)]+)\)\s*(.*)$',
+        r'^PULL\s+([\w.*\-]+)\s*->\s*(FILL_TABLE|UPDATE_CELLS)\(([^)]+)\)\s*(.*)$',
         line.strip(), re.IGNORECASE,
     )
     if not m:
