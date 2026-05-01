@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import yaml
 
@@ -35,7 +35,7 @@ class OwnerRoleViolation:
         )
 
 
-def _load_json(filename: str) -> dict | list:
+def _load_json(filename: str) -> Union[dict, list]:
     with open(CONFIG_DIR / filename, encoding="utf-8") as f:
         return json.load(f)
 
