@@ -78,6 +78,13 @@ def save_store_snapshot(store_path: Optional[Path] = None) -> Path:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     dest = SNAPSHOT_DIR / f"store_{ts}.json"
 
+    # Sur Windows le timer système peut avoir ~15ms de résolution :
+    # deux appels rapides produiraient le même nom → on ajoute un compteur.
+    counter = 0
+    while dest.exists():
+        counter += 1
+        dest = SNAPSHOT_DIR / f"store_{ts}_{counter}.json"
+
     if src_path.exists():
         shutil.copy2(src_path, dest)
     else:
