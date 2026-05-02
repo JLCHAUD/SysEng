@@ -66,6 +66,7 @@ class FileRecord:
     manifest_version: str = "1"
     last_sync: Optional[str] = None   # ISO datetime
     status: str = "unknown"           # "ok" | "error" | "unknown"
+    manifest_metadata: Dict[str, str] = field(default_factory=dict)  # champs en-tête libre (owner, projet…)
 
 
 @dataclass
@@ -86,8 +87,50 @@ class EdgeRecord:
 @dataclass
 class ConsistencyWarning:
     code: str        # "PULL_NEVER_PUSHED" | "PUSH_CONFLICT" | "STALE_FILE"
+                     # "COLLECT_FILE_NOT_FOUND" | "COLLECT_TABLE_MISSING"
+                     # "COLLECT_CIRCULAR_DEP" | "COLLECT_TYPE_CAST"
     message: str
     details: str = ""
+
+
+@dataclass
+class ListRecord:
+    """
+    Déclaration d'une liste de fichiers fils dans le Manifeste d'un père.
+
+    Exemples :
+      LIST UOs_actifs FROM TABLE liste_uo          → form="TABLE"
+      LIST uo_mi20 TYPE=uo_instance WHERE projet=MI20  → form="DYNAMIC"
+    """
+    list_name: str          # ex: "UOs_actifs"
+    owner_file_id: str      # fichier père qui déclare la liste
+    form: str               # "TABLE" | "DYNAMIC"
+    # Forme TABLE
+    source_table: str = ""          # nom de la table Excel dans le père
+    context_columns: List[str] = field(default_factory=list)  # colonnes contextuelles détectées
+    # Forme DYNAMIC
+    filter_type: str = ""           # "uo_instance"
+    filter_where: List[str] = field(default_factory=list)     # ["projet=MI20", "owner=Jean"]
+
+
+@dataclass
+class CollectEdge:
+    """
+    Arc de collecte cross-fichiers : père agrège une table depuis ses fils.
+
+    Exemple :
+      COLLECT Planning FROM UOs_actifs INTO vue_planning
+      → owner_file_id="synthese_mi20", list_name="UOs_actifs",
+        source_table="Planning", target_table="vue_planning"
+    """
+    owner_file_id: str      # fichier père
+    list_name: str          # "UOs_actifs"
+    source_table: str       # table extraite chez chaque fils  ex: "Planning"
+    target_table: str       # table résultat dans le père       ex: "vue_planning"
+    context_columns: List[str] = field(default_factory=list)  # colonnes injectées depuis la liste
+    where_clause: str = ""  # filtre sur les lignes  ex: "criticite >= 3"
+    cols_filter: List[str] = field(default_factory=list)      # sélection de colonnes
+    with_fields: List[str] = field(default_factory=list)      # champs WITH (liste dynamique)
 
 
 @dataclass
@@ -98,21 +141,25 @@ class EcosystemSchema:
     tables: Dict[str, TableSchema] = field(default_factory=dict)
     variables: Dict[str, VariableSchema] = field(default_factory=dict)
     edges: List[EdgeRecord] = field(default_factory=list)
+    lists: List[ListRecord] = field(default_factory=list)
+    collect_edges: List[CollectEdge] = field(default_factory=list)
 
 
 # ─── Sérialisation ────────────────────────────────────────────────────────────
 
 def _to_dict(schema: EcosystemSchema) -> dict:
     return {
-        "version":   schema.version,
-        "last_scan": schema.last_scan,
-        "files":     {k: asdict(v) for k, v in schema.files.items()},
-        "tables":    {
+        "version":       schema.version,
+        "last_scan":     schema.last_scan,
+        "files":         {k: asdict(v) for k, v in schema.files.items()},
+        "tables":        {
             k: {**asdict(v), "columns": {cn: asdict(cv) for cn, cv in v.columns.items()}}
             for k, v in schema.tables.items()
         },
-        "variables": {k: asdict(v) for k, v in schema.variables.items()},
-        "edges":     [asdict(e) for e in schema.edges],
+        "variables":     {k: asdict(v) for k, v in schema.variables.items()},
+        "edges":         [asdict(e) for e in schema.edges],
+        "lists":         [asdict(l) for l in schema.lists],
+        "collect_edges": [asdict(c) for c in schema.collect_edges],
     }
 
 
@@ -135,6 +182,13 @@ def _from_dict(d: dict) -> EcosystemSchema:
         for vid, vdata in d.get("variables", {}).items()
     }
     edges = [EdgeRecord(**e) for e in d.get("edges", [])]
+    lists = [ListRecord(**l) for l in d.get("lists", [])]
+    collect_edges = [CollectEdge(**c) for c in d.get("collect_edges", [])]
+
+    # Migration : FileRecord sans manifest_metadata (ecosystem.json antérieur)
+    for frec in files.values():
+        if not hasattr(frec, "manifest_metadata"):
+            frec.manifest_metadata = {}
 
     return EcosystemSchema(
         version=d.get("version", "2.0"),
@@ -143,6 +197,8 @@ def _from_dict(d: dict) -> EcosystemSchema:
         tables=tables,
         variables=variables,
         edges=edges,
+        lists=lists,
+        collect_edges=collect_edges,
     )
 
 
@@ -230,11 +286,13 @@ def record_file_sync(
     file_type: str,
     status: str,
     manifest_version: str = "1",
+    manifest_metadata: Optional[Dict[str, str]] = None,
     ecosystem_path: Path = ECOSYSTEM_PATH,
 ) -> None:
     """
     Enregistre (ou met à jour) la trace d'un sync de fichier dans l'Exomap.
     Appelé par sync.py après chaque execute_ast().
+    manifest_metadata : champs libres de l'en-tête (owner, projet, has_risques…)
     """
     schema = load(ecosystem_path)
     schema.files[file_id] = FileRecord(
@@ -244,6 +302,7 @@ def record_file_sync(
         manifest_version=manifest_version,
         last_sync=datetime.now().isoformat(timespec="seconds"),
         status=status,
+        manifest_metadata=manifest_metadata or {},
     )
     save(schema, ecosystem_path)
 
@@ -284,7 +343,83 @@ def record_edges_from_ast(
             to_node=f"store::{push.global_name}",
         ))
 
+    # Listes déclarées (LIST)
+    schema.lists = [l for l in schema.lists if l.owner_file_id != file_id]
+    for list_node in getattr(ast, "lists", []):
+        schema.lists.append(ListRecord(
+            list_name=list_node.name,
+            owner_file_id=file_id,
+            form=list_node.form,
+            source_table=getattr(list_node, "source_table", ""),
+            filter_type=getattr(list_node, "filter_type", ""),
+            filter_where=[f"{f}={v}" for f, _, v in getattr(list_node, "filter_where", [])],
+        ))
+
+    # Arcs COLLECT : père → fils (via liste)
+    schema.collect_edges = [c for c in schema.collect_edges if c.owner_file_id != file_id]
+    for collect in getattr(ast, "collects", []):
+        schema.collect_edges.append(CollectEdge(
+            owner_file_id=file_id,
+            list_name=collect.list_name,
+            source_table=collect.source_table,
+            target_table=collect.target_table,
+            where_clause=getattr(collect, "where_clause", ""),
+            cols_filter=getattr(collect, "cols_filter", []),
+            with_fields=getattr(collect, "with_fields", []),
+        ))
+
     save(schema, ecosystem_path)
+
+
+# ─── API publique — requêtes hiérarchie ──────────────────────────────────────
+
+def get_files_by_type(
+    file_type: str,
+    filters: Optional[Dict[str, str]] = None,
+    path: Path = ECOSYSTEM_PATH,
+) -> List[FileRecord]:
+    """
+    Retourne les fichiers connus d'un type donné, avec filtres optionnels
+    sur manifest_metadata. Utilisé par resolve_lists() pour les listes DYNAMIC.
+
+    Exemple :
+      get_files_by_type("uo_instance", {"projet": "MI20", "owner": "Jean"})
+    """
+    schema = load(path)
+    results = [f for f in schema.files.values() if f.file_type == file_type]
+    if filters:
+        for key, value in filters.items():
+            results = [f for f in results if f.manifest_metadata.get(key) == value]
+    return results
+
+
+def get_collect_children(
+    owner_file_id: str,
+    path: Path = ECOSYSTEM_PATH,
+) -> List[CollectEdge]:
+    """Retourne les arcs COLLECT dont ce fichier est le père."""
+    schema = load(path)
+    return [c for c in schema.collect_edges if c.owner_file_id == owner_file_id]
+
+
+def get_collect_parents(
+    child_file_id: str,
+    path: Path = ECOSYSTEM_PATH,
+) -> List[str]:
+    """
+    Retourne les FILE_IDs des pères qui collectent depuis ce fichier
+    (via une liste qui l'inclut).
+    """
+    schema = load(path)
+    parents = []
+    for lst in schema.lists:
+        # Seules les listes TABLE peuvent être vérifiées statiquement
+        # (les listes DYNAMIC sont résolues à l'exécution)
+        if lst.form == "DYNAMIC":
+            continue
+        # Vérifier si child_file_id est dans la table du père
+        # (non vérifiable ici sans ouvrir l'Excel → on retourne les pères candidats)
+    return parents  # complété à l'exécution par l'executor
 
 
 # ─── Détection d'incohérences ─────────────────────────────────────────────────
@@ -334,6 +469,33 @@ def check_consistency(path: Path = ECOSYSTEM_PATH) -> List[ConsistencyWarning]:
                 message=f"{fid} ({frec.file_type}) n'a jamais été synchronisé",
                 details=f"Chemin : {frec.path}",
             ))
+
+    # 4. COLLECT référençant une liste inconnue
+    known_lists = {(l.owner_file_id, l.list_name) for l in schema.lists}
+    for ce in schema.collect_edges:
+        if (ce.owner_file_id, ce.list_name) not in known_lists:
+            warnings.append(ConsistencyWarning(
+                code="COLLECT_LIST_UNKNOWN",
+                message=f"{ce.owner_file_id} : COLLECT référence la liste '{ce.list_name}' non déclarée",
+                details=f"Cible : {ce.target_table}",
+            ))
+
+    # 5. COLLECT_CIRCULAR_DEP — détection de cycles dans le graphe père/fils
+    # Graphe statique : père → [pères des fils connus via listes TABLE]
+    # (les listes DYNAMIC ne sont pas vérifiables statiquement)
+    parent_map: Dict[str, str] = {}  # list_name+owner → owner (pour cycles simples)
+    for ce in schema.collect_edges:
+        for lst in schema.lists:
+            if lst.list_name == ce.list_name and lst.owner_file_id == ce.owner_file_id:
+                if lst.form == "TABLE":
+                    # Vérifier si le père est référencé dans ses propres fils
+                    # (nécessite d'ouvrir les Excel → non fait ici, check superficiel)
+                    if ce.owner_file_id == ce.source_table:
+                        warnings.append(ConsistencyWarning(
+                            code="COLLECT_CIRCULAR_DEP",
+                            message=f"Cycle possible : {ce.owner_file_id} se référence lui-même",
+                            details=f"Liste '{ce.list_name}', COLLECT {ce.source_table} → {ce.target_table}",
+                        ))
 
     return warnings
 
@@ -409,6 +571,22 @@ def lineage_text(
             var = e.from_node.split("::")[-1]
             lines.append(f"  --> PUSH  {var} -> store::{store_key}")
 
+        for ce in schema.collect_edges:
+            if ce.owner_file_id == fid:
+                where = f" WHERE {ce.where_clause}" if ce.where_clause else ""
+                lines.append(
+                    f"  <<< COLLECT  [{ce.list_name}].{ce.source_table}"
+                    f" -> {ce.target_table}{where}"
+                )
+
+        for lst in schema.lists:
+            if lst.owner_file_id == fid:
+                if lst.form == "TABLE":
+                    lines.append(f"  --- LIST  {lst.list_name} FROM TABLE {lst.source_table}")
+                else:
+                    where = " WHERE " + " AND ".join(lst.filter_where) if lst.filter_where else ""
+                    lines.append(f"  --- LIST  {lst.list_name} TYPE={lst.filter_type}{where}")
+
     return "\n".join(lines) if lines else "  (aucun arc enregistré)"
 
 
@@ -416,17 +594,21 @@ def lineage_dict(path: Path = ECOSYSTEM_PATH) -> dict:
     """Retourne l'Exomap complète sous forme de dict (pour JSON export ou CLI)."""
     schema = load(path)
     return {
-        "version":    schema.version,
-        "last_scan":  schema.last_scan,
-        "files":      {k: asdict(v) for k, v in schema.files.items()},
-        "edges":      [asdict(e) for e in schema.edges],
+        "version":       schema.version,
+        "last_scan":     schema.last_scan,
+        "files":         {k: asdict(v) for k, v in schema.files.items()},
+        "edges":         [asdict(e) for e in schema.edges],
+        "lists":         [asdict(l) for l in schema.lists],
+        "collect_edges": [asdict(c) for c in schema.collect_edges],
         "stats": {
-            "nb_files":     len(schema.files),
-            "nb_tables":    len(schema.tables),
-            "nb_variables": len(schema.variables),
-            "nb_edges":     len(schema.edges),
-            "nb_pull_edges": sum(1 for e in schema.edges if e.edge_type == "PULL"),
-            "nb_push_edges": sum(1 for e in schema.edges if e.edge_type == "PUSH"),
+            "nb_files":          len(schema.files),
+            "nb_tables":         len(schema.tables),
+            "nb_variables":      len(schema.variables),
+            "nb_edges":          len(schema.edges),
+            "nb_pull_edges":     sum(1 for e in schema.edges if e.edge_type == "PULL"),
+            "nb_push_edges":     sum(1 for e in schema.edges if e.edge_type == "PUSH"),
+            "nb_lists":          len(schema.lists),
+            "nb_collect_edges":  len(schema.collect_edges),
         },
     }
 

@@ -43,6 +43,7 @@ class FileHeader:
     file_id: str = ""
     version: str = "1"
     doc: str = ""
+    manifest_metadata: Dict[str, str] = field(default_factory=dict)  # champs libres (owner, projet…)
 
 
 @dataclass
@@ -117,6 +118,40 @@ class NotifyNode:
 
 
 @dataclass
+class ListNode:
+    """
+    Déclaration d'une liste de fichiers fils.
+
+    Forme TABLE   : LIST UOs_actifs FROM TABLE liste_uo
+    Forme DYNAMIC : LIST uo_mi20 TYPE=uo_instance WHERE projet=MI20
+    """
+    name: str                                    # "UOs_actifs"
+    form: str                                    # "TABLE" | "DYNAMIC"
+    source_table: str = ""                       # TABLE → nom de la table Excel
+    filter_type: str = ""                        # DYNAMIC → FILE_TYPE filtre
+    filter_where: List[Tuple[str, str, str]] = field(default_factory=list)
+    # DYNAMIC → [(champ, op, valeur), ...]  ex: [("projet", "=", "MI20")]
+
+
+@dataclass
+class CollectNode:
+    """
+    Agrégation cross-fichiers depuis une liste vers une table locale.
+
+    COLLECT Planning FROM UOs_actifs INTO vue_planning
+    COLLECT Risques  FROM UOs_actifs INTO vue_risques WHERE criticite >= 3
+    COLLECT Livrables FROM UOs_actifs INTO vue_livrables COLS=[id, libelle, statut]
+    COLLECT Planning FROM uo_mi20 INTO vue_planning WITH owner, projet
+    """
+    source_table: str                            # "Planning"
+    list_name: str                               # "UOs_actifs"
+    target_table: str                            # "vue_planning"
+    where_clause: str = ""                       # "criticite >= 3"
+    cols_filter: List[str] = field(default_factory=list)   # ["id", "libelle", "statut"]
+    with_fields: List[str] = field(default_factory=list)   # ["owner", "projet"]
+
+
+@dataclass
 class ParseError:
     line_num: int
     raw: str
@@ -134,6 +169,8 @@ class PasserelleAST:
     pulls: List[PullNode] = field(default_factory=list)
     validates: List[ValidateNode] = field(default_factory=list)
     notifies: List[NotifyNode] = field(default_factory=list)
+    lists: List[ListNode] = field(default_factory=list)
+    collects: List[CollectNode] = field(default_factory=list)
     errors: List[ParseError] = field(default_factory=list)
 
     # Index rapide : nom de variable → DefNode
@@ -200,22 +237,39 @@ def _parse_kv_attrs(text: str) -> Dict[str, str]:
 
 # ─── Parsers par instruction ─────────────────────────────────────────────────
 
+_KNOWN_HEADER_KEYS = {"FILE_TYPE", "FILE_ID", "VERSION", "DOC"}
+
+
 def _parse_header_line(line: str, ast: PasserelleAST) -> bool:
-    """Tente de parser une ligne d'en-tête. Retourne True si consommée."""
-    for key in ("FILE_TYPE", "FILE_ID", "VERSION", "DOC"):
-        m = re.match(rf'^{key}\s*:\s*(.+)$', line, re.IGNORECASE)
-        if m:
-            val = m.group(1).strip().strip('"').strip("'")
-            if key == "FILE_TYPE":
-                ast.header.file_type = val
-            elif key == "FILE_ID":
-                ast.header.file_id = val
-            elif key == "VERSION":
-                ast.header.version = val
-            elif key == "DOC":
-                ast.header.doc = val
-            return True
-    return False
+    """
+    Tente de parser une ligne d'en-tête. Retourne True si consommée.
+    Les clés connues (FILE_TYPE, FILE_ID, VERSION, DOC) alimentent FileHeader.
+    Toute autre ligne 'KEY: value' est stockée dans manifest_metadata
+    (ex : owner, projet, has_risques) pour les listes DYNAMIC.
+    """
+    m = re.match(r'^([\w_]+)\s*:\s*(.+)$', line, re.IGNORECASE)
+    if not m:
+        return False
+
+    key = m.group(1).upper()
+    val = m.group(2).strip().strip('"').strip("'")
+
+    if key == "FILE_TYPE":
+        ast.header.file_type = val
+    elif key == "FILE_ID":
+        ast.header.file_id = val
+    elif key == "VERSION":
+        ast.header.version = val
+    elif key == "DOC":
+        ast.header.doc = val
+    elif key not in {"DEF", "COL", "BIND", "PUSH", "PULL",
+                     "VALIDATE", "EXTENDS", "NOTIFY", "LIST", "COLLECT"}:
+        # Champ de métadonnée libre (owner, projet, has_risques…)
+        ast.header.manifest_metadata[key.lower()] = val
+    else:
+        return False  # mot-clé MXL, pas une ligne d'en-tête
+
+    return True
 
 
 def _parse_def(line: str, anchor: str) -> Optional[DefNode]:
@@ -433,6 +487,110 @@ def _parse_pull(line: str, anchor: str) -> Optional[PullNode]:
     )
 
 
+# ─── Parsers LIST / COLLECT ───────────────────────────────────────────────────
+
+def _parse_list_where(where_str: str) -> List[Tuple[str, str, str]]:
+    """
+    Parse 'field=value AND field2=value2' en [(champ, op, valeur), ...].
+    Opérateurs supportés : = et !=
+    """
+    result = []
+    for part in re.split(r'\bAND\b', where_str, flags=re.IGNORECASE):
+        part = part.strip()
+        m = re.match(r'^([\w_]+)\s*(!=|=)\s*(.+)$', part)
+        if m:
+            result.append((m.group(1).strip(), m.group(2), m.group(3).strip()))
+    return result
+
+
+def _parse_list(line: str) -> Optional[ListNode]:
+    """
+    LIST UOs_actifs FROM TABLE liste_uo
+    LIST uo_mi20 TYPE=uo_instance WHERE projet=MI20
+    LIST equipe_Jean TYPE=uo_instance WHERE owner=Jean AND has_risques=oui
+    """
+    line = line.strip()
+
+    # Forme TABLE
+    m = re.match(
+        r'^LIST\s+([\w_]+)\s+FROM\s+TABLE\s+([\w_]+)$',
+        line, re.IGNORECASE,
+    )
+    if m:
+        return ListNode(name=m.group(1), form="TABLE", source_table=m.group(2))
+
+    # Forme DYNAMIC
+    m = re.match(
+        r'^LIST\s+([\w_]+)\s+TYPE=([\w_]+)(?:\s+WHERE\s+(.+))?$',
+        line, re.IGNORECASE,
+    )
+    if m:
+        where_str = (m.group(3) or "").strip()
+        return ListNode(
+            name=m.group(1),
+            form="DYNAMIC",
+            filter_type=m.group(2),
+            filter_where=_parse_list_where(where_str) if where_str else [],
+        )
+
+    return None
+
+
+def _parse_collect(line: str) -> Optional[CollectNode]:
+    """
+    COLLECT <source_table> FROM <list_name> INTO <target_table>
+            [WHERE <condition>] [COLS=[col1, col2, ...]] [WITH field1, field2]
+
+    Tous les modificateurs sont inline sur la même ligne Excel.
+    Exemples :
+      COLLECT Planning FROM UOs_actifs INTO vue_planning
+      COLLECT Risques  FROM UOs_actifs INTO vue_risques WHERE criticite >= 3
+      COLLECT Livrables FROM UOs_actifs INTO vue_livrables COLS=[id, libelle, statut]
+      COLLECT Planning FROM uo_mi20 INTO vue_planning WITH owner, projet
+    """
+    m = re.match(
+        r'^COLLECT\s+([\w_]+)\s+FROM\s+([\w_]+)\s+INTO\s+([\w_]+)(.*)?$',
+        line.strip(), re.IGNORECASE,
+    )
+    if not m:
+        return None
+
+    source_table = m.group(1)
+    list_name    = m.group(2)
+    target_table = m.group(3)
+    trailing     = (m.group(4) or "").strip()
+
+    where_clause = ""
+    cols_filter: List[str] = []
+    with_fields: List[str] = []
+
+    # COLS=[col1, col2, ...] — extraire avant WHERE pour éviter le conflit
+    cols_m = re.search(r'\bCOLS=\[([^\]]+)\]', trailing, re.IGNORECASE)
+    if cols_m:
+        cols_filter = [c.strip() for c in cols_m.group(1).split(',') if c.strip()]
+        trailing = trailing[:cols_m.start()] + trailing[cols_m.end():]
+
+    # WITH field1, field2  (doit être en fin de ligne)
+    with_m = re.search(r'\bWITH\s+([\w_,\s]+)$', trailing, re.IGNORECASE)
+    if with_m:
+        with_fields = [f.strip() for f in with_m.group(1).split(',') if f.strip()]
+        trailing = trailing[:with_m.start()].strip()
+
+    # WHERE <condition>
+    where_m = re.search(r'\bWHERE\s+(.+)$', trailing, re.IGNORECASE)
+    if where_m:
+        where_clause = where_m.group(1).strip()
+
+    return CollectNode(
+        source_table=source_table,
+        list_name=list_name,
+        target_table=target_table,
+        where_clause=where_clause,
+        cols_filter=cols_filter,
+        with_fields=with_fields,
+    )
+
+
 # ─── Parser principal ─────────────────────────────────────────────────────────
 
 def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
@@ -516,6 +674,20 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
                 ast.notifies.append(node)
             else:
                 ast.errors.append(ParseError(line_num, instr, "Syntaxe NOTIFY invalide"))
+
+        elif keyword == "LIST":
+            node = _parse_list(instr)
+            if node:
+                ast.lists.append(node)
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe LIST invalide"))
+
+        elif keyword == "COLLECT":
+            node = _parse_collect(instr)
+            if node:
+                ast.collects.append(node)
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe COLLECT invalide"))
 
         else:
             ast.errors.append(ParseError(line_num, instr,
@@ -620,6 +792,8 @@ def merge_asts(child: PasserelleAST, template: PasserelleAST) -> PasserelleAST:
     merged.validates = template.validates + child.validates
     merged.binds     = template.binds     + child.binds
     merged.pushes    = template.pushes    + child.pushes
+    merged.lists     = template.lists     + child.lists
+    merged.collects  = template.collects  + child.collects
 
     # ── COL index ────────────────────────────────────────────────────────────
     for col in merged.cols:
@@ -778,6 +952,9 @@ def ast_summary(ast: PasserelleAST) -> str:
         f"BIND      : {len(ast.binds)} lien(s)",
         f"PUSH      : {len(ast.pushes)} export(s)",
         f"PULL      : {len(ast.pulls)} import(s)",
+        f"LIST      : {len(ast.lists)} liste(s)",
+        f"COLLECT   : {len(ast.collects)} agrégation(s)",
+        f"Metadata  : {ast.header.manifest_metadata or '—'}",
         f"Erreurs   : {len(ast.errors)}",
     ]
     if ast.errors:

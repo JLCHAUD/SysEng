@@ -35,12 +35,13 @@ from src.parser import PasserelleAST, PullNode, DefNode, BindNode, PushNode
 
 @dataclass
 class ExecutionResult:
-    pushed:   List[str] = field(default_factory=list)  # clés store mises à jour
-    pulled:   List[str] = field(default_factory=list)  # tables Excel mises à jour
-    bound:    List[str] = field(default_factory=list)  # plages nommées écrites
-    errors:   List[str] = field(default_factory=list)  # erreurs (SEVERITY=error)
-    warnings: List[str] = field(default_factory=list)  # avertissements (SEVERITY=warning)
-    skipped:  List[str] = field(default_factory=list)  # instructions ignorées
+    pushed:    List[str] = field(default_factory=list)  # clés store mises à jour
+    pulled:    List[str] = field(default_factory=list)  # tables Excel mises à jour
+    collected: List[str] = field(default_factory=list)  # tables écrites par COLLECT
+    bound:     List[str] = field(default_factory=list)  # plages nommées écrites
+    errors:    List[str] = field(default_factory=list)  # erreurs (SEVERITY=error)
+    warnings:  List[str] = field(default_factory=list)  # avertissements (SEVERITY=warning)
+    skipped:   List[str] = field(default_factory=list)  # instructions ignorées
 
     @property
     def has_blocking_errors(self) -> bool:
@@ -50,6 +51,7 @@ class ExecutionResult:
     def summary(self) -> str:
         lines = [
             f"PULL    : {len(self.pulled)} table(s) mise(s) à jour",
+            f"COLLECT : {len(self.collected)} table(s) agrégée(s)",
             f"PUSH    : {len(self.pushed)} variable(s) publiée(s)",
             f"BIND    : {len(self.bound)} plage(s) écrite(s)",
             f"Skip    : {len(self.skipped)}",
@@ -186,6 +188,160 @@ def _resolve_named_range(wb, target_sheet: str, range_name: str
     return None
 
 
+# ─── Phase 0 — Résolution des LIST ───────────────────────────────────────────
+
+@dataclass
+class ListEntry:
+    file_id:  str
+    filepath: Path
+    context:  Dict[str, Any]   # colonnes contextuelles (Nom_ingenieur, Projet…)
+
+
+@dataclass
+class ResolvedList:
+    name:    str
+    entries: List[ListEntry]
+
+
+def _find_sheet_with_table(wb, table_name: str):
+    """Cherche dans toutes les feuilles celle qui contient la table nommée."""
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        if table_name in ws.tables:
+            return ws
+    return None
+
+
+def _eval_row_condition(row: Dict[str, Any], condition: str) -> bool:
+    """
+    Évalue une condition simple sur un dict de ligne.
+    Supporte AND et les opérateurs =, !=, >, >=, <, <=.
+    """
+    condition = condition.strip()
+    if not condition:
+        return True
+
+    if " AND " in condition.upper():
+        parts = re.split(r"\bAND\b", condition, flags=re.IGNORECASE)
+        return all(_eval_row_condition(row, p) for p in parts)
+
+    m = re.match(r'^([\w_]+)\s*(!=|>=|<=|=|>|<)\s*(.+)$', condition)
+    if not m:
+        return True
+
+    col, op, raw = m.group(1), m.group(2), m.group(3).strip()
+    cell = row.get(col)
+
+    if raw.startswith('"') or raw.startswith("'"):
+        val: Any = raw.strip('"').strip("'")
+    else:
+        try:
+            val = float(raw) if "." in raw else int(raw)
+        except ValueError:
+            val = raw
+
+    if isinstance(val, str) and cell is not None and not isinstance(cell, str):
+        cell = str(cell)
+    if isinstance(cell, str) and not isinstance(val, str):
+        try:
+            cell = type(val)(cell)
+        except (ValueError, TypeError):
+            cell, val = str(cell), str(val)
+
+    if op == "=":  return cell == val
+    if op == "!=": return cell != val
+    if op == ">":  return cell is not None and cell > val
+    if op == ">=": return cell is not None and cell >= val
+    if op == "<":  return cell is not None and cell < val
+    if op == "<=": return cell is not None and cell <= val
+    return True
+
+
+def _tolerant_union(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Aligne tous les dicts sur l'union de leurs clés (ordre d'apparition).
+    Les clés absentes sont remplies avec None.
+    """
+    all_keys: List[str] = []
+    seen: set = set()
+    for row in rows:
+        for k in row:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+    return [{k: row.get(k) for k in all_keys} for row in rows]
+
+
+def resolve_lists(
+    ast,
+    wb,
+    ecosystem=None,
+) -> Dict[str, ResolvedList]:
+    """
+    Phase 0 — Résout toutes les déclarations LIST du Manifeste.
+
+    Forme TABLE   : lit la table Excel du père (FILE_ID + colonnes contextuelles).
+    Forme DYNAMIC : interroge l'Exomap via ecosystem.get_files_by_type().
+
+    Retourne {nom_liste: ResolvedList}.
+    """
+    resolved: Dict[str, ResolvedList] = {}
+
+    for list_node in getattr(ast, "lists", []):
+        if list_node.form == "TABLE":
+            ws = _find_sheet_with_table(wb, list_node.source_table)
+            if ws is None:
+                continue  # table absente → liste vide, COLLECT avertira
+            rows = _read_table_from_ws(ws, list_node.source_table)
+            entries = []
+            for row in rows:
+                fid = str(row.get("FILE_ID", "") or "").strip()
+                if not fid:
+                    continue
+                context = {k: v for k, v in row.items() if k != "FILE_ID"}
+                entries.append(ListEntry(
+                    file_id=fid,
+                    filepath=_resolve_child_path(fid, wb),
+                    context=context,
+                ))
+            resolved[list_node.name] = ResolvedList(name=list_node.name, entries=entries)
+
+        elif list_node.form == "DYNAMIC":
+            if ecosystem is None:
+                continue  # Exomap requise mais absente → liste vide
+            filters = {}
+            for field_name, _op, value in getattr(list_node, "filter_where", []):
+                filters[field_name] = value
+            file_records = ecosystem.get_files_by_type(list_node.filter_type, filters)
+            entries = [
+                ListEntry(
+                    file_id=fr.file_id,
+                    filepath=Path(fr.path),
+                    context=fr.manifest_metadata,
+                )
+                for fr in file_records
+            ]
+            resolved[list_node.name] = ResolvedList(name=list_node.name, entries=entries)
+
+    return resolved
+
+
+def _resolve_child_path(file_id: str, parent_wb) -> Path:
+    """
+    Tente de retrouver le chemin d'un fichier fils depuis son FILE_ID.
+    Stratégie simple : cherche un .xlsx contenant file_id dans le même répertoire.
+    """
+    try:
+        parent_path = Path(parent_wb.path) if hasattr(parent_wb, "path") else None
+        if parent_path and parent_path.parent.exists():
+            for p in parent_path.parent.rglob("*.xlsx"):
+                if file_id.lower() in p.stem.lower():
+                    return p
+    except Exception:
+        pass
+    return Path(f"{file_id}.xlsx")  # chemin best-effort
+
+
 # ─── Phase 1 — PULL ───────────────────────────────────────────────────────────
 
 def _overwrite_table(ws, table_name: str, data: List[Dict]) -> None:
@@ -320,7 +476,110 @@ def execute_pulls(ast: PasserelleAST, wb, store,
             result.skipped.append(f"PULL {pull.global_name} — mode READ_ONLY")
 
 
-# ─── Phase 2 — COMPUTE ────────────────────────────────────────────────────────
+# ─── Phase 2 — COLLECT ───────────────────────────────────────────────────────
+
+def execute_collects(
+    ast,
+    wb,
+    resolved_lists: Dict[str, ResolvedList],
+    result: ExecutionResult,
+) -> None:
+    """
+    Phase 2 — Agrège les tables des fichiers fils dans les tables cibles du père.
+
+    Pour chaque COLLECT :
+      1. Résout la liste de fichiers fils
+      2. Ouvre chaque fils, extrait la table source
+      3. Applique WHERE et COLS si présents
+      4. Injecte _source_file_id et colonnes contextuelles
+      5. Union tolérante → écrit dans la table cible du père (OVERWRITE)
+
+    Exécuté AVANT COMPUTE pour que le père puisse calculer sur les données collectées.
+    """
+    for collect in getattr(ast, "collects", []):
+        rlist = resolved_lists.get(collect.list_name)
+        if rlist is None:
+            result.warnings.append(
+                f"COLLECT {collect.target_table} — liste '{collect.list_name}' non résolue"
+            )
+            continue
+
+        all_rows: List[Dict[str, Any]] = []
+
+        for entry in rlist.entries:
+            if not entry.filepath.exists():
+                result.warnings.append(
+                    f"COLLECT {collect.target_table} — {entry.file_id} introuvable "
+                    f"({entry.filepath})"
+                )
+                continue
+
+            try:
+                wb_child = load_workbook(str(entry.filepath), data_only=True)
+            except Exception as exc:
+                result.warnings.append(
+                    f"COLLECT {collect.target_table} — impossible d'ouvrir "
+                    f"{entry.file_id} : {exc}"
+                )
+                continue
+
+            try:
+                ws_child = _find_sheet_with_table(wb_child, collect.source_table)
+                if ws_child is None:
+                    result.warnings.append(
+                        f"COLLECT {collect.target_table} — table '{collect.source_table}' "
+                        f"absente dans {entry.file_id}"
+                    )
+                    continue
+
+                rows = _read_table_from_ws(ws_child, collect.source_table)
+
+                # Filtre WHERE sur les lignes
+                where = getattr(collect, "where_clause", "") or ""
+                if where:
+                    rows = [r for r in rows if _eval_row_condition(r, where)]
+
+                # Sélection de colonnes COLS
+                cols = getattr(collect, "cols_filter", []) or []
+                if cols:
+                    rows = [{k: r.get(k) for k in cols} for r in rows]
+
+                # Colonnes contextuelles : WITH (liste DYNAMIC) ou tout (liste TABLE)
+                with_fields = getattr(collect, "with_fields", []) or []
+                if with_fields:
+                    context = {k: entry.context.get(k) for k in with_fields}
+                else:
+                    context = dict(entry.context)
+
+                # Enrichissement : _source_file_id en premier, puis contexte, puis données fils
+                for row in rows:
+                    enriched: Dict[str, Any] = {"_source_file_id": entry.file_id}
+                    enriched.update(context)
+                    enriched.update(row)
+                    all_rows.append(enriched)
+
+            finally:
+                wb_child.close()
+
+        # Union tolérante de toutes les lignes collectées
+        unified = _tolerant_union(all_rows)
+
+        # Écriture dans la table cible du père
+        ws_target = _find_sheet_with_table(wb, collect.target_table)
+        if ws_target is None:
+            result.warnings.append(
+                f"COLLECT {collect.target_table} — table cible introuvable dans le père "
+                f"(créer la table Excel '{collect.target_table}' d'abord)"
+            )
+            continue
+
+        _overwrite_table(ws_target, collect.target_table, unified)
+        result.collected.append(
+            f"{collect.target_table} ({len(unified)} lignes depuis {len(rlist.entries)} fils)"
+        )
+
+
+# ─── Phase 3 — COMPUTE ────────────────────────────────────────────────────────
 
 def _resolve_col(col_ref: str, ctx: Dict[str, Any]) -> List[Any]:
     """
@@ -1115,17 +1374,19 @@ def execute_ast(
     ast: PasserelleAST,
     filepath: Path,
     store,
+    ecosystem=None,
 ) -> ExecutionResult:
     """
-    Exécute un PasserelleAST sur le fichier Excel en 4 phases.
+    Exécute un PasserelleAST sur le fichier Excel en 6 phases.
 
     Args:
-        ast      : AST produit par parse_file()
-        filepath : chemin du fichier Excel (sera lu et sauvegardé)
-        store    : module store (doit exposer get(), set_many())
+        ast       : AST produit par parse_file()
+        filepath  : chemin du fichier Excel (sera lu et sauvegardé)
+        store     : module store (doit exposer get(), set_many())
+        ecosystem : module src.ecosystem (optionnel, requis pour LIST DYNAMIC)
 
     Returns:
-        ExecutionResult avec les listes pushed / pulled / bound / errors / skipped
+        ExecutionResult avec pushed / pulled / collected / bound / errors / skipped
     """
     result = ExecutionResult()
 
@@ -1140,25 +1401,31 @@ def execute_ast(
         return result
 
     try:
+        # Phase 0 — Résolution des LIST (avant tout : COLLECT dépend des listes)
+        resolved_lists = resolve_lists(ast, wb, ecosystem)
+
         # Phase 1 — PULL
         execute_pulls(ast, wb, store, result)
 
-        # Phase 2 — COMPUTE
+        # Phase 2 — COLLECT (avant COMPUTE : le père calcule sur les données collectées)
+        execute_collects(ast, wb, resolved_lists, result)
+
+        # Phase 3 — COMPUTE
         ctx = execute_computes(ast, wb, result)
 
-        # Phase 2b — VALIDATE
+        # Phase 3b — VALIDATE
         execute_validates(ast, ctx, result)
 
-        # Phase 3 — PUSH
+        # Phase 4 — PUSH
         execute_pushes(ast, ctx, store, result)
 
-        # Phase 4 — BIND
+        # Phase 5 — BIND
         execute_binds(ast, wb, ctx, result)
 
-        # Phase 4b — NOTIFY (M09)
+        # Phase 5b — NOTIFY (M09)
         execute_notifies(ast, ctx, result)
 
-        # Phase 5 — _Log (M08)
+        # Phase 6 — _Log (M08)
         _write_log_sheet(wb, result)
 
         # Sauvegarde avec backup préalable (M08)
@@ -1295,8 +1562,9 @@ def _write_log_sheet(wb, result: ExecutionResult) -> None:
 
     # Résumé de run
     ws.append([now, "INFO",
-               f"PULL={len(result.pulled)} PUSH={len(result.pushed)} "
-               f"BIND={len(result.bound)} err={len(result.errors)}"])
+               f"PULL={len(result.pulled)} COLLECT={len(result.collected)} "
+               f"PUSH={len(result.pushed)} BIND={len(result.bound)} "
+               f"err={len(result.errors)}"])
 
     # Purge : ne garder que les LOG_MAX_ROWS dernières lignes de données
     data_rows = ws.max_row - 1   # header = ligne 1
