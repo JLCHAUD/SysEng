@@ -1,0 +1,53 @@
+{
+  "version": "2",
+  "relations": [
+    {
+      "id": "rel-001",
+      "parent_class": "cockpit_pole",
+      "child_class": "cockpit_metier",
+      "qualifier": "PRESCRIBED",
+      "cardinality": "1..N",
+      "description": "Tout cockpit métier appartient à un pôle. Validation bloquante à l'enregistrement."
+    },
+    {
+      "id": "rel-002",
+      "parent_class": "cockpit_metier",
+      "child_class": "cockpit_ingenieur",
+      "qualifier": "PRESCRIBED",
+      "cardinality": "1..N",
+      "description": "Tout ingénieur est rattaché à un pilote métier."
+    },
+    {
+      "id": "rel-003",
+      "parent_class": "cockpit_ingenieur",
+      "child_class": "uo_instance",
+      "qualifier": "PRESCRIBED",
+      "cardinality": "1..N",
+      "description": "Toute UO appartient à un ingénieur."
+    },
+    {
+      "id": "rel-004",
+      "parent_class": "referentiel_uo",
+      "child_class": "uo_instance",
+      "qualifier": "TYPICAL",
+      "cardinality": "1..N",
+      "description": "L'UO instance référence son type UO dans le référentiel."
+    },
+    {
+      "id": "rel-005",
+      "parent_class": "referentiel_acteurs",
+      "child_class": "uo_instance",
+      "qualifier": "TYPICAL",
+      "cardinality": "1..N",
+      "description": "L'UO consomme le registre d'acteurs pour ses correspondants techniques."
+    },
+    {
+      "id": "rel-006",
+      "parent_class": "projet_v",
+      "child_class": "uo_instance",
+      "qualifier": "PRESCRIBED",
+      "cardinality": "1..N",
+      "description": "Toute UO est rattachée à un projet. PULL de la feuille Projet."
+    }
+  ]
+}
