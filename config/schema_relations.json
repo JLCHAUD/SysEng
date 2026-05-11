@@ -48,6 +48,14 @@
       "qualifier": "PRESCRIBED",
       "cardinality": "1..N",
       "description": "Toute UO est rattachée à un projet. PULL de la feuille Projet."
+    },
+    {
+      "id": "rel-007",
+      "parent_class": "cockpit_metier",
+      "child_class": "uo_instance",
+      "qualifier": "PRESCRIBED",
+      "cardinality": "1..N",
+      "description": "Toute UO est pilotée par un pilote métier (vue transverse directe, hors hiérarchie ingénieur)."
     }
   ]
 }

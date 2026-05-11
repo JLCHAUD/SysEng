@@ -1,0 +1,61 @@
+{
+  "_comment": "Exemple de contenu du referentiel_uo — TabTypesUO pour l'écosystème SysEng.",
+  "_classe": "referentiel_uo",
+  "_post": "REF-UO-01",
+  "_owner": "pilote_pole",
+
+  "min_fields": {
+    "lot": "L03",
+    "numero_uo": "U12",
+    "libelle": "Climatisation / CVC",
+    "description": "Spécification système et justification du sous-système climatisation, ventilation et chauffage.",
+    "livrable_attendu": "Note de spécification système + dossier de justification"
+  },
+
+  "TabTypesUO": [
+    {
+      "lot": "L01",
+      "numero_uo": "U09",
+      "libelle": "Traction / Freinage",
+      "description": "Spécification et dossier de justification du sous-système traction / freinage.",
+      "livrable_attendu": "Note de spécification système + SIL assessment"
+    },
+    {
+      "lot": "L02",
+      "numero_uo": "U07",
+      "libelle": "Portes palières / embarquement",
+      "description": "Spécification système des portes de véhicule et palières.",
+      "livrable_attendu": "Note de spécification système"
+    },
+    {
+      "lot": "L03",
+      "numero_uo": "U12",
+      "libelle": "Climatisation / CVC",
+      "description": "Spécification et justification CVC (climatisation, ventilation, chauffage).",
+      "livrable_attendu": "Note de spécification + dossier de justification"
+    },
+    {
+      "lot": "L04",
+      "numero_uo": "U01",
+      "libelle": "Éclairage intérieur",
+      "description": "Spécification et justification éclairage intérieur (fonctionnel, de secours).",
+      "livrable_attendu": "Note de spécification + calculs photométriques"
+    },
+    {
+      "lot": "L05",
+      "numero_uo": "U03",
+      "libelle": "Frein de service / urgence",
+      "description": "Spécification système du sous-système de freinage service et urgence.",
+      "livrable_attendu": "Note de spécification + SIL assessment"
+    }
+  ],
+
+  "TabActivitesStd": [
+    { "id_type_uo": "L03U12", "ordre": 1, "designation": "Analyse des exigences client",         "charge_h_std": 8,  "poids_pct_std": 10 },
+    { "id_type_uo": "L03U12", "ordre": 2, "designation": "Rédaction note de spécification",        "charge_h_std": 24, "poids_pct_std": 30 },
+    { "id_type_uo": "L03U12", "ordre": 3, "designation": "Calculs thermiques / sizing",             "charge_h_std": 16, "poids_pct_std": 20 },
+    { "id_type_uo": "L03U12", "ordre": 4, "designation": "Revue et validation interne",             "charge_h_std": 8,  "poids_pct_std": 10 },
+    { "id_type_uo": "L03U12", "ordre": 5, "designation": "Soumission et suivi client",              "charge_h_std": 8,  "poids_pct_std": 10 },
+    { "id_type_uo": "L03U12", "ordre": 6, "designation": "Levée de commentaires",                   "charge_h_std": 16, "poids_pct_std": 20 }
+  ]
+}

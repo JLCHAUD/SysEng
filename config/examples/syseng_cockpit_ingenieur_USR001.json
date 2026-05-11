@@ -1,0 +1,44 @@
+{
+  "_comment": "Exemple de cockpit_ingenieur — Alice Dubois (USR001).",
+  "_classe": "cockpit_ingenieur",
+  "_post": "COCKPIT-ING-01",
+  "_owner": "ingenieur_sys",
+
+  "min_fields": {
+    "ingenieur_id":    "USR001",
+    "nb_uo_actives":   2,
+    "charge_totale_h": 160.0,
+    "avancement_moyen": 37.5,
+    "nb_alertes":      0,
+    "metier_ref":      "COCKPIT-MET-01"
+  },
+
+  "MesUO": [
+    {
+      "uo_id":         "L03U12-P042",
+      "designation":   "Climatisation / CVC — MI20 RATP",
+      "projet_id":     "MI20_RATP",
+      "avancement_pct": 35.0,
+      "statut":        "en_cours",
+      "lien":          "output/UOs/L03U12-P042_climatisation_mi20.xlsx"
+    },
+    {
+      "uo_id":         "L05U03-P042",
+      "designation":   "Frein de service / urgence — MI20 RATP",
+      "projet_id":     "MI20_RATP",
+      "avancement_pct": 40.0,
+      "statut":        "en_cours",
+      "lien":          "output/UOs/L05U03-P042_frein_mi20.xlsx"
+    }
+  ],
+
+  "Urgences": [
+    {
+      "uo_id":        "L03U12-P042",
+      "type_urgence": "point_ouvert_critique",
+      "designation":  "PO-001 — Profil de mission thermique manquant",
+      "date_ref":     "2026-04-10",
+      "priorite":     "haute"
+    }
+  ]
+}

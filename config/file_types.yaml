@@ -3,7 +3,7 @@ file_types:
   referentiel_uo:
     label: Référentiel des UO
     description: Catalogue des types d'UO — définit ce que chaque UO doit produire.
-    owner_role: it_manager
+    owner_role: pilote_pole
     required_sheets:
       - _Manifeste
       - TabTypesUO
@@ -53,7 +53,7 @@ file_types:
   referentiel_acteurs:
     label: Référentiel des Acteurs
     description: Registre centralisé de tous les acteurs externes de l'écosystème.
-    owner_role: it_manager
+    owner_role: pilote_pole
     required_sheets:
       - _Manifeste
       - TabActeurs

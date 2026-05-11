@@ -1,0 +1,169 @@
+{
+  "_comment": "Exemple complet d'une uo_instance — L03U12-P042 (Climatisation / Projet MI20 RATP).",
+  "_classe": "uo_instance",
+  "_post": "L03U12-P042",
+  "_owner": "ingenieur_sys",
+  "_convention_nommage": "L{lot}U{uo}-{projet}[-{systeme}]",
+
+  "min_fields": {
+    "uo_id":           "L03U12-P042",
+    "type_uo":         "L03U12",
+    "projet_id":       "MI20_RATP",
+    "systeme":         "",
+    "ingenieur_ref":   "USR001",
+    "avancement_global": 35.0,
+    "statut":          "en_cours",
+    "nb_points_ouverts": 2,
+    "nb_alertes":      0,
+    "charge_h":        80.0,
+    "seuil_alerte":    20.0,
+    "date_debut":      "2026-03-15",
+    "date_fin_prevue": "2026-07-31"
+  },
+
+  "TabDonneesEntree": [
+    {
+      "designation":    "Cahier des charges climatisation MI20",
+      "type_donnee":    "document",
+      "origine":        "RATP — Direction du Matériel",
+      "responsable":    "ACT-001",
+      "statut":         "reçue",
+      "date_reception": "2026-03-20",
+      "maturite":       "B",
+      "date_maj":       "2026-03-20",
+      "commentaire":    "Version B — en attente de révision C"
+    },
+    {
+      "designation":    "Profil de mission thermique",
+      "type_donnee":    "valeur",
+      "origine":        "RATP — Direction du Matériel",
+      "responsable":    "ACT-001",
+      "statut":         "en_attente",
+      "date_reception": null,
+      "maturite":       "—",
+      "date_maj":       "2026-04-10",
+      "commentaire":    "Point ouvert PO-001 — en cours de fourniture"
+    },
+    {
+      "designation":    "Normes EN 14750-1 et EN 14750-2",
+      "type_donnee":    "spec",
+      "origine":        "Référentiel normatif",
+      "responsable":    "USR001",
+      "statut":         "reçue",
+      "date_reception": "2026-03-01",
+      "maturite":       "finale",
+      "date_maj":       "2026-03-01",
+      "commentaire":    ""
+    }
+  ],
+
+  "TabActivites": [
+    {
+      "designation":        "Analyse des exigences client",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-03-15",
+      "charge_h":           8.0,
+      "poids_pct":          10.0,
+      "avancement_pct":     100.0,
+      "type_tache":         "analyse"
+    },
+    {
+      "designation":        "Rédaction note de spécification",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-04-01",
+      "charge_h":           24.0,
+      "poids_pct":          30.0,
+      "avancement_pct":     50.0,
+      "type_tache":         "redaction"
+    },
+    {
+      "designation":        "Calculs thermiques / sizing",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-05-01",
+      "charge_h":           16.0,
+      "poids_pct":          20.0,
+      "avancement_pct":     0.0,
+      "type_tache":         "calcul"
+    },
+    {
+      "designation":        "Revue et validation interne",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-06-15",
+      "charge_h":           8.0,
+      "poids_pct":          10.0,
+      "avancement_pct":     0.0,
+      "type_tache":         "revue"
+    },
+    {
+      "designation":        "Soumission et suivi client",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-06-30",
+      "charge_h":           8.0,
+      "poids_pct":          10.0,
+      "avancement_pct":     0.0,
+      "type_tache":         "livraison"
+    },
+    {
+      "designation":        "Levée de commentaires",
+      "applicable":         true,
+      "date_debut_prevue":  "2026-07-15",
+      "charge_h":           16.0,
+      "poids_pct":          20.0,
+      "avancement_pct":     0.0,
+      "type_tache":         "correction"
+    }
+  ],
+
+  "TabLivrables": [
+    {
+      "designation":       "Note de spécification CVC — MI20",
+      "type_livrable":     "note_specification",
+      "maturite_attendue": "B",
+      "date_attendue":     "2026-06-30",
+      "receptionnaire":    "ACT-001",
+      "statut":            "non_livré",
+      "date_livraison":    null,
+      "date_revision":     null,
+      "commentaire":       "Soumission maturité B en juin, C après levée commentaires"
+    },
+    {
+      "designation":       "Note de calcul thermique",
+      "type_livrable":     "note_de_calcul",
+      "maturite_attendue": "B",
+      "date_attendue":     "2026-06-15",
+      "receptionnaire":    "ACT-001",
+      "statut":            "non_livré",
+      "date_livraison":    null,
+      "date_revision":     null,
+      "commentaire":       ""
+    }
+  ],
+
+  "TabPointsOuverts": [
+    {
+      "designation":  "PO-001 — Profil de mission thermique manquant",
+      "description":  "Le profil de mission thermique (températures intérieures/extérieures, taux d'occupation) est nécessaire pour les calculs thermiques. Non reçu à ce jour.",
+      "pic":          ["ACT-001", "USR001"],
+      "statut":       "ouvert",
+      "mise_a_jour":  "",
+      "historique":   "2026-04-10 [USR001] : Relance envoyée à C. Rousseau. Délai annoncé : fin avril.\n2026-05-05 [USR001] : Toujours en attente, nouvelle relance. Profil prévu pour semaine du 11/05."
+    },
+    {
+      "designation":  "PO-002 — Confirmation du type de compresseur",
+      "description":  "Le choix entre compresseur scroll et à vis impacte le dimensionnement. ACT-005 (fournisseur) doit confirmer.",
+      "pic":          ["ACT-005", "USR001"],
+      "statut":       "en_cours",
+      "mise_a_jour":  "",
+      "historique":   "2026-04-22 [USR001] : Question posée à Industrie SystèmeSA.\n2026-05-02 [USR001] : Réponse partielle : compresseur scroll privilégié, attente confirmation définitive."
+    }
+  ],
+
+  "TabEscalade": [],
+
+  "TabRetourExperience": [],
+
+  "Correspondants": [
+    { "acteur_id": "ACT-001", "fonction": "ingenieur_sys_client",  "organisation": "RATP — Direction du Matériel",    "email": "c.rousseau@ratp.fr" },
+    { "acteur_id": "ACT-005", "fonction": "fournisseur",            "organisation": "Industrie SystèmeSA",             "email": "contact@systemesa.fr" }
+  ]
+}

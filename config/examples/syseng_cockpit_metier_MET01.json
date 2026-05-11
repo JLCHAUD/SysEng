@@ -1,0 +1,76 @@
+{
+  "_comment": "Exemple de cockpit_metier — Jean-Luc Bernard (USR004), Pilote Métier 01.",
+  "_classe": "cockpit_metier",
+  "_post": "COCKPIT-MET-01",
+  "_owner": "pilote_metier",
+
+  "min_fields": {
+    "metier_id":        "MET-01",
+    "metier_label":     "Systèmes Embarqués & Confort",
+    "avancement_global": 36.7,
+    "nb_uo":            3,
+    "nb_alertes":       1,
+    "donneur_ordre_ref": "ACT-003"
+  },
+
+  "SyntheseIngénieurs": [
+    {
+      "ingenieur_ref":    "USR001",
+      "nb_uo_actives":    2,
+      "charge_totale_h":  160.0,
+      "avancement_moyen": 37.5,
+      "nb_alertes":       0,
+      "nb_points_ouverts": 2
+    },
+    {
+      "ingenieur_ref":    "USR002",
+      "nb_uo_actives":    2,
+      "charge_totale_h":  120.0,
+      "avancement_moyen": 25.0,
+      "nb_alertes":       1,
+      "nb_points_ouverts": 1
+    }
+  ],
+
+  "ActivitesImminentes": [
+    {
+      "uo_id":             "L03U12-P042",
+      "ingenieur_ref":     "USR001",
+      "designation":       "Calculs thermiques / sizing",
+      "date_debut_prevue": "2026-05-01",
+      "charge_h":          16.0,
+      "poids_pct":         20.0,
+      "avancement_pct":    0.0
+    },
+    {
+      "uo_id":             "L02U07-P042",
+      "ingenieur_ref":     "USR002",
+      "designation":       "Rédaction note de spécification portes",
+      "date_debut_prevue": "2026-05-12",
+      "charge_h":          20.0,
+      "poids_pct":         25.0,
+      "avancement_pct":    0.0
+    }
+  ],
+
+  "Alertes": [
+    {
+      "uo_id":        "L02U07-P042",
+      "ingenieur_ref": "USR002",
+      "type_alerte":  "avancement_faible",
+      "detail":       "Avancement 20% — sous le seuil d'alerte de 25%",
+      "date_alerte":  "2026-05-08"
+    }
+  ],
+
+  "PointsBloquants": [
+    {
+      "uo_id":          "L03U12-P042",
+      "type":           "point_ouvert_critique",
+      "designation":    "PO-001 — Profil de mission thermique manquant",
+      "pic":            ["ACT-001", "USR001"],
+      "date_ouverture": "2026-04-10",
+      "statut":         "ouvert"
+    }
+  ]
+}

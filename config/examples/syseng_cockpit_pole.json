@@ -1,0 +1,73 @@
+{
+  "_comment": "Exemple de cockpit_pole — Pierre Legrand (USR006), Pilote de Pôle SysEng.",
+  "_classe": "cockpit_pole",
+  "_post": "COCKPIT-POLE-01",
+  "_owner": "pilote_pole",
+
+  "min_fields": {
+    "pole_id":           "POLE-SYSENG",
+    "pole_label":        "Pôle Ingénierie Systèmes Ferroviaires",
+    "avancement_global": 32.0,
+    "nb_uo_actives":     5,
+    "nb_alertes":        1,
+    "donneur_ordre_ref": "ACT-002"
+  },
+
+  "SyntheseMetier": [
+    {
+      "pilote_metier_ref":  "USR004",
+      "nb_uo_actives":      4,
+      "charge_totale_h":    320.0,
+      "avancement_moyen":   36.7,
+      "nb_alertes":         1,
+      "nb_points_bloquants": 1
+    },
+    {
+      "pilote_metier_ref":  "USR005",
+      "nb_uo_actives":      1,
+      "charge_totale_h":    80.0,
+      "avancement_moyen":   15.0,
+      "nb_alertes":         0,
+      "nb_points_bloquants": 0
+    }
+  ],
+
+  "SyntheseProjet": [
+    {
+      "projet_id":        "MI20_RATP",
+      "nb_uo_actives":    5,
+      "charge_engagee_h": 400.0,
+      "avancement_global": 32.0,
+      "nb_alertes":       1
+    }
+  ],
+
+  "PointsBloquants": [],
+
+  "Capacitaire": {
+    "partie_client": [
+      {
+        "projet_id":          "MI20_RATP",
+        "periode":            "2026-Q2",
+        "charge_prev_client_h": 400.0,
+        "type_besoin":        "études système"
+      }
+    ],
+    "partie_interne": [
+      {
+        "pilote_metier_ref": "USR004",
+        "periode":           "2026-Q2",
+        "capacite_dispo_h":  360.0,
+        "charge_engagee_h":  320.0,
+        "solde_h":           40.0
+      },
+      {
+        "pilote_metier_ref": "USR005",
+        "periode":           "2026-Q2",
+        "capacite_dispo_h":  120.0,
+        "charge_engagee_h":  80.0,
+        "solde_h":           40.0
+      }
+    ]
+  }
+}

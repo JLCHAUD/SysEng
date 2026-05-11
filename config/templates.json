@@ -1,0 +1,16 @@
+{
+  "version": "1",
+  "templates": [
+    {
+      "id": "L3U1_ContCom",
+      "label": "Lot 3 UO 1 Conception Controle Commande",
+      "class_id": "referentiel_uo",
+      "description": "",
+      "extra_sheets": [],
+      "field_defaults": {},
+      "std_tables": [],
+      "mxl_defaults": {},
+      "source_file": ""
+    }
+  ]
+}
