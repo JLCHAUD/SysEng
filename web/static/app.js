@@ -738,10 +738,447 @@ const ViewEcosystem = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: ExcelImport (wizard 5 étapes)
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewExcelImport = {
+  emits: ['toast'],
+  setup(_, { emit }) {
+    const step = ref(1);
+    const scanning = ref(false);
+    const saving = ref(false);
+    const comparing = ref(false);
+    const dragOver = ref(false);
+    const uploadedFile = ref(null);
+    const scanResult = ref(null);
+    const fileTypes = ref([]);
+    const actors = ref([]);
+    const availableTables = ref({});
+    const selectedClass = ref('');
+    const tableComparisons = ref({});
+    const tableMappings = ref([]);
+    const collectMappings = ref([]);
+    const form = reactive({ file_id: '', owner_id: '', periodicite: 'quotidien', update_class_fields: false });
+
+    const isCockpit = computed(() => {
+      const ft = fileTypes.value.find(f => f.id === selectedClass.value);
+      return (ft?.allowed_namespaces || []).length > 0;
+    });
+
+    const childClasses = computed(() => {
+      const ft = fileTypes.value.find(f => f.id === selectedClass.value);
+      return ft?.allowed_namespaces || [];
+    });
+
+    onMounted(async () => {
+      [fileTypes.value, actors.value] = await Promise.all([GET('/api/file-types'), GET('/api/actors')]);
+    });
+
+    const onDrop = e => {
+      dragOver.value = false;
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleFile(file);
+    };
+
+    const onFileInput = e => {
+      const file = e.target.files?.[0];
+      if (file) handleFile(file);
+    };
+
+    const handleFile = file => {
+      if (!file.name.match(/\.(xlsx|xlsm|xlsb|xls)$/i)) {
+        emit('toast', { msg: 'Le fichier doit être un .xlsx / .xlsm', type: 'error' });
+        return;
+      }
+      uploadedFile.value = file;
+    };
+
+    const scanFile = async () => {
+      if (!uploadedFile.value) return;
+      scanning.value = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', uploadedFile.value);
+        const r = await fetch('/api/excel/scan-upload', { method: 'POST', body: fd });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ detail: r.statusText }));
+          throw new Error(err.detail || r.statusText);
+        }
+        scanResult.value = await r.json();
+        const idRange = scanResult.value.named_ranges.find(nr =>
+          ['uo_id', 'file_id', 'post_id', 'id'].includes(nr.name.toLowerCase())
+        );
+        if (idRange?.value_preview) form.file_id = idRange.value_preview;
+        step.value = 2;
+      } catch(e) { emit('toast', { msg: e.message, type: 'error' }); }
+      finally { scanning.value = false; }
+    };
+
+    const compareAndProceed = async () => {
+      if (!selectedClass.value) { emit('toast', { msg: 'Choisir une Classe', type: 'error' }); return; }
+      comparing.value = true;
+      try {
+        if (Object.keys(availableTables.value).length === 0) {
+          const data = await GET('/api/excel/available-tables');
+          availableTables.value = data.by_class || {};
+        }
+        const allExisting = [];
+        Object.entries(availableTables.value).forEach(([cls, tbls]) => {
+          tbls.forEach(t => allExisting.push({ ...t, cls }));
+        });
+
+        const comparisons = {};
+        for (const tbl of (scanResult.value?.tables || [])) {
+          let best = null, bestScore = 0;
+          for (const existing of allExisting) {
+            const res = await POST('/api/excel/compare-tables', {
+              scanned_columns: tbl.columns.map(c => c.name),
+              existing_table_id: existing.table_id,
+            });
+            if (res.match_score > bestScore) { bestScore = res.match_score; best = { ...res, existing }; }
+          }
+          if (best && bestScore >= 0.6) comparisons[tbl.name] = best;
+        }
+        tableComparisons.value = comparisons;
+
+        tableMappings.value = (scanResult.value?.tables || []).map(tbl => {
+          const comp = comparisons[tbl.name];
+          return {
+            scannedTable: tbl,
+            action: comp ? 'link' : 'create',
+            linkedId: comp?.existing?.table_id || '',
+            schemaName: comp?.existing?.table_name || tbl.name,
+            columns: tbl.columns.map(c => ({ ...c, col_type: c.suggested_type, include: true, is_key: false, required: true })),
+            comparison: comp || null,
+          };
+        });
+        step.value = 3;
+      } catch(e) { emit('toast', { msg: e.message, type: 'error' }); }
+      finally { comparing.value = false; }
+    };
+
+    const proceedFromMapping = async () => {
+      if (isCockpit.value) {
+        if (collectMappings.value.length === 0) {
+          const suggestions = [];
+          for (const ns of childClasses.value) {
+            const nsKey = ns.replace(/\.$/, '');
+            const cls = fileTypes.value.find(f => f.id.includes(nsKey) || (f.push_prefix || '').startsWith(nsKey));
+            const classId = cls?.id || nsKey;
+            const tbls = availableTables.value[classId] || [];
+            tbls.forEach(t => suggestions.push({
+              source_class: classId, source_table: t.table_name,
+              target_table: t.table_name, where: '', cols: '', enabled: false,
+            }));
+          }
+          collectMappings.value = suggestions;
+        }
+        step.value = 4;
+      } else {
+        step.value = 5;
+      }
+    };
+
+    const register = async () => {
+      if (!form.file_id) { emit('toast', { msg: 'ID du Post requis', type: 'error' }); return; }
+      saving.value = true;
+      try {
+        const tblMappings = tableMappings.value.map(m => ({
+          excel_name: m.scannedTable.name,
+          schema_name: m.action === 'link' ? (m.linkedId?.split('.').pop() || m.schemaName) : m.schemaName,
+          sheet: m.scannedTable.sheet,
+          columns: m.columns.filter(c => c.include).map(c => ({
+            name: c.name, col_type: c.col_type, header: c.name, is_key: c.is_key, required: c.required,
+          })),
+          include: true,
+        }));
+        const fieldMappings = (scanResult.value?.named_ranges || []).map(nr => ({
+          named_range: nr.name, field_name: nr.name, field_type: nr.suggested_type,
+          nature: 'identitaire', source: 'user_input', required: true, pushable: false, include: true,
+        }));
+        const activeCollects = collectMappings.value.filter(cm => cm.enabled).map(cm => ({
+          source_class: cm.source_class, source_table: cm.source_table,
+          target_table: cm.target_table, where_clause: cm.where, cols_filter: cm.cols,
+        }));
+
+        await POST('/api/excel/register', {
+          path: uploadedFile.value?.name || '',
+          file_id: form.file_id, type_fichier: selectedClass.value,
+          owner_id: form.owner_id, synchro_periodicite: form.periodicite,
+          field_mappings: fieldMappings, table_mappings: tblMappings,
+          update_class_fields: form.update_class_fields, collect_mappings: activeCollects,
+        });
+
+        emit('toast', { msg: `Post '${form.file_id}' enregistré avec succès`, type: 'ok' });
+        step.value = 1; uploadedFile.value = null; scanResult.value = null;
+        selectedClass.value = ''; tableMappings.value = []; collectMappings.value = [];
+        tableComparisons.value = {}; availableTables.value = {};
+        Object.assign(form, { file_id: '', owner_id: '', periodicite: 'quotidien', update_class_fields: false });
+      } catch(e) { emit('toast', { msg: e.message, type: 'error' }); }
+      finally { saving.value = false; }
+    };
+
+    const verdictClass = v => v === 'identical' ? 'badge-green' : v === 'compatible' ? 'badge-orange' : 'badge-gray';
+    const verdictLabel = s => s >= 0.9 ? `identique (${Math.round(s*100)}%)` : s >= 0.6 ? `compatible (${Math.round(s*100)}%)` : 'différent';
+
+    return {
+      step, scanning, saving, comparing, dragOver, uploadedFile, scanResult,
+      fileTypes, actors, availableTables, selectedClass, tableComparisons,
+      tableMappings, collectMappings, isCockpit, form,
+      onDrop, onFileInput, handleFile, scanFile, compareAndProceed, proceedFromMapping,
+      register, verdictClass, verdictLabel,
+    };
+  },
+  template: `
+    <div>
+      <!-- Indicateurs d'étapes -->
+      <div style="display:flex;align-items:center;gap:0;margin-bottom:24px;flex-wrap:wrap;gap:4px">
+        <template v-for="(s, i) in ['Upload','Résultats','Mapping','COLLECT','Enregistrer']" :key="i">
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;font-size:0.82rem;font-weight:500"
+               :style="{background:step===i+1?'var(--accent)':'transparent',color:step===i+1?'#fff':'var(--text-dim)',opacity:(!isCockpit&&i===3)?0.35:1}">
+            <span style="width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700"
+                  :style="{background:step>i+1?'#22c55e':step===i+1?'rgba(255,255,255,0.25)':'var(--border)'}">
+              {{ step>i+1?'✓':i+1 }}
+            </span>
+            {{ s }}
+          </div>
+          <div v-if="i<4" style="width:16px;height:1px;background:var(--border)"></div>
+        </template>
+      </div>
+
+      <!-- ÉTAPE 1: Upload -->
+      <div v-if="step===1" class="card">
+        <div class="card-header"><span class="card-title">Choisir un fichier Excel</span></div>
+        <div style="padding:16px">
+          <div @dragover.prevent="dragOver=true" @dragleave.prevent="dragOver=false" @drop.prevent="onDrop"
+               style="border:2px dashed;border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;transition:all 0.2s"
+               :style="{borderColor:dragOver?'var(--accent)':'var(--border)',background:dragOver?'rgba(59,130,246,0.08)':'var(--surface-alt)'}"
+               @click="$refs.fileInput.click()">
+            <div style="font-size:2.5rem;margin-bottom:12px">📊</div>
+            <div v-if="!uploadedFile" style="color:var(--text-dim);font-size:0.95rem">
+              Glissez un fichier <strong>.xlsx</strong> ici<br>
+              <span style="font-size:0.82rem">ou cliquez pour parcourir</span>
+            </div>
+            <div v-else style="color:#22c55e;font-weight:600">
+              ✓ {{ uploadedFile.name }}<br>
+              <span style="font-size:0.82rem;color:var(--text-dim)">{{ (uploadedFile.size/1024).toFixed(0) }} Ko</span>
+            </div>
+            <input ref="fileInput" type="file" accept=".xlsx,.xlsm,.xls" style="display:none" @change="onFileInput" />
+          </div>
+          <div style="margin-top:16px;display:flex;justify-content:flex-end">
+            <button class="btn btn-primary" :disabled="!uploadedFile||scanning" @click="scanFile">
+              {{ scanning ? '⏳ Scan en cours…' : '→ Scanner le fichier' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 2: Résultats du scan -->
+      <div v-if="step===2" class="card">
+        <div class="card-header"><span class="card-title">Résultats du scan</span></div>
+        <div style="padding:16px">
+          <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+            <span class="badge badge-gray">{{ scanResult?.path }}</span>
+            <span class="badge badge-blue">{{ (scanResult?.sheets||[]).length }} feuilles</span>
+            <span class="badge badge-purple">{{ (scanResult?.named_ranges||[]).length }} plages nommées</span>
+            <span class="badge badge-green">{{ (scanResult?.tables||[]).length }} tables Excel</span>
+          </div>
+
+          <div v-if="(scanResult?.named_ranges||[]).length" style="margin-bottom:20px">
+            <div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;color:var(--text-dim)">PLAGES NOMMÉES</div>
+            <table>
+              <thead><tr><th>Nom</th><th>Feuille</th><th>Aperçu</th><th>Type</th></tr></thead>
+              <tbody>
+                <tr v-for="nr in scanResult.named_ranges" :key="nr.name">
+                  <td><code style="color:var(--accent)">{{ nr.name }}</code></td>
+                  <td style="color:var(--text-dim);font-size:0.82rem">{{ nr.sheet }}</td>
+                  <td style="font-size:0.82rem">{{ nr.value_preview || '—' }}</td>
+                  <td><span class="badge badge-gray" style="font-size:0.75rem">{{ nr.suggested_type }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="(scanResult?.tables||[]).length" style="margin-bottom:20px">
+            <div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;color:var(--text-dim)">TABLES EXCEL</div>
+            <table>
+              <thead><tr><th>Nom</th><th>Feuille</th><th>Colonnes</th><th>Lignes</th></tr></thead>
+              <tbody>
+                <tr v-for="t in scanResult.tables" :key="t.name">
+                  <td><code style="color:var(--accent)">{{ t.name }}</code></td>
+                  <td style="color:var(--text-dim);font-size:0.82rem">{{ t.sheet }}</td>
+                  <td>{{ t.columns.length }} col.</td>
+                  <td style="color:var(--text-dim)">{{ t.row_count }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="form-group" style="max-width:400px">
+            <label>Classe (type de fichier) *</label>
+            <select v-model="selectedClass">
+              <option value="">— Choisir une Classe —</option>
+              <option v-for="ft in fileTypes" :key="ft.id" :value="ft.id">{{ ft.id }} — {{ ft.label }}</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
+            <button class="btn btn-ghost" @click="step=1">← Retour</button>
+            <button class="btn btn-primary" :disabled="!selectedClass||comparing" @click="compareAndProceed">
+              {{ comparing ? '⏳ Comparaison…' : '→ Mapper les tables' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 3: Mapping des tables -->
+      <div v-if="step===3" class="card">
+        <div class="card-header"><span class="card-title">Mapping des tables</span></div>
+        <div style="padding:16px">
+          <div v-if="tableMappings.length===0" style="color:var(--text-dim);padding:24px;text-align:center">
+            Aucune table trouvée dans ce fichier.
+          </div>
+          <div v-for="m in tableMappings" :key="m.scannedTable.name"
+               style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+              <code style="color:var(--accent)">{{ m.scannedTable.name }}</code>
+              <span v-if="m.comparison" class="badge" :class="verdictClass(m.comparison.verdict)">
+                ⚡ {{ verdictLabel(m.comparison.match_score) }}
+              </span>
+              <span v-else class="badge badge-gray">Nouvelle</span>
+              <select v-model="m.action" style="width:auto;padding:4px 8px;margin-left:auto">
+                <option v-if="m.comparison" value="link">Lier à la table existante</option>
+                <option value="create">Créer nouvelle table</option>
+              </select>
+            </div>
+            <div v-if="m.action==='create'" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label style="font-size:0.82rem;white-space:nowrap">Nom schéma :</label>
+              <input v-model="m.schemaName" style="width:200px" placeholder="TabNomTable" />
+            </div>
+            <div v-if="m.action==='link'&&m.comparison" style="font-size:0.82rem;color:var(--text-dim);margin-bottom:8px">
+              Liée à : <code>{{ m.comparison.existing.table_id }}</code>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <span v-for="col in m.scannedTable.columns" :key="col.name"
+                    style="font-size:0.77rem;padding:3px 7px;border-radius:4px;border:1px solid var(--border)"
+                    :style="{background: m.comparison&&m.comparison.matching_columns.includes(col.name)?'rgba(34,197,94,0.1)':m.comparison&&m.comparison.extra_in_scan.includes(col.name)?'rgba(245,158,11,0.1)':'var(--surface-alt)'}">
+                {{ col.name }} <span style="color:var(--text-dim)">· {{ col.suggested_type }}</span>
+              </span>
+            </div>
+            <div v-if="m.comparison&&m.comparison.missing_in_scan.length" style="margin-top:6px;font-size:0.78rem;color:#f59e0b">
+              ⚠ Colonnes manquantes : {{ m.comparison.missing_in_scan.join(', ') }}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
+            <button class="btn btn-ghost" @click="step=2">← Retour</button>
+            <button class="btn btn-primary" @click="proceedFromMapping">
+              {{ isCockpit ? '→ COLLECT Builder' : '→ Enregistrement' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 4: COLLECT Builder -->
+      <div v-if="step===4" class="card">
+        <div class="card-header"><span class="card-title">COLLECT Builder</span></div>
+        <div style="padding:16px">
+          <div style="margin-bottom:16px;padding:10px 14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:6px;font-size:0.85rem;color:var(--text-dim)">
+            Ce fichier (classe <strong>{{ selectedClass }}</strong>) peut agréger des tables depuis des fichiers enfants.
+            Cochez les tables à collecter.
+          </div>
+          <div v-if="collectMappings.length===0" style="color:var(--text-dim);text-align:center;padding:24px">
+            Aucune table disponible dans les classes enfants (tables.json vide pour ces classes).
+          </div>
+          <table v-else>
+            <thead>
+              <tr>
+                <th style="width:28px"></th>
+                <th>Source</th>
+                <th>Dans ce fichier comme</th>
+                <th>WHERE (optionnel)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="cm in collectMappings" :key="cm.source_class+'_'+cm.source_table">
+                <td><input type="checkbox" v-model="cm.enabled" style="width:auto" /></td>
+                <td>
+                  <span class="badge badge-gray" style="font-size:0.75rem">{{ cm.source_class }}</span>
+                  <code style="color:var(--accent);margin-left:6px;font-size:0.82rem">{{ cm.source_table }}</code>
+                </td>
+                <td><input v-model="cm.target_table" :disabled="!cm.enabled" style="width:180px" /></td>
+                <td><input v-model="cm.where" :disabled="!cm.enabled" placeholder="ex: statut = 'actif'" style="width:200px" /></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
+            <button class="btn btn-ghost" @click="step=3">← Retour</button>
+            <button class="btn btn-primary" @click="step=5">→ Enregistrement</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 5: Enregistrement -->
+      <div v-if="step===5" class="card">
+        <div class="card-header"><span class="card-title">Enregistrement</span></div>
+        <div style="padding:16px">
+          <div class="form-row">
+            <div class="form-group">
+              <label>ID du Post *</label>
+              <input v-model="form.file_id" placeholder="ex: UO-006 ou L03U12-P042" />
+            </div>
+            <div class="form-group">
+              <label>Classe</label>
+              <input :value="selectedClass" disabled />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Owner</label>
+              <select v-model="form.owner_id">
+                <option value="">— Choisir —</option>
+                <option v-for="a in actors" :key="a.id" :value="a.id">{{ a.nom }} ({{ a.id }})</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Périodicité</label>
+              <select v-model="form.periodicite">
+                <option value="quotidien">quotidien</option>
+                <option value="hebdomadaire">hebdomadaire</option>
+                <option value="manuel">manuel</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" v-model="form.update_class_fields" style="width:auto;margin-right:6px" />
+              Mettre à jour les min_fields de la Classe avec les plages nommées
+            </label>
+          </div>
+
+          <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:14px;margin:16px 0;font-size:0.85rem;line-height:1.8">
+            <div style="font-weight:600;margin-bottom:6px;font-size:0.88rem">Résumé</div>
+            <div style="color:#22c55e">✓ {{ (scanResult?.named_ranges||[]).length }} plages nommées → min_fields</div>
+            <div style="color:#22c55e">✓ {{ tableMappings.filter(m=>m.action==='link').length }} table(s) liée(s)</div>
+            <div style="color:#3b82f6">✓ {{ tableMappings.filter(m=>m.action==='create').length }} nouvelle(s) table(s) → tables.json</div>
+            <div v-if="isCockpit" style="color:#8b5cf6">✓ {{ collectMappings.filter(cm=>cm.enabled).length }} COLLECT → hierarchy.json</div>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:space-between">
+            <button class="btn btn-ghost" @click="step=isCockpit?4:3">← Retour</button>
+            <button class="btn btn-primary" :disabled="!form.file_id||saving" @click="register">
+              {{ saving ? '⏳ Enregistrement…' : '✓ Enregistrer' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const App = {
-  components: { ToastComponent, ViewDashboard, ViewFileTypes, ViewRegistry, ViewActors, ViewEcosystem, ViewHierarchy, ViewTables, ViewMxlPreview, ViewSchemaBlueprint, ViewSchemaClasses, ViewSchemaRelations, ViewSchemaFunctions, ViewSchemaTemplates },
+  components: { ToastComponent, ViewDashboard, ViewFileTypes, ViewRegistry, ViewActors, ViewEcosystem, ViewHierarchy, ViewTables, ViewMxlPreview, ViewExcelImport, ViewSchemaBlueprint, ViewSchemaClasses, ViewSchemaRelations, ViewSchemaFunctions, ViewSchemaTemplates },
   setup() {
     const view = ref('dashboard');
     const selectedClassId = ref(null);
@@ -763,6 +1200,7 @@ const App = {
       { id: 'filetypes',  icon: '◈', label: 'Types de fichiers',   group: 'Configuration' },
       { id: 'registry',   icon: '◧', label: 'Registre',            group: 'Configuration' },
       { id: 'actors',     icon: '◉', label: 'Acteurs',             group: 'Configuration' },
+      { id: 'excel-import', icon: '⤵', label: 'Importer Excel',     group: 'Configuration' },
       { id: 'hierarchy',  icon: '⬡', label: 'Hiérarchie',          group: 'Structure' },
       { id: 'tables',     icon: '▦', label: 'Tables & colonnes',   group: 'Structure' },
       { id: 'mxl',        icon: '⌥', label: 'Générateur MXL',      group: 'Structure' },
@@ -788,6 +1226,7 @@ const App = {
       hierarchy: 'Hiérarchie — LIST & COLLECT',
       tables:    'Tables & colonnes',
       mxl:       'Générateur de Manifeste MXL',
+      'excel-import': 'Importer un fichier Excel',
       ecosystem:        'Graphe écosystème',
       'schema-blueprint': 'Schéma — Blueprint',
       'schema-classes':   'Schéma — Classes',
@@ -836,7 +1275,8 @@ const App = {
         <view-actors      v-else-if="view==='actors'"     @toast="addToast" />
         <view-hierarchy   v-else-if="view==='hierarchy'"  @toast="addToast" />
         <view-tables      v-else-if="view==='tables'"     @toast="addToast" />
-        <view-mxl-preview v-else-if="view==='mxl'"        @toast="addToast" />
+        <view-mxl-preview    v-else-if="view==='mxl'"           @toast="addToast" />
+        <view-excel-import   v-else-if="view==='excel-import'" @toast="addToast" />
         <view-ecosystem          v-else-if="view==='ecosystem'"        @toast="addToast" />
         <view-schema-blueprint   v-else-if="view==='schema-blueprint'" @toast="addToast" @open-class="openClass" />
         <view-schema-classes     v-else-if="view==='schema-classes'"   @toast="addToast" :initial-class="selectedClassId" />

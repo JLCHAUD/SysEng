@@ -1,14 +1,6 @@
 {
-  "version": "2",
+  "version": "1",
   "relations": [
-    {
-      "id": "rel-001",
-      "parent_class": "cockpit_pole",
-      "child_class": "cockpit_metier",
-      "qualifier": "PRESCRIBED",
-      "cardinality": "1..N",
-      "description": "Tout cockpit métier appartient à un pôle. Validation bloquante à l'enregistrement."
-    },
     {
       "id": "rel-002",
       "parent_class": "cockpit_metier",

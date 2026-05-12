@@ -1,4 +1,437 @@
 {
   "version": "1",
-  "tables": {}
+  "tables": {
+    "UO-basic.Donnees_Entree": {
+      "id": "UO-basic.Donnees_Entree",
+      "file_id": "UO-basic",
+      "table_name": "Donnees_Entree",
+      "sheet": "Données d'entrée",
+      "description": "Importé depuis Donnees_Entree",
+      "columns": [
+        {
+          "name": "ID",
+          "col_type": "string",
+          "header": "ID",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Désignation",
+          "col_type": "string",
+          "header": "Désignation",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Type ",
+          "col_type": "string",
+          "header": "Type ",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Origine",
+          "col_type": "string",
+          "header": "Origine",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "PIC ",
+          "col_type": "string",
+          "header": "PIC ",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Status",
+          "col_type": "string",
+          "header": "Status",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date reception",
+          "col_type": "string",
+          "header": "Date reception",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Maturité",
+          "col_type": "string",
+          "header": "Maturité",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date  Update",
+          "col_type": "string",
+          "header": "Date  Update",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Comments",
+          "col_type": "string",
+          "header": "Comments",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        }
+      ]
+    },
+    "UO-basic.Activites": {
+      "id": "UO-basic.Activites",
+      "file_id": "UO-basic",
+      "table_name": "Activites",
+      "sheet": "Activités",
+      "description": "Importé depuis Activites",
+      "columns": [
+        {
+          "name": "ID",
+          "col_type": "string",
+          "header": "ID",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Designation",
+          "col_type": "string",
+          "header": "Designation",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Applicable",
+          "col_type": "string",
+          "header": "Applicable",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date Begin",
+          "col_type": "date",
+          "header": "Date Begin",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Load (h)",
+          "col_type": "int",
+          "header": "Load (h)",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Weight (%)",
+          "col_type": "float",
+          "header": "Weight (%)",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Avancement",
+          "col_type": "string",
+          "header": "Avancement",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Type",
+          "col_type": "float",
+          "header": "Type",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        }
+      ]
+    },
+    "UO-basic.Livrables": {
+      "id": "UO-basic.Livrables",
+      "file_id": "UO-basic",
+      "table_name": "Livrables",
+      "sheet": "Livrables",
+      "description": "Importé depuis Livrables",
+      "columns": [
+        {
+          "name": "ID",
+          "col_type": "string",
+          "header": "ID",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Désignation",
+          "col_type": "string",
+          "header": "Désignation",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Type ",
+          "col_type": "string",
+          "header": "Type ",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Maturité attendue",
+          "col_type": "string",
+          "header": "Maturité attendue",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date Attendue initiale",
+          "col_type": "string",
+          "header": "Date Attendue initiale",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "PIC ",
+          "col_type": "string",
+          "header": "PIC ",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Status",
+          "col_type": "string",
+          "header": "Status",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date revisée",
+          "col_type": "string",
+          "header": "Date revisée",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date  livraison",
+          "col_type": "string",
+          "header": "Date  livraison",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Comments",
+          "col_type": "string",
+          "header": "Comments",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        }
+      ]
+    },
+    "UO-basic.Escalade": {
+      "id": "UO-basic.Escalade",
+      "file_id": "UO-basic",
+      "table_name": "Escalade",
+      "sheet": "Escalade",
+      "description": "Importé depuis Escalade",
+      "columns": [
+        {
+          "name": "ID",
+          "col_type": "string",
+          "header": "ID",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Désignation",
+          "col_type": "string",
+          "header": "Désignation",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Date",
+          "col_type": "date",
+          "header": "Date",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Type",
+          "col_type": "string",
+          "header": "Type",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "PIC ",
+          "col_type": "string",
+          "header": "PIC ",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Status",
+          "col_type": "string",
+          "header": "Status",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        }
+      ]
+    },
+    "UO-basic.Retex": {
+      "id": "UO-basic.Retex",
+      "file_id": "UO-basic",
+      "table_name": "Retex",
+      "sheet": "REX",
+      "description": "Importé depuis Retex",
+      "columns": [
+        {
+          "name": "ID",
+          "col_type": "string",
+          "header": "ID",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Type REX",
+          "col_type": "string",
+          "header": "Type REX",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Commentaire",
+          "col_type": "string",
+          "header": "Commentaire",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Auteur",
+          "col_type": "string",
+          "header": "Auteur",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Liens",
+          "col_type": "string",
+          "header": "Liens",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Outils",
+          "col_type": "string",
+          "header": "Outils",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Status",
+          "col_type": "string",
+          "header": "Status",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Colonne8",
+          "col_type": "string",
+          "header": "Colonne8",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "Colonne9",
+          "col_type": "string",
+          "header": "Colonne9",
+          "write": "",
+          "is_key": false,
+          "required": true,
+          "description": ""
+        }
+      ]
+    }
+  }
 }

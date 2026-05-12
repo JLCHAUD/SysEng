@@ -308,7 +308,7 @@ def record_file_sync(
 
 
 def record_edges_from_ast(
-    ast,           # PasserelleAST — import circulaire évité
+    ast,           # ManifestAST — import circulaire évité
     file_id: str,
     ecosystem_path: Path = ECOSYSTEM_PATH,
 ) -> None:

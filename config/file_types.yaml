@@ -1,380 +1,281 @@
 file_types:
-
   referentiel_uo:
     label: Référentiel des UO
     description: Catalogue des types d'UO — définit ce que chaque UO doit produire.
+    template: ''
     owner_role: pilote_pole
     required_sheets:
-      - _Manifeste
-      - TabTypesUO
-      - TabActivitesStd
+    - _Manifeste
+    - TabTypesUO
+    - TabActivitesStd
     optional_sheets:
-      - _Log
+    - _Log
     allowed_namespaces:
-      - ref.uo.
-    push_prefix: "ref.uo."
-    min_fields:
-      - name: lot
-        label: Numéro de lot
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: false
-      - name: numero_uo
-        label: Numéro UO dans le lot
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: false
-      - name: libelle
-        label: Libellé de l'UO
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: true
-      - name: description
-        label: Description détaillée
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: false
-        pushable: true
-      - name: livrable_attendu
-        label: Nature du livrable attendu
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: false
-        pushable: true
-
+    - ref.uo.
+    push_prefix: ref.uo.
   referentiel_acteurs:
     label: Référentiel des Acteurs
     description: Registre centralisé de tous les acteurs externes de l'écosystème.
+    template: ''
     owner_role: pilote_pole
     required_sheets:
-      - _Manifeste
-      - TabActeurs
+    - _Manifeste
+    - TabActeurs
     optional_sheets:
-      - _Log
+    - _Log
     allowed_namespaces:
-      - ref.acteurs.
-    push_prefix: "ref.acteurs."
-
+    - ref.acteurs.
+    push_prefix: ref.acteurs.
   projet_v:
     label: Fichier Projet
-    description: Source de vérité sur l'organisation et le contexte d'un projet. 1 Post par projet actif.
+    description: Source de vérité sur l'organisation et le contexte d'un projet. 1
+      Post par projet actif.
     owner_role: pilote_metier
     required_sheets:
-      - _Manifeste
+    - _Manifeste
     optional_sheets:
-      - _Log
+    - _Log
     allowed_namespaces:
-      - projet.
-    push_prefix: "projet.{id}."
-
-  cockpit_pole:
-    label: Cockpit Pôle de Compétences
-    description: Tableau de bord du pilote pôle — charge par métier, avancement, capacitaire, points bloquants.
-    owner_role: pilote_pole
-    required_sheets:
-      - _Manifeste
-      - SyntheseMetier
-      - SyntheseProjet
-      - Capacitaire
-    optional_sheets:
-      - PointsBloquants
-      - _Log
-    allowed_namespaces:
-      - pole.
-      - metier.
-      - uo.
-    push_prefix: "pole."
-    min_fields:
-      - name: pole_id
-        label: Identifiant du pôle
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: false
-      - name: pole_label
-        label: Libellé du pôle
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: true
-      - name: avancement_global
-        label: Avancement global (%)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: false
-      - name: nb_uo_actives
-        label: Nombre d'UO actives
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: false
-      - name: nb_alertes
-        label: Nombre d'alertes ouvertes
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: false
-      - name: donneur_ordre_ref
-        label: Référence donneur d'ordre pôle
-        field_type: ref
-        nature: identitaire
-        source: reference
-        required: false
-        pushable: false
-        ref_class: ""
-
+    - projet.
+    push_prefix: projet.{id}.
   cockpit_metier:
     label: Cockpit Pilote Métier
-    description: Tableau de bord du pilote métier — charge ingénieurs, activités imminentes, alertes, points bloquants.
+    description: Tableau de bord du pilote métier — charge ingénieurs, activités imminentes,
+      alertes, points bloquants.
     owner_role: pilote_metier
     required_sheets:
-      - _Manifeste
-      - SyntheseIngénieurs
-      - ActivitesImminentes
-      - Alertes
+    - _Manifeste
+    - SyntheseIngénieurs
+    - ActivitesImminentes
+    - Alertes
     optional_sheets:
-      - PointsBloquants
-      - _Log
+    - PointsBloquants
+    - _Log
     allowed_namespaces:
-      - metier.
-      - ingenieur.
-      - uo.
-    push_prefix: "metier.{id}."
+    - metier.
+    - ingenieur.
+    - uo.
+    push_prefix: metier.{id}.
     min_fields:
-      - name: metier_id
-        label: Identifiant du pilote métier
-        field_type: string
-        nature: identitaire
-        source: system
-        required: true
-        pushable: true
-      - name: metier_label
-        label: Libellé du métier
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: true
-      - name: avancement_global
-        label: Avancement global (%)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: nb_uo
-        label: Nombre d'UO pilotées
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: nb_alertes
-        label: Alertes ouvertes
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: donneur_ordre_ref
-        label: Référence donneur d'ordre métier
-        field_type: ref
-        nature: identitaire
-        source: reference
-        required: false
-        pushable: false
-        ref_class: ""
-
+    - name: metier_id
+      label: Identifiant du pilote métier
+      field_type: string
+      nature: identitaire
+      source: system
+      required: true
+      pushable: true
+    - name: metier_label
+      label: Libellé du métier
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: avancement_global
+      label: Avancement global (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_uo
+      label: Nombre d'UO pilotées
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Alertes ouvertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: donneur_ordre_ref
+      label: Référence donneur d'ordre métier
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: false
+      pushable: false
+      ref_class: ''
   cockpit_ingenieur:
     label: Cockpit Ingénieur
     description: Hub personnel de l'ingénieur — navigation vers ses UO et vue urgences.
     owner_role: ingenieur_sys
     required_sheets:
-      - _Manifeste
-      - MesUO
-      - Urgences
+    - _Manifeste
+    - MesUO
+    - Urgences
     optional_sheets:
-      - _Log
+    - _Log
     allowed_namespaces:
-      - ingenieur.
-      - uo.
-    push_prefix: "ingenieur.{id}."
+    - ingenieur.
+    - uo.
+    push_prefix: ingenieur.{id}.
     min_fields:
-      - name: ingenieur_id
-        label: Identifiant ingénieur
-        field_type: string
-        nature: identitaire
-        source: system
-        required: true
-        pushable: true
-      - name: nb_uo_actives
-        label: Nombre d'UO actives
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: charge_totale_h
-        label: Charge totale (h)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: avancement_moyen
-        label: Avancement moyen (%)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: nb_alertes
-        label: Nombre d'alertes
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: metier_ref
-        label: Référence pilote métier
-        field_type: ref
-        nature: identitaire
-        source: reference
-        required: true
-        pushable: true
-        ref_class: cockpit_metier
-
+    - name: ingenieur_id
+      label: Identifiant ingénieur
+      field_type: string
+      nature: identitaire
+      source: system
+      required: true
+      pushable: true
+    - name: nb_uo_actives
+      label: Nombre d'UO actives
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: charge_totale_h
+      label: Charge totale (h)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: avancement_moyen
+      label: Avancement moyen (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Nombre d'alertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: metier_ref
+      label: Référence pilote métier
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: cockpit_metier
   uo_instance:
     label: Unité d'Œuvre (instance)
-    description: >
-      Post de travail d'un ingénieur sur une UO spécifique.
-      Convention de nommage : L{NN}U{NN}-{PPPP}[-{SSSS}].
+    description: 'Post de travail d''un ingénieur sur une UO spécifique. Convention
+      de nommage : L{NN}U{NN}-{PPPP}[-{SSSS}].
+
+      '
     owner_role: ingenieur_sys
     required_sheets:
-      - _Manifeste
-      - Projet
-      - DescriptionBesoin
-      - TabDonneesEntree
-      - TabActivites
-      - TabLivrables
-      - TabPointsOuverts
-      - Correspondants
+    - _Manifeste
+    - Projet
+    - DescriptionBesoin
+    - TabDonneesEntree
+    - TabActivites
+    - TabLivrables
+    - TabPointsOuverts
+    - Correspondants
     optional_sheets:
-      - TabEscalade
-      - TabRetourExperience
-      - Dashboard
-      - _Log
+    - TabEscalade
+    - TabRetourExperience
+    - Dashboard
+    - _Log
     allowed_namespaces:
-      - uo.
-      - ref.uo.
-      - ref.acteurs.
-      - projet.
-    push_prefix: "uo.{id}."
+    - uo.
+    - ref.uo.
+    - ref.acteurs.
+    - projet.
+    push_prefix: uo.{id}.
     min_fields:
-      - name: uo_id
-        label: Identifiant UO (L{NN}U{NN}-{PPPP}[-{SSSS}])
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: true
-      - name: type_uo
-        label: Référence type UO (L{NN}U{NN})
-        field_type: ref
-        nature: identitaire
-        source: reference
-        required: true
-        pushable: true
-        ref_class: referentiel_uo
-      - name: projet_id
-        label: Code projet
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: true
-        pushable: true
-      - name: systeme
-        label: Code système ou fonction (ex. ATO, FRE)
-        field_type: string
-        nature: identitaire
-        source: user_input
-        required: false
-        pushable: true
-      - name: ingenieur_ref
-        label: Ingénieur owner
-        field_type: ref
-        nature: identitaire
-        source: reference
-        required: true
-        pushable: true
-        ref_class: cockpit_ingenieur
-      - name: avancement_global
-        label: Avancement global (%)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: statut
-        label: Statut UO
-        field_type: string
-        nature: operationnel
-        source: user_input
-        required: true
-        pushable: true
-      - name: nb_points_ouverts
-        label: Nombre de points ouverts actifs
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: nb_alertes
-        label: Nombre d'alertes
-        field_type: int
-        nature: operationnel
-        source: computed
-        required: true
-        pushable: true
-      - name: charge_h
-        label: Charge totale prévue (h)
-        field_type: float
-        nature: operationnel
-        source: computed
-        required: false
-        pushable: true
-      - name: seuil_alerte
-        label: Seuil d'alerte avancement (%)
-        field_type: float
-        nature: parametre
-        source: user_input
-        required: false
-        pushable: false
-      - name: date_debut
-        label: Date de début
-        field_type: date
-        nature: operationnel
-        source: user_input
-        required: false
-        pushable: true
-      - name: date_fin_prevue
-        label: Date de fin prévue
-        field_type: date
-        nature: operationnel
-        source: user_input
-        required: false
-        pushable: true
+    - name: uo_id
+      label: Identifiant UO (L{NN}U{NN}-{PPPP}[-{SSSS}])
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: type_uo
+      label: Référence type UO (L{NN}U{NN})
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: referentiel_uo
+    - name: projet_id
+      label: Code projet
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: systeme
+      label: Code système ou fonction (ex. ATO, FRE)
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: false
+      pushable: true
+    - name: ingenieur_ref
+      label: Ingénieur owner
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: cockpit_ingenieur
+    - name: avancement_global
+      label: Avancement global (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: statut
+      label: Statut UO
+      field_type: string
+      nature: operationnel
+      source: user_input
+      required: true
+      pushable: true
+    - name: nb_points_ouverts
+      label: Nombre de points ouverts actifs
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Nombre d'alertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: charge_h
+      label: Charge totale prévue (h)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: false
+      pushable: true
+    - name: seuil_alerte
+      label: Seuil d'alerte avancement (%)
+      field_type: float
+      nature: parametre
+      source: user_input
+      required: false
+      pushable: false
+    - name: date_debut
+      label: Date de début
+      field_type: date
+      nature: operationnel
+      source: user_input
+      required: false
+      pushable: true
+    - name: date_fin_prevue
+      label: Date de fin prévue
+      field_type: date
+      nature: operationnel
+      source: user_input
+      required: false
+      pushable: true

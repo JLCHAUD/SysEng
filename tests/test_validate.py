@@ -11,7 +11,7 @@ Couvre :
 import pytest
 from src.parser import _parse_validate, ValidateNode, parse_lines
 from src.executor import _validate_rule, execute_validates, ExecutionResult
-from src.parser import PasserelleAST
+from src.parser import ManifestAST
 
 
 # ─── 1. Parsing ───────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ class TestValidateRule:
 class TestExecuteValidates:
 
     def _ast(self, validates):
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.validates = validates
         return ast
 
@@ -273,7 +273,7 @@ class TestExecuteValidates:
 class TestScenarioUO:
     def test_uo_valide(self):
         """Données propres → aucune violation."""
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.validates = [
             ValidateNode("$activites.avancement", "RANGE(0, 100)"),
             ValidateNode("$activites.id",          "NOT_NULL"),
@@ -296,7 +296,7 @@ class TestScenarioUO:
 
     def test_uo_avec_donnees_corrompues(self):
         """Avancement hors range + doublon d'ID → 2 erreurs."""
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.validates = [
             ValidateNode("$activites.avancement", "RANGE(0, 100)"),
             ValidateNode("$activites.id",          "UNIQUE"),

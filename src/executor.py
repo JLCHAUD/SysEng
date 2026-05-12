@@ -1,7 +1,7 @@
 """
 ExoSync — executor.py
 =====================
-Exécute un PasserelleAST sur un fichier Excel en 4 phases séquentielles :
+Exécute un ManifestAST sur un fichier Excel en 4 phases séquentielles :
 
   Phase 1 — PULL   : store central → tables Excel
   Phase 2 — COMPUTE: tables Excel  → variables Python (scalaires + tables)
@@ -28,7 +28,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_to_tuple
 
-from src.parser import PasserelleAST, PullNode, DefNode, BindNode, PushNode
+from src.parser import ManifestAST, PullNode, DefNode, BindNode, PushNode
 
 
 # ─── Résultat d'exécution ────────────────────────────────────────────────────
@@ -428,7 +428,7 @@ def _update_table(ws, table_name: str, data: List[Dict], key: str) -> int:
     return updated
 
 
-def execute_pulls(ast: PasserelleAST, wb, store,
+def execute_pulls(ast: ManifestAST, wb, store,
                   result: ExecutionResult) -> None:
     """Phase 1 — Copie les données du store vers les tables Excel."""
     for pull in ast.pulls:
@@ -772,27 +772,6 @@ def _eval_formula(formula: str, ctx: Dict[str, Any]) -> Any:
             return 0.0
         return a / b
 
-    # ─ TRAFFIC_LIGHT ──────────────────────────────────────────────────────────
-    if formula.upper().startswith("TRAFFIC_LIGHT("):
-        inner = formula[len("TRAFFIC_LIGHT("):-1]
-        # Ex: $avancement_global, warn=30, ok=70
-        parts = [s.strip() for s in inner.split(",")]
-        val = _resolve_scalar(parts[0], ctx)
-        attrs: Dict[str, float] = {}
-        for p in parts[1:]:
-            m = re.match(r'(\w+)\s*=\s*([\d.]+)', p.strip())
-            if m:
-                attrs[m.group(1).lower()] = float(m.group(2))
-        warn = attrs.get("warn", 30.0)
-        ok   = attrs.get("ok",   70.0)
-        if val is None:
-            return "ROUGE"
-        if val < warn:
-            return "ROUGE"
-        if val < ok:
-            return "ORANGE"
-        return "VERT"
-
     # ─ SWITCH_RANGE ───────────────────────────────────────────────────────────
     if formula.upper().startswith("SWITCH_RANGE("):
         # SWITCH_RANGE($val, [0,25]:"DÉMARRAGE", [26,75]:"EN_COURS", ...)
@@ -1083,7 +1062,7 @@ def _eval_condition(cond: str, ctx: Dict[str, Any]) -> bool:
     return False
 
 
-def execute_computes(ast: PasserelleAST, wb,
+def execute_computes(ast: ManifestAST, wb,
                      result: ExecutionResult) -> Dict[str, Any]:
     """
     Phase 2 — Lit les tables GET_TABLE depuis Excel puis évalue les COMPUTE.
@@ -1255,7 +1234,7 @@ def _validate_rule(rule: str, values: List[Any]) -> List[str]:
     return violations
 
 
-def execute_validates(ast: "PasserelleAST", ctx: Dict[str, Any],
+def execute_validates(ast: "ManifestAST", ctx: Dict[str, Any],
                       result: ExecutionResult) -> None:
     """
     Phase 2b — Vérifie les règles VALIDATE sur les variables du contexte.
@@ -1300,7 +1279,7 @@ def execute_validates(ast: "PasserelleAST", ctx: Dict[str, Any],
 
 # ─── Phase 3 — PUSH ───────────────────────────────────────────────────────────
 
-def execute_pushes(ast: PasserelleAST, ctx: Dict[str, Any],
+def execute_pushes(ast: ManifestAST, ctx: Dict[str, Any],
                    store, result: ExecutionResult) -> None:
     """Phase 3 — Publie les variables calculées dans le store central.
 
@@ -1339,7 +1318,7 @@ def execute_pushes(ast: PasserelleAST, ctx: Dict[str, Any],
 
 # ─── Phase 4 — BIND ───────────────────────────────────────────────────────────
 
-def execute_binds(ast: PasserelleAST, wb, ctx: Dict[str, Any],
+def execute_binds(ast: ManifestAST, wb, ctx: Dict[str, Any],
                   result: ExecutionResult) -> None:
     """
     Phase 4 — Écrit les valeurs calculées dans les plages nommées du Dashboard.
@@ -1371,13 +1350,13 @@ def execute_binds(ast: PasserelleAST, wb, ctx: Dict[str, Any],
 # ─── Entrée publique ──────────────────────────────────────────────────────────
 
 def execute_ast(
-    ast: PasserelleAST,
+    ast: ManifestAST,
     filepath: Path,
     store,
     ecosystem=None,
 ) -> ExecutionResult:
     """
-    Exécute un PasserelleAST sur le fichier Excel en 6 phases.
+    Exécute un ManifestAST sur le fichier Excel en 6 phases.
 
     Args:
         ast       : AST produit par parse_file()
@@ -1441,7 +1420,7 @@ def execute_ast(
 
 # ─── M09 — NOTIFY ────────────────────────────────────────────────────────────
 
-def execute_notifies(ast: "PasserelleAST", ctx: Dict[str, Any],
+def execute_notifies(ast: "ManifestAST", ctx: Dict[str, Any],
                      result: ExecutionResult) -> None:
     """
     Phase 4b — Exécute les instructions NOTIFY.

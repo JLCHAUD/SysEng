@@ -21,7 +21,7 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.table import Table
 
 from src.executor import execute_ast, ExecutionResult
-from src.parser import PasserelleAST, FileHeader, DefNode, PullNode, PushNode, BindNode
+from src.parser import ManifestAST, FileHeader, DefNode, PullNode, PushNode, BindNode
 
 
 # ─── Store isolé pour les tests ───────────────────────────────────────────────
@@ -116,7 +116,7 @@ def _build_uo001_workbook() -> Workbook:
     return wb
 
 
-def _build_uo001_ast() -> PasserelleAST:
+def _build_uo001_ast() -> ManifestAST:
     """
     Construit l'AST correspondant à ce Manifeste MXL :
 
@@ -128,7 +128,7 @@ def _build_uo001_ast() -> PasserelleAST:
       DEF $avancement_global = COMPUTE(MEAN_WEIGHTED($actives.avancement, $actives.heures))
       DEF $total_heures      = COMPUTE(SUM($activites.heures))
       DEF $nb_total          = COMPUTE(COUNT($activites.id))
-      DEF $statut_global     = COMPUTE(TRAFFIC_LIGHT($avancement_global, warn=30, ok=70))
+      DEF $statut_global     = COMPUTE(SWITCH_RANGE($avancement_global, [0,29]:"ROUGE", [30,69]:"ORANGE", [70,100]:"VERT"))
 
       BIND $avancement_global -> Dashboard.avancement_global
       BIND $total_heures      -> Dashboard.total_heures
@@ -140,7 +140,7 @@ def _build_uo001_ast() -> PasserelleAST:
       PUSH $nb_total          -> uo.UO-001.nb_activites
       PUSH $statut_global     -> uo.UO-001.statut
     """
-    ast = PasserelleAST()
+    ast = ManifestAST()
     ast.header = FileHeader(file_type="uo_instance", file_id="UO-001")
 
     ast.defs = [
@@ -149,7 +149,7 @@ def _build_uo001_ast() -> PasserelleAST:
         DefNode("$avancement_global","COMPUTE",   formula="MEAN_WEIGHTED($actives.avancement, $actives.heures)"),
         DefNode("$total_heures",     "COMPUTE",   formula="SUM($activites.heures)"),
         DefNode("$nb_total",         "COMPUTE",   formula="COUNT($activites.id)"),
-        DefNode("$statut_global",    "COMPUTE",   formula="TRAFFIC_LIGHT($avancement_global, warn=30, ok=70)"),
+        DefNode("$statut_global",    "COMPUTE",   formula='SWITCH_RANGE($avancement_global, [0,29]:"ROUGE", [30,69]:"ORANGE", [70,100]:"VERT")'),
     ]
     for d in ast.defs:
         ast._defs_index[d.var_name] = d
@@ -271,7 +271,7 @@ class TestExecuteAstPull:
         wb.save(str(filepath))
 
         # AST avec PULL APPEND_NEW + GET_TABLE + PUSH COUNT
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.header = FileHeader(file_type="uo_instance", file_id="UO-PULL")
         ast.pulls = [
             PullNode(
@@ -318,7 +318,7 @@ class TestExecuteAstPull:
         filepath = tmp_path / "UO-OW.xlsx"
         wb.save(str(filepath))
 
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.header = FileHeader(file_type="uo_instance", file_id="UO-OW")
         ast.pulls = [
             PullNode("ref.acteurs", "FILL_TABLE", "Acteurs", "TabActeurs", "OVERWRITE")
@@ -348,7 +348,7 @@ class TestExecuteAstStatusFormatage:
         filepath = tmp_path / "UO-FORMAT.xlsx"
         wb.save(str(filepath))
 
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.header = FileHeader(file_type="uo_instance", file_id="UO-FORMAT")
         ast.defs = [DefNode("$statut", "COMPUTE", formula='"VERT"')]
         ast._defs_index["$statut"] = ast.defs[0]
@@ -370,7 +370,7 @@ class TestExecuteAstErreurs:
     """Vérifie la robustesse face aux erreurs."""
 
     def test_fichier_inexistant(self, tmp_path):
-        ast = PasserelleAST()
+        ast = ManifestAST()
         store = MemStore()
         result = execute_ast(ast, tmp_path / "INEXISTANT.xlsx", store)
         assert len(result.errors) == 1
@@ -382,7 +382,7 @@ class TestExecuteAstErreurs:
         filepath = tmp_path / "UO-ERR.xlsx"
         wb.save(str(filepath))
 
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.header = FileHeader(file_type="uo_instance", file_id="UO-ERR")
         ast.defs = [DefNode("$t", "GET_TABLE", sheet="Activites", table_name="TabActivites")]
         ast._defs_index["$t"] = ast.defs[0]
@@ -401,7 +401,7 @@ class TestExecuteAstErreurs:
         filepath = tmp_path / "UO-SKIP.xlsx"
         wb.save(str(filepath))
 
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.pulls = [PullNode("ref.absent", "FILL_TABLE", "Activites", "TabActivites", "OVERWRITE")]
 
         store = MemStore()  # store vide

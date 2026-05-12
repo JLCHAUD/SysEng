@@ -337,8 +337,8 @@ class TestNotifyParsing:
 class TestNotifyExecution:
     def test_notify_log_ajoute_warning(self):
         from src.executor import execute_notifies, ExecutionResult
-        from src.parser import NotifyNode, PasserelleAST
-        ast = PasserelleAST()
+        from src.parser import NotifyNode, ManifestAST
+        ast = ManifestAST()
         ast.notifies.append(NotifyNode(channel="log", message="Test notification"))
         result = ExecutionResult()
         execute_notifies(ast, {}, result)
@@ -346,8 +346,8 @@ class TestNotifyExecution:
 
     def test_notify_condition_non_satisfaite(self):
         from src.executor import execute_notifies, ExecutionResult
-        from src.parser import NotifyNode, PasserelleAST
-        ast = PasserelleAST()
+        from src.parser import NotifyNode, ManifestAST
+        ast = ManifestAST()
         ast.notifies.append(NotifyNode(
             channel="log", message="Alerte", condition="1 > 100"
         ))
@@ -360,9 +360,9 @@ class TestNotifyExecution:
         """Sans SMTP_HOST, l'email est loggué comme warning non bloquant."""
         import os
         from src.executor import execute_notifies, ExecutionResult
-        from src.parser import NotifyNode, PasserelleAST
+        from src.parser import NotifyNode, ManifestAST
         os.environ.pop("SMTP_HOST", None)
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.notifies.append(NotifyNode(
             channel="email", message="Hello", target="x@y.com"
         ))

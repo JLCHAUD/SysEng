@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from web.api import file_types, registry, actors, ecosystem, hierarchy, tables, mxl_generator, schema, xlsx_generator
+from web.api import file_types, registry, actors, ecosystem, hierarchy, tables, mxl_generator, schema, xlsx_generator, excel_import
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -26,6 +26,7 @@ app.include_router(tables.router,       prefix="/api/tables",       tags=["table
 app.include_router(mxl_generator.router,  prefix="/api/mxl",          tags=["mxl"])
 app.include_router(xlsx_generator.router, prefix="/api/xlsx",         tags=["xlsx"])
 app.include_router(schema.router,         prefix="/api/schema",       tags=["schema"])
+app.include_router(excel_import.router,   prefix="/api/excel",         tags=["excel"])
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
