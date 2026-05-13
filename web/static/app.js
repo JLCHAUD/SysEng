@@ -757,7 +757,7 @@ const ViewExcelImport = {
     const tableComparisons = ref({});
     const tableMappings = ref([]);
     const collectMappings = ref([]);
-    const form = reactive({ file_id: '', owner_id: '', periodicite: 'quotidien', update_class_fields: false });
+    const form = reactive({ file_id: '', owner_role: '', periodicite: 'quotidien', update_class_fields: false });
 
     const isCockpit = computed(() => {
       const ft = fileTypes.value.find(f => f.id === selectedClass.value);
@@ -767,6 +767,16 @@ const ViewExcelImport = {
     const childClasses = computed(() => {
       const ft = fileTypes.value.find(f => f.id === selectedClass.value);
       return ft?.allowed_namespaces || [];
+    });
+
+    const availableOwnerRoles = computed(() => {
+      const roles = [...new Set(fileTypes.value.map(f => f.owner_role).filter(Boolean))];
+      return roles.sort();
+    });
+
+    watch(selectedClass, cls => {
+      const ft = fileTypes.value.find(f => f.id === cls);
+      if (ft?.owner_role) form.owner_role = ft.owner_role;
     });
 
     onMounted(async () => {
@@ -903,7 +913,7 @@ const ViewExcelImport = {
         await POST('/api/excel/register', {
           path: uploadedFile.value?.name || '',
           file_id: form.file_id, type_fichier: selectedClass.value,
-          owner_id: form.owner_id, synchro_periodicite: form.periodicite,
+          owner_role: form.owner_role, synchro_periodicite: form.periodicite,
           field_mappings: fieldMappings, table_mappings: tblMappings,
           update_class_fields: form.update_class_fields, collect_mappings: activeCollects,
         });
@@ -912,7 +922,7 @@ const ViewExcelImport = {
         step.value = 1; uploadedFile.value = null; scanResult.value = null;
         selectedClass.value = ''; tableMappings.value = []; collectMappings.value = [];
         tableComparisons.value = {}; availableTables.value = {};
-        Object.assign(form, { file_id: '', owner_id: '', periodicite: 'quotidien', update_class_fields: false });
+        Object.assign(form, { file_id: '', owner_role: '', periodicite: 'quotidien', update_class_fields: false });
       } catch(e) { emit('toast', { msg: e.message, type: 'error' }); }
       finally { saving.value = false; }
     };
@@ -1132,10 +1142,10 @@ const ViewExcelImport = {
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Owner</label>
-              <select v-model="form.owner_id">
+              <label>Rôle owner</label>
+              <select v-model="form.owner_role">
                 <option value="">— Choisir —</option>
-                <option v-for="a in actors" :key="a.id" :value="a.id">{{ a.nom }} ({{ a.id }})</option>
+                <option v-for="r in availableOwnerRoles" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
             <div class="form-group">

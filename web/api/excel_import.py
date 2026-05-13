@@ -93,7 +93,7 @@ class RegisterRequest(BaseModel):
     path: str
     file_id: str
     type_fichier: str
-    owner_id: str = ""
+    owner_role: str = ""
     synchro_periodicite: str = "quotidien"
     field_mappings: list[FieldMapping] = []
     table_mappings: list[TableMapping] = []
@@ -394,7 +394,7 @@ def register_excel(body: RegisterRequest):
         "type_fichier": body.type_fichier,
         "chemin": body.path,
         "synchro_periodicite": body.synchro_periodicite,
-        "owner_id": body.owner_id,
+        "owner_role": body.owner_role,
         "genere_par_script": False,
         "derniere_synchro": None,
         "statut_dernier_synchro": "importé",
