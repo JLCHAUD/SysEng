@@ -28,7 +28,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_to_tuple
 
-from src.parser import ManifestAST, BindNode, PushNode
+from src.parser import ManifestAST
 
 
 # ─── Résultat d'exécution ────────────────────────────────────────────────────

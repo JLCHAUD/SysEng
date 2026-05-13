@@ -1,17 +1,15 @@
 """Generates one cockpit Excel file per engineer."""
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import List
 
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule, FormulaRule
-from openpyxl.styles import Alignment
-from openpyxl.utils import get_column_letter
+from openpyxl.formatting.rule import CellIsRule
 
 from src.models import UOInstance
 from src.styles import (
     BLUE_DARK, BLUE_MID, BLUE_LIGHT, GREEN_LIGHT, ORANGE_LIGHT, RED_LIGHT,
-    GREY_LIGHT, WHITE, YELLOW_LIGHT,
+    GREY_LIGHT, WHITE,
     THIN_BORDER, solid_fill, header_font, body_font, center, left,
     style_header_row, style_data_row, set_column_widths, freeze_top_row,
 )

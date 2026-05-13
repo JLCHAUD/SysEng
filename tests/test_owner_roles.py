@@ -175,7 +175,7 @@ class TestValidateOwnerRoles:
             EntreeRegistre(
                 id="UO-TEST", type_fichier="uo_instance",
                 chemin="test.xlsx", synchro_periodicite="quotidien",
-                owner_id="USR004",  # Jean-Luc, pilote_tech — attendu: ingenieur_sys
+                owner_id="USR004",  # Jean-Luc, pilote_metier — attendu: ingenieur_sys
             )
         ]
         violations = validate_owner_roles(entrees)
@@ -183,7 +183,7 @@ class TestValidateOwnerRoles:
         v = violations[0]
         assert v.file_id == "UO-TEST"
         assert v.expected_role == "ingenieur_sys"
-        assert v.owner_role == "pilote_tech"
+        assert v.owner_role == "pilote_metier"
 
     def test_violation_owner_absent(self):
         """Un fichier avec un owner_role attendu mais sans owner_id doit signaler une violation."""
