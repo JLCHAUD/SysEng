@@ -246,8 +246,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     from src.ecosystem import ECOSYSTEM_PATH, load as eco_load, check_consistency
     from src.config_loader import load_registre, validate_owner_roles
     from src.history import list_runs, list_snapshots
-    from pathlib import Path
-
     _header("ExoSync — Doctor (diagnostic)")
     ok_count = 0
     warn_count = 0
@@ -339,7 +337,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 def cmd_history(args: argparse.Namespace) -> int:
     """Affiche l'historique des runs et snapshots."""
     from src.history import list_runs, list_snapshots, compare_snapshots, history_of_key
-    import json as _json
 
     if args.key:
         # Historique d'une cle specifique
@@ -359,7 +356,7 @@ def cmd_history(args: argparse.Namespace) -> int:
             _err("Il faut au moins 2 snapshots pour comparer.")
             return 1
         a, b = snaps[1], snaps[0]
-        _header(f"Comparaison snapshots")
+        _header("Comparaison snapshots")
         print(f"  Avant  : {a.name}")
         print(f"  Apres  : {b.name}")
         diff = compare_snapshots(a, b)

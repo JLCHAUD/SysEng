@@ -158,7 +158,7 @@ def _to_dict(schema: EcosystemSchema) -> dict:
         },
         "variables":     {k: asdict(v) for k, v in schema.variables.items()},
         "edges":         [asdict(e) for e in schema.edges],
-        "lists":         [asdict(l) for l in schema.lists],
+        "lists":         [asdict(lst) for lst in schema.lists],
         "collect_edges": [asdict(c) for c in schema.collect_edges],
     }
 
@@ -182,7 +182,7 @@ def _from_dict(d: dict) -> EcosystemSchema:
         for vid, vdata in d.get("variables", {}).items()
     }
     edges = [EdgeRecord(**e) for e in d.get("edges", [])]
-    lists = [ListRecord(**l) for l in d.get("lists", [])]
+    lists = [ListRecord(**lst) for lst in d.get("lists", [])]
     collect_edges = [CollectEdge(**c) for c in d.get("collect_edges", [])]
 
     # Migration : FileRecord sans manifest_metadata (ecosystem.json antérieur)
@@ -344,7 +344,7 @@ def record_edges_from_ast(
         ))
 
     # Listes déclarées (LIST)
-    schema.lists = [l for l in schema.lists if l.owner_file_id != file_id]
+    schema.lists = [lst for lst in schema.lists if lst.owner_file_id != file_id]
     for list_node in getattr(ast, "lists", []):
         schema.lists.append(ListRecord(
             list_name=list_node.name,
@@ -471,7 +471,7 @@ def check_consistency(path: Path = ECOSYSTEM_PATH) -> List[ConsistencyWarning]:
             ))
 
     # 4. COLLECT référençant une liste inconnue
-    known_lists = {(l.owner_file_id, l.list_name) for l in schema.lists}
+    known_lists = {(lst.owner_file_id, lst.list_name) for lst in schema.lists}
     for ce in schema.collect_edges:
         if (ce.owner_file_id, ce.list_name) not in known_lists:
             warnings.append(ConsistencyWarning(
@@ -598,7 +598,7 @@ def lineage_dict(path: Path = ECOSYSTEM_PATH) -> dict:
         "last_scan":     schema.last_scan,
         "files":         {k: asdict(v) for k, v in schema.files.items()},
         "edges":         [asdict(e) for e in schema.edges],
-        "lists":         [asdict(l) for l in schema.lists],
+        "lists":         [asdict(lst) for lst in schema.lists],
         "collect_edges": [asdict(c) for c in schema.collect_edges],
         "stats": {
             "nb_files":          len(schema.files),

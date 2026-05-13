@@ -31,6 +31,8 @@ class StatutLivrable(str, Enum):
 class Role(str, Enum):
     INGENIEUR_SYS       = "ingenieur_sys"
     PILOTE_TECH         = "pilote_tech"
+    PILOTE_METIER       = "pilote_metier"
+    PILOTE_POLE         = "pilote_pole"
     ENGAGEMENT_MGR      = "engagement_mgr"
     IT_MANAGER          = "it_manager"
     DONNEUR_ORDRE       = "donneur_ordre"
