@@ -3,17 +3,14 @@ from datetime import date
 from pathlib import Path
 
 from openpyxl import Workbook
-from openpyxl.chart import BarChart, Reference
-from openpyxl.chart.series import SeriesLabel
-from openpyxl.styles import Alignment
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from src.models import UOInstance, StatutUO
+from src.models import UOInstance
 from src.styles import (
-    BLUE_DARK, BLUE_MID, BLUE_LIGHT, GREEN, GREEN_LIGHT, ORANGE_LIGHT,
-    RED_LIGHT, GREY_LIGHT, GREY_MID, WHITE, YELLOW_LIGHT,
+    BLUE_DARK, BLUE_MID, BLUE_LIGHT, GREEN_LIGHT, ORANGE_LIGHT,
+    GREY_LIGHT, GREY_MID, WHITE, YELLOW_LIGHT,
     THIN_BORDER, solid_fill, header_font, body_font, center, left,
     style_header_row, style_data_row, set_column_widths, freeze_top_row,
 )
@@ -72,7 +69,6 @@ def _sheet_livrables(wb: Workbook, uo: UOInstance):
     style_header_row(ws, 2, 1, 5, color=BLUE_MID)
 
     deliverables = uo.uo_type.deliverables if uo.uo_type else []
-    statuses = ["À faire", "En cours", "Livré", "Validé"]
     for i, deliv in enumerate(deliverables):
         row = 3 + i
         ws.cell(row=row, column=1, value=deliv.id)
@@ -244,7 +240,6 @@ def _sheet_rex(wb: Workbook, uo: UOInstance):
 
     # Extra empty rows for engineer to fill
     start_extra = 3 + len(rex_items)
-    categories = ["Problème rencontré", "Solution appliquée", "À surveiller", "Bonne pratique"]
     for i in range(5):
         row = start_extra + i
         ws.cell(row=row, column=1, value="")
@@ -275,8 +270,6 @@ def _sheet_points_ouverts(wb: Workbook, uo: UOInstance):
     style_header_row(ws, 2, 1, 7, color=BLUE_MID)
 
     # Empty rows ready to fill
-    natures = ["Question expert", "Problème technique", "Demande fournisseur", "Action interne"]
-    statuses = ["À faire", "En cours", "Fermé"]
     for i in range(10):
         row = 3 + i
         ws.cell(row=row, column=1, value=f"PO-{i+1:03d}")
@@ -404,7 +397,6 @@ def _sheet_dashboard(wb: Workbook, uo: UOInstance):
     num_cells = 8
     for col in range(1, num_cells + 1):
         cell = ws.cell(row=10, column=col, value="")
-        threshold = col / num_cells
         cell.fill = solid_fill("70AD47")  # all green by default; CF will handle graying
         cell.border = THIN_BORDER
         ws.column_dimensions[get_column_letter(col)].width = 8
@@ -514,7 +506,7 @@ def _sheet_manifeste(wb: Workbook, uo: UOInstance):
 
     # En-tête du fichier
     rows.append(("# --- EN-TETE FICHIER ---", "", True))
-    rows.append((f"FILE_TYPE: uo_instance", "", False))
+    rows.append(("FILE_TYPE: uo_instance", "", False))
     rows.append((f"FILE_ID:   {uo.id}", "", False))
     rows.append(("VERSION:   1", "", False))
 

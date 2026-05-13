@@ -483,7 +483,6 @@ def check_consistency(path: Path = ECOSYSTEM_PATH) -> List[ConsistencyWarning]:
     # 5. COLLECT_CIRCULAR_DEP — détection de cycles dans le graphe père/fils
     # Graphe statique : père → [pères des fils connus via listes TABLE]
     # (les listes DYNAMIC ne sont pas vérifiables statiquement)
-    parent_map: Dict[str, str] = {}  # list_name+owner → owner (pour cycles simples)
     for ce in schema.collect_edges:
         for lst in schema.lists:
             if lst.list_name == ce.list_name and lst.owner_file_id == ce.owner_file_id:

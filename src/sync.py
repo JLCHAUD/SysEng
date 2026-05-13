@@ -19,7 +19,6 @@ from src.config_loader import load_registre, save_registre
 from src.executor import execute_ast
 from src.models import EntreeRegistre
 from src.parser import parse_file
-from src.parser import MANIFESTE_SHEET
 from src.passerelle import executer_passerelle  # conservé pour rétro-compat (legacy _Passerelle)
 
 ROOT = Path(__file__).parent.parent

@@ -29,7 +29,7 @@ Note : la feuille s'appelait auparavant _Passerelle (ADR-001).
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src import ecosystem as Ecosystem
 from src.ecosystem import ColumnSchema, TableSchema, VariableSchema
@@ -949,7 +949,7 @@ def ast_summary(ast: ManifestAST) -> str:
         f"FILE_TYPE : {ast.header.file_type}",
         f"FILE_ID   : {ast.header.file_id}",
         f"VERSION   : {ast.header.version}",
-        f"",
+        "",
         f"DEF       : {len(ast.defs)} variable(s)",
         f"COL       : {len(ast.cols)} colonne(s)",
         f"BIND      : {len(ast.binds)} lien(s)",

@@ -28,7 +28,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_to_tuple
 
-from src.parser import ManifestAST, PullNode, DefNode, BindNode, PushNode
+from src.parser import ManifestAST, BindNode, PushNode
 
 
 # ─── Résultat d'exécution ────────────────────────────────────────────────────
@@ -248,12 +248,18 @@ def _eval_row_condition(row: Dict[str, Any], condition: str) -> bool:
         except (ValueError, TypeError):
             cell, val = str(cell), str(val)
 
-    if op == "=":  return cell == val
-    if op == "!=": return cell != val
-    if op == ">":  return cell is not None and cell > val
-    if op == ">=": return cell is not None and cell >= val
-    if op == "<":  return cell is not None and cell < val
-    if op == "<=": return cell is not None and cell <= val
+    if op == "=":
+        return cell == val
+    if op == "!=":
+        return cell != val
+    if op == ">":
+        return cell is not None and cell > val
+    if op == ">=":
+        return cell is not None and cell >= val
+    if op == "<":
+        return cell is not None and cell < val
+    if op == "<=":
+        return cell is not None and cell <= val
     return True
 
 
@@ -716,8 +722,6 @@ def _eval_formula(formula: str, ctx: Dict[str, Any]) -> Any:
     if formula.upper().startswith("MEAN_WEIGHTED("):
         inner = formula[len("MEAN_WEIGHTED("):-1]
         val_ref, wgt_ref = [s.strip() for s in inner.split(",", 1)]
-        values  = [v for v in _resolve_col(val_ref, ctx) if v is not None]
-        weights = [w for w in _resolve_col(wgt_ref, ctx) if w is not None]
         pairs   = [(v, w) for v, w in zip(
             _resolve_col(val_ref, ctx),
             _resolve_col(wgt_ref, ctx)
@@ -1434,7 +1438,6 @@ def execute_notifies(ast: "ManifestAST", ctx: Dict[str, Any],
     les variables $x sont remplacées par leur valeur dans ctx.
     """
     import os
-    import re as _re
 
     for nnode in ast.notifies:
         # Évaluer la condition IF (si présente)
