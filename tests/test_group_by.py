@@ -19,7 +19,7 @@ from src.executor import (
     execute_computes,
     ExecutionResult,
 )
-from src.parser import PasserelleAST, DefNode
+from src.parser import ManifestAST, DefNode
 
 
 # ─── Données communes ─────────────────────────────────────────────────────────
@@ -318,7 +318,7 @@ class TestGroupBySortTopNIntegration:
         sheetnames = []
 
     def _ast(self, defs):
-        ast = PasserelleAST()
+        ast = ManifestAST()
         ast.defs = defs
         return ast
 

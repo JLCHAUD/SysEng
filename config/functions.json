@@ -1,0 +1,65 @@
+{
+  "version": "2",
+  "functions": [
+    {
+      "id": "pilote_pole",
+      "label": "Pilote de Pôle de Compétences",
+      "description": "Owner du cockpit_pole. Interlocuteur du donneur d'ordre pôle.",
+      "side": "interne"
+    },
+    {
+      "id": "pilote_metier",
+      "label": "Pilote Métier",
+      "description": "Owner du cockpit_metier. Manager des ingénieurs. Interlocuteur du donneur d'ordre métier.",
+      "side": "interne"
+    },
+    {
+      "id": "ingenieur_sys",
+      "label": "Ingénieur Système",
+      "description": "Owner du cockpit_ingenieur et des uo_instance.",
+      "side": "interne"
+    },
+    {
+      "id": "it_manager",
+      "label": "Administrateur IT",
+      "description": "Owner des référentiels (referentiel_uo, referentiel_acteurs). Gère l'infrastructure de l'écosystème.",
+      "side": "interne"
+    },
+    {
+      "id": "donneur_ordre_pole",
+      "label": "Donneur d'Ordre Pôle",
+      "description": "Client au niveau du pôle. Reçoit la synthèse d'avancement et les alertes globales.",
+      "side": "externe"
+    },
+    {
+      "id": "donneur_ordre_metier",
+      "label": "Donneur d'Ordre Métier",
+      "description": "Client au niveau du pilote métier. Reçoit avancement et points ouverts métier.",
+      "side": "externe"
+    },
+    {
+      "id": "ingenieur_sys_client",
+      "label": "Ingénieur Système Client",
+      "description": "Ingénieur système côté maître d'ouvrage. Correspondant technique affecté aux UO.",
+      "side": "externe"
+    },
+    {
+      "id": "expert_technique",
+      "label": "Expert Technique",
+      "description": "Expert thématique (feu/fumée, vibration, acoustique…). Correspondant technique affecté aux UO.",
+      "side": "externe"
+    },
+    {
+      "id": "fournisseur",
+      "label": "Fournisseur",
+      "description": "Industriel ou sous-traitant. Correspondant technique affecté aux UO.",
+      "side": "externe"
+    },
+    {
+      "id": "correspondant_projet",
+      "label": "Correspondant Projet",
+      "description": "Interface projet côté client. Correspondant technique optionnel affecté aux UO.",
+      "side": "externe"
+    }
+  ]
+}

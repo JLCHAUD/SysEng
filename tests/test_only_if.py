@@ -84,8 +84,8 @@ class TestExecutePushesOnlyIf:
 
     def _ast_with_pushes(self, pushes):
         """Crée un AST minimal avec une liste de PushNode."""
-        from src.parser import PasserelleAST
-        ast = PasserelleAST()
+        from src.parser import ManifestAST
+        ast = ManifestAST()
         ast.pushes = pushes
         return ast
 

@@ -171,33 +171,27 @@ class TestDiv:
         assert result == 0.0  # pas d'exception
 
 
-# ─── TRAFFIC_LIGHT ───────────────────────────────────────────────────────────
+# ─── SWITCH_RANGE (seuils warn=30 ok=70) ─────────────────────────────────────
 
-class TestTrafficLight:
+class TestSwitchRangeStatut:
+    FORMULA = 'SWITCH_RANGE($avancement, [0,29]:"ROUGE", [30,69]:"ORANGE", [70,100]:"VERT")'
+
     def test_rouge(self):
-        ctx = {"$avancement": 20.0}
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "ROUGE"
+        assert _eval_formula(self.FORMULA, {"$avancement": 20.0}) == "ROUGE"
 
     def test_orange(self):
-        ctx = {"$avancement": 50.0}
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "ORANGE"
+        assert _eval_formula(self.FORMULA, {"$avancement": 50.0}) == "ORANGE"
 
     def test_vert(self):
-        ctx = {"$avancement": 75.0}
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "VERT"
+        assert _eval_formula(self.FORMULA, {"$avancement": 75.0}) == "VERT"
 
     def test_seuil_exact_warn(self):
-        ctx = {"$avancement": 30.0}
-        # 30 < 30 est faux → ORANGE
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "ORANGE"
+        # 30 est dans [30,69] → ORANGE
+        assert _eval_formula(self.FORMULA, {"$avancement": 30.0}) == "ORANGE"
 
     def test_seuil_exact_ok(self):
-        ctx = {"$avancement": 70.0}
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "VERT"
-
-    def test_none_retourne_rouge(self):
-        ctx = {"$avancement": None}
-        assert _eval_formula("TRAFFIC_LIGHT($avancement, warn=30, ok=70)", ctx) == "ROUGE"
+        # 70 est dans [70,100] → VERT
+        assert _eval_formula(self.FORMULA, {"$avancement": 70.0}) == "VERT"
 
 
 # ─── SWITCH_RANGE ────────────────────────────────────────────────────────────
@@ -279,7 +273,7 @@ class TestScenarioComplet:
         ctx["$nb_cloturees"]  = _eval_formula("COUNT($cloturees.id)", ctx)
         ctx["$taux_cloture"]  = _eval_formula("DIV($nb_cloturees, $nb_total)", ctx)
         ctx["$statut_global"] = _eval_formula(
-            "TRAFFIC_LIGHT($avancement_global, warn=30, ok=70)", ctx
+            'SWITCH_RANGE($avancement_global, [0,29]:"ROUGE", [30,69]:"ORANGE", [70,100]:"VERT")', ctx
         )
 
         # Vérifications

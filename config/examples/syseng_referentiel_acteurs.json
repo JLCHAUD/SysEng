@@ -1,0 +1,72 @@
+{
+  "_comment": "Exemple de contenu du referentiel_acteurs — TabActeurs pour l'écosystème SysEng.",
+  "_classe": "referentiel_acteurs",
+  "_post": "REF-ACT-01",
+  "_owner": "pilote_pole",
+
+  "TabActeurs": [
+    {
+      "id": "ACT-001",
+      "nom": "Rousseau",
+      "prenom": "Claire",
+      "organisation": "RATP — Direction du Matériel",
+      "fonction": "ingenieur_sys_client",
+      "email": "c.rousseau@ratp.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-002",
+      "nom": "Dumont",
+      "prenom": "Marc",
+      "organisation": "RATP — Direction Générale",
+      "fonction": "donneur_ordre_pole",
+      "email": "m.dumont@ratp.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-003",
+      "nom": "Arnaud",
+      "prenom": "Sophie",
+      "organisation": "RATP — Direction du Matériel",
+      "fonction": "donneur_ordre_metier",
+      "email": "s.arnaud@ratp.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-004",
+      "nom": "Moreau",
+      "prenom": "Thierry",
+      "organisation": "Labo Acoustique & Vibration SA",
+      "fonction": "expert_technique",
+      "email": "t.moreau@labo-acoustique.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-005",
+      "nom": "Industrie SystèmeSA",
+      "prenom": "",
+      "organisation": "Industrie SystèmeSA",
+      "fonction": "fournisseur",
+      "email": "contact@systemesa.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-006",
+      "nom": "Lambert",
+      "prenom": "François",
+      "organisation": "SNCF — Ingénierie Matériel",
+      "fonction": "ingenieur_sys_client",
+      "email": "f.lambert@sncf.fr",
+      "actif": true
+    },
+    {
+      "id": "ACT-007",
+      "nom": "Petit",
+      "prenom": "Élodie",
+      "organisation": "SNCF — Direction de Projet EXEN",
+      "fonction": "correspondant_projet",
+      "email": "e.petit@sncf.fr",
+      "actif": true
+    }
+  ]
+}

@@ -26,7 +26,7 @@ from src.ecosystem import (
     register_many, record_file_sync, record_edges_from_ast,
     check_consistency, lineage_text, lineage_dict, summary,
 )
-from src.parser import PasserelleAST, FileHeader, PullNode, PushNode, DefNode
+from src.parser import ManifestAST, FileHeader, PullNode, PushNode, DefNode
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,9 +36,9 @@ def _eco(tmp_path: Path) -> Path:
     return tmp_path / "ecosystem.json"
 
 
-def _ast_with_edges(file_id="UO-001", pulls=None, pushes=None) -> PasserelleAST:
+def _ast_with_edges(file_id="UO-001", pulls=None, pushes=None) -> ManifestAST:
     """Construit un AST minimal avec des PULL et PUSH."""
-    ast = PasserelleAST()
+    ast = ManifestAST()
     ast.header = FileHeader(file_type="uo_instance", file_id=file_id)
     ast.pulls  = pulls  or []
     ast.pushes = pushes or []

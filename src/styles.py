@@ -1,6 +1,4 @@
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.styles.differential import DifferentialStyle
-from openpyxl.formatting.rule import ColorScaleRule, CellIsRule, Rule
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
 BLUE_DARK = "1F3864"

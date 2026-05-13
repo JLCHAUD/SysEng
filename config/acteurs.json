@@ -29,7 +29,7 @@
   {
     "id": "USR004",
     "nom": "Jean-Luc Bernard",
-    "role": "pilote_tech",
+    "role": "pilote_metier",
     "filtre_type": "ingenieur",
     "filtre_valeur": "Alice Dubois,Bruno Lecomte,Camille Vidal",
     "acces": "read",
@@ -37,15 +37,24 @@
   },
   {
     "id": "USR005",
+    "nom": "Denis Renard",
+    "role": "pilote_metier",
+    "filtre_type": "ingenieur",
+    "filtre_valeur": "Denis Renard",
+    "acces": "read",
+    "email": "d.renard@corp.fr"
+  },
+  {
+    "id": "USR006",
     "nom": "Pierre Legrand",
-    "role": "engagement_mgr",
+    "role": "pilote_pole",
     "filtre_type": "ALL",
     "filtre_valeur": "ALL",
     "acces": "read",
     "email": "p.legrand@corp.fr"
   },
   {
-    "id": "USR006",
+    "id": "USR007",
     "nom": "Admin IT",
     "role": "it_manager",
     "filtre_type": "ALL",
@@ -54,21 +63,48 @@
     "email": "it@corp.fr"
   },
   {
-    "id": "USR007",
+    "id": "USR008",
     "nom": "Claire Rousseau",
-    "role": "pilote_tech_client",
+    "role": "ingenieur_sys_client",
     "filtre_type": "projet",
     "filtre_valeur": "MI20_RATP",
     "acces": "read_filtered",
     "email": "c.rousseau@ratp.fr"
   },
   {
-    "id": "USR008",
-    "nom": "Donneur Ordre RATP",
-    "role": "donneur_ordre",
+    "id": "USR009",
+    "nom": "Marc Dumont",
+    "role": "donneur_ordre_pole",
+    "filtre_type": "ALL",
+    "filtre_valeur": "ALL",
+    "acces": "read_summary",
+    "email": "m.dumont@ratp.fr"
+  },
+  {
+    "id": "USR010",
+    "nom": "Sophie Arnaud",
+    "role": "donneur_ordre_metier",
     "filtre_type": "projet",
     "filtre_valeur": "MI20_RATP",
     "acces": "read_summary",
-    "email": "do@ratp.fr"
+    "email": "s.arnaud@ratp.fr"
+  },
+  {
+    "id": "USR011",
+    "nom": "Thierry Moreau",
+    "role": "expert_technique",
+    "filtre_type": "projet",
+    "filtre_valeur": "MI20_RATP",
+    "acces": "read_filtered",
+    "email": "t.moreau@labo-acoustique.fr"
+  },
+  {
+    "id": "USR012",
+    "nom": "Industrie SystèmeSA",
+    "role": "fournisseur",
+    "filtre_type": "projet",
+    "filtre_valeur": "MI20_RATP",
+    "acces": "read_filtered",
+    "email": "contact@systemesa.fr"
   }
 ]

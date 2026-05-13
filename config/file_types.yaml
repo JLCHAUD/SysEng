@@ -1,110 +1,281 @@
-# ExoSync — Registre des types de fichiers (M05)
-# Chaque type définit les feuilles attendues, le template MXL associé,
-# et les namespaces store autorisés.
-
 file_types:
-
-  uo_instance:
-    label: "Unite d Oeuvre (instance)"
-    description: "Feuille de suivi d une UO de l ingenierie"
-    template: "config/templates/manifeste_uo_instance.mxl"
-    owner_role: "ingenieur_sys"
-    required_sheets:
-      - _Manifeste
-      - Activites
-    optional_sheets:
-      - Dashboard
-      - _Log
-    allowed_namespaces:
-      - "uo."
-      - "ref."
-      - "projet."
-    push_prefix: "uo.{id}."
-
   referentiel_uo:
-    label: "Referentiel des UO"
-    description: "Tables de reference communes a toutes les UO"
-    template: "config/templates/manifeste_referentiel_uo.mxl"
-    owner_role: "it_manager"
+    label: Référentiel des UO
+    description: Catalogue des types d'UO — définit ce que chaque UO doit produire.
+    template: ''
+    owner_role: pilote_pole
     required_sheets:
-      - _Manifeste
-      - TypesUO
+    - _Manifeste
+    - TabTypesUO
+    - TabActivitesStd
     optional_sheets:
-      - _Log
+    - _Log
     allowed_namespaces:
-      - "ref."
-    push_prefix: "ref."
+    - ref.uo.
+    push_prefix: ref.uo.
+  referentiel_acteurs:
+    label: Référentiel des Acteurs
+    description: Registre centralisé de tous les acteurs externes de l'écosystème.
+    template: ''
+    owner_role: pilote_pole
+    required_sheets:
+    - _Manifeste
+    - TabActeurs
+    optional_sheets:
+    - _Log
+    allowed_namespaces:
+    - ref.acteurs.
+    push_prefix: ref.acteurs.
+  projet_v:
+    label: Fichier Projet
+    description: Source de vérité sur l'organisation et le contexte d'un projet. 1
+      Post par projet actif.
+    owner_role: pilote_metier
+    required_sheets:
+    - _Manifeste
+    optional_sheets:
+    - _Log
+    allowed_namespaces:
+    - projet.
+    push_prefix: projet.{id}.
+  cockpit_metier:
+    label: Cockpit Pilote Métier
+    description: Tableau de bord du pilote métier — charge ingénieurs, activités imminentes,
+      alertes, points bloquants.
+    owner_role: pilote_metier
+    required_sheets:
+    - _Manifeste
+    - SyntheseIngénieurs
+    - ActivitesImminentes
+    - Alertes
+    optional_sheets:
+    - PointsBloquants
+    - _Log
+    allowed_namespaces:
+    - metier.
+    - ingenieur.
+    - uo.
+    push_prefix: metier.{id}.
+    min_fields:
+    - name: metier_id
+      label: Identifiant du pilote métier
+      field_type: string
+      nature: identitaire
+      source: system
+      required: true
+      pushable: true
+    - name: metier_label
+      label: Libellé du métier
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: avancement_global
+      label: Avancement global (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_uo
+      label: Nombre d'UO pilotées
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Alertes ouvertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: donneur_ordre_ref
+      label: Référence donneur d'ordre métier
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: false
+      pushable: false
+      ref_class: ''
+  cockpit_ingenieur:
+    label: Cockpit Ingénieur
+    description: Hub personnel de l'ingénieur — navigation vers ses UO et vue urgences.
+    owner_role: ingenieur_sys
+    required_sheets:
+    - _Manifeste
+    - MesUO
+    - Urgences
+    optional_sheets:
+    - _Log
+    allowed_namespaces:
+    - ingenieur.
+    - uo.
+    push_prefix: ingenieur.{id}.
+    min_fields:
+    - name: ingenieur_id
+      label: Identifiant ingénieur
+      field_type: string
+      nature: identitaire
+      source: system
+      required: true
+      pushable: true
+    - name: nb_uo_actives
+      label: Nombre d'UO actives
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: charge_totale_h
+      label: Charge totale (h)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: avancement_moyen
+      label: Avancement moyen (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Nombre d'alertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: metier_ref
+      label: Référence pilote métier
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: cockpit_metier
+  uo_instance:
+    label: Unité d'Œuvre (instance)
+    description: 'Post de travail d''un ingénieur sur une UO spécifique. Convention
+      de nommage : L{NN}U{NN}-{PPPP}[-{SSSS}].
 
-  referentiel_projet:
-    label: "Referentiel projet"
-    description: "Donnees de reference du projet (acteurs, systemes...)"
-    template: "config/templates/manifeste_referentiel_projet.mxl"
-    owner_role: "engagement_mgr"
+      '
+    owner_role: ingenieur_sys
     required_sheets:
-      - _Manifeste
+    - _Manifeste
+    - Projet
+    - DescriptionBesoin
+    - TabDonneesEntree
+    - TabActivites
+    - TabLivrables
+    - TabPointsOuverts
+    - Correspondants
     optional_sheets:
-      - _Log
+    - TabEscalade
+    - TabRetourExperience
+    - Dashboard
+    - _Log
     allowed_namespaces:
-      - "projet."
-    push_prefix: "projet."
-
-  cockpit:
-    label: "Cockpit de pilotage"
-    description: "Tableau de bord consolide pour le pilote technique"
-    template: "config/templates/manifeste_cockpit.mxl"
-    owner_role: "pilote_tech"
-    required_sheets:
-      - _Manifeste
-      - Dashboard
-    optional_sheets:
-      - _Log
-    allowed_namespaces:
-      - "cockpit."
-      - "uo."
-      - "projet."
-      - "ref."
-    push_prefix: "cockpit."
-
-  pilote:
-    label: "Fiche pilote"
-    description: "Vue pilote d une UO ou d un systeme"
-    template: "config/templates/manifeste_uo_instance.mxl"
-    owner_role: "pilote_tech"
-    required_sheets:
-      - _Manifeste
-    optional_sheets:
-      - Dashboard
-      - _Log
-    allowed_namespaces:
-      - "pilote."
-      - "uo."
-    push_prefix: "pilote."
-
-  consolidation:
-    label: "Consolidation"
-    description: "Agregation multi-UO ou multi-projet"
-    template: "config/templates/manifeste_cockpit.mxl"
-    owner_role: "engagement_mgr"
-    required_sheets:
-      - _Manifeste
-    optional_sheets:
-      - _Log
-    allowed_namespaces:
-      - "consolidation."
-      - "uo."
-      - "cockpit."
-    push_prefix: "consolidation."
-
-  client:
-    label: "Vue client"
-    description: "Livrable client extrait de l ecosysteme pour le donneur d ordre"
-    template: "config/templates/manifeste_uo_instance.mxl"
-    owner_role: "donneur_ordre"
-    required_sheets:
-      - _Manifeste
-    optional_sheets:
-      - _Log
-    allowed_namespaces:
-      - "client."
-      - "uo."
-    push_prefix: "client."
+    - uo.
+    - ref.uo.
+    - ref.acteurs.
+    - projet.
+    push_prefix: uo.{id}.
+    min_fields:
+    - name: uo_id
+      label: Identifiant UO (L{NN}U{NN}-{PPPP}[-{SSSS}])
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: type_uo
+      label: Référence type UO (L{NN}U{NN})
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: referentiel_uo
+    - name: projet_id
+      label: Code projet
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: true
+      pushable: true
+    - name: systeme
+      label: Code système ou fonction (ex. ATO, FRE)
+      field_type: string
+      nature: identitaire
+      source: user_input
+      required: false
+      pushable: true
+    - name: ingenieur_ref
+      label: Ingénieur owner
+      field_type: ref
+      nature: identitaire
+      source: reference
+      required: true
+      pushable: true
+      ref_class: cockpit_ingenieur
+    - name: avancement_global
+      label: Avancement global (%)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: statut
+      label: Statut UO
+      field_type: string
+      nature: operationnel
+      source: user_input
+      required: true
+      pushable: true
+    - name: nb_points_ouverts
+      label: Nombre de points ouverts actifs
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: nb_alertes
+      label: Nombre d'alertes
+      field_type: int
+      nature: operationnel
+      source: computed
+      required: true
+      pushable: true
+    - name: charge_h
+      label: Charge totale prévue (h)
+      field_type: float
+      nature: operationnel
+      source: computed
+      required: false
+      pushable: true
+    - name: seuil_alerte
+      label: Seuil d'alerte avancement (%)
+      field_type: float
+      nature: parametre
+      source: user_input
+      required: false
+      pushable: false
+    - name: date_debut
+      label: Date de début
+      field_type: date
+      nature: operationnel
+      source: user_input
+      required: false
+      pushable: true
+    - name: date_fin_prevue
+      label: Date de fin prévue
+      field_type: date
+      nature: operationnel
+      source: user_input
+      required: false
+      pushable: true

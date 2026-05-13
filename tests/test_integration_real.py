@@ -135,7 +135,7 @@ def _build_uo001(tmp_path: Path) -> Path:
         "DEF $avancement        = COMPUTE(MEAN_WEIGHTED($activites.avancement, $activites.heures))",
         "DEF $total_heures      = COMPUTE(SUM($activites.heures))",
         "DEF $nb_cloturees      = COMPUTE(COUNT_IF($activites.statut, \"CLOTUREE\"))",
-        "DEF $statut            = COMPUTE(TRAFFIC_LIGHT($avancement, warn=40, ok=70))",
+        'DEF $statut            = COMPUTE(SWITCH_RANGE($avancement, [0,39]:"ROUGE", [40,69]:"ORANGE", [70,100]:"VERT"))',
         "VALIDATE $activites.avancement : RANGE(0, 100)",
         "VALIDATE $activites.id         : UNIQUE",
         "BIND $avancement   -> Dashboard.avancement_global",
@@ -153,7 +153,7 @@ def _build_uo001(tmp_path: Path) -> Path:
 def _build_uo002(tmp_path: Path) -> Path:
     """
     UO-002.xlsx — données différentes d'UO-001.
-      Avancement plus faible → TRAFFIC_LIGHT retourne ROUGE.
+      Avancement plus faible → SWITCH_RANGE retourne ROUGE.
     """
     wb = Workbook()
     ws_act = wb.active
@@ -174,7 +174,7 @@ def _build_uo002(tmp_path: Path) -> Path:
         "DEF $activites    = GET_TABLE(Activites, TabActivites)",
         "DEF $avancement   = COMPUTE(MEAN_WEIGHTED($activites.avancement, $activites.heures))",
         "DEF $total_heures = COMPUTE(SUM($activites.heures))",
-        "DEF $statut       = COMPUTE(TRAFFIC_LIGHT($avancement, warn=40, ok=70))",
+        'DEF $statut       = COMPUTE(SWITCH_RANGE($avancement, [0,39]:"ROUGE", [40,69]:"ORANGE", [70,100]:"VERT"))',
         "VALIDATE $activites.avancement : RANGE(0, 100)",
         "PUSH $avancement   -> uo.UO-002.avancement",
         "PUSH $total_heures -> uo.UO-002.heures",
@@ -320,7 +320,7 @@ class TestUO001:
 
 
 class TestUO002:
-    """UO-002 — données faibles, TRAFFIC_LIGHT → ROUGE."""
+    """UO-002 — données faibles, SWITCH_RANGE → ROUGE."""
 
     def _run(self, tmp_path):
         path  = _build_uo002(tmp_path)

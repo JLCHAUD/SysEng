@@ -29,7 +29,7 @@ Note : la feuille s'appelait auparavant _Passerelle (ADR-001).
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src import ecosystem as Ecosystem
 from src.ecosystem import ColumnSchema, TableSchema, VariableSchema
@@ -159,7 +159,7 @@ class ParseError:
 
 
 @dataclass
-class PasserelleAST:
+class ManifestAST:
     header: FileHeader = field(default_factory=FileHeader)
     extends: Optional["ExtendsNode"] = None
     defs: List[DefNode] = field(default_factory=list)
@@ -240,7 +240,7 @@ def _parse_kv_attrs(text: str) -> Dict[str, str]:
 _KNOWN_HEADER_KEYS = {"FILE_TYPE", "FILE_ID", "VERSION", "DOC"}
 
 
-def _parse_header_line(line: str, ast: PasserelleAST) -> bool:
+def _parse_header_line(line: str, ast: ManifestAST) -> bool:
     """
     Tente de parser une ligne d'en-tête. Retourne True si consommée.
     Les clés connues (FILE_TYPE, FILE_ID, VERSION, DOC) alimentent FileHeader.
@@ -277,6 +277,7 @@ def _parse_def(line: str, anchor: str) -> Optional[DefNode]:
     DEF $var = GET_CELL(sheet, named_range)
     DEF $var = GET_TABLE(sheet, table_name)
     DEF $var = COMPUTE(formula...)
+    DEF $var = FONCTION(...)          ← sucre syntaxique, équivalent à COMPUTE(FONCTION(...))
     """
     m = re.match(r'^DEF\s+(\$[\w]+)\s*=\s*(\w+)\((.+)\)$', line.strip(), re.DOTALL)
     if not m:
@@ -307,7 +308,9 @@ def _parse_def(line: str, anchor: str) -> Optional[DefNode]:
         node.formula = inner
 
     else:
-        return None  # fonction inconnue
+        # Syntaxe directe : DEF $x = FONCTION(...) → traité comme COMPUTE(FONCTION(...))
+        node.source_type = "COMPUTE"
+        node.formula = f"{func}({inner})"
 
     return node
 
@@ -593,12 +596,12 @@ def _parse_collect(line: str) -> Optional[CollectNode]:
 
 # ─── Parser principal ─────────────────────────────────────────────────────────
 
-def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
+def parse_lines(lines: List[Tuple[str, str]]) -> ManifestAST:
     """
-    Parse une liste de (instruction, ancre) et retourne un PasserelleAST.
+    Parse une liste de (instruction, ancre) et retourne un ManifestAST.
     lines = [(col_A_value, col_B_value), ...]
     """
-    ast = PasserelleAST()
+    ast = ManifestAST()
 
     for line_num, (raw_instr, anchor) in enumerate(lines, start=1):
         instr = (raw_instr or "").strip()
@@ -696,7 +699,7 @@ def parse_lines(lines: List[Tuple[str, str]]) -> PasserelleAST:
     return ast
 
 
-def parse_sheet(ws) -> PasserelleAST:
+def parse_sheet(ws) -> ManifestAST:
     """
     Parse une feuille openpyxl _Manifeste.
     Colonne A = instruction, Colonne B = ancre.
@@ -731,7 +734,7 @@ TEMPLATES_DIR    = Path(__file__).parent.parent / "config" / "templates"
 
 # ─── EXTENDS — résolution et fusion ──────────────────────────────────────────
 
-def parse_mxl_file(filepath: Path, substitutions: Dict[str, str] = None) -> PasserelleAST:
+def parse_mxl_file(filepath: Path, substitutions: Dict[str, str] = None) -> ManifestAST:
     """
     Parse un fichier .mxl texte (template) et retourne un AST.
     Chaque ligne non vide et non commentaire est une instruction (pas d'ancre).
@@ -749,7 +752,7 @@ def parse_mxl_file(filepath: Path, substitutions: Dict[str, str] = None) -> Pass
     return parse_lines(lines)
 
 
-def merge_asts(child: PasserelleAST, template: PasserelleAST) -> PasserelleAST:
+def merge_asts(child: ManifestAST, template: ManifestAST) -> ManifestAST:
     """
     Fusionne un AST enfant avec un AST template selon les règles de fusion MXL :
 
@@ -758,7 +761,7 @@ def merge_asts(child: PasserelleAST, template: PasserelleAST) -> PasserelleAST:
       PULL, COL, VALIDATE, BIND, PUSH           : additifs (template + enfant)
       errors                                    : additifs
     """
-    merged = PasserelleAST()
+    merged = ManifestAST()
 
     # ── Header : l'enfant prime ────────────────────────────────────────────────
     merged.header = FileHeader(
@@ -808,9 +811,9 @@ def merge_asts(child: PasserelleAST, template: PasserelleAST) -> PasserelleAST:
 
 
 def resolve_extends(
-    ast: PasserelleAST,
+    ast: ManifestAST,
     templates_dir: Path = TEMPLATES_DIR,
-) -> PasserelleAST:
+) -> ManifestAST:
     """
     Si l'AST contient une instruction EXTENDS, charge le template .mxl,
     substitue les variables et retourne l'AST fusionné.
@@ -845,7 +848,7 @@ def resolve_extends(
     return merge_asts(child=ast, template=template_ast)
 
 
-def parse_file(filepath: Path) -> Optional[PasserelleAST]:
+def parse_file(filepath: Path) -> Optional[ManifestAST]:
     """
     Ouvre un fichier Excel, cherche la feuille _Manifeste et la parse.
     Accepte aussi l'ancien nom _Passerelle (rétro-compat ADR-001).
@@ -871,7 +874,7 @@ def parse_file(filepath: Path) -> Optional[PasserelleAST]:
 
 # ─── Enrichissement de l'écosystème ──────────────────────────────────────────
 
-def enrich_ecosystem(ast: PasserelleAST) -> Tuple[int, int]:
+def enrich_ecosystem(ast: ManifestAST) -> Tuple[int, int]:
     """
     Extrait les tables et variables déclarées dans l'AST
     et les enregistre dans l'ecosystem schema.
@@ -940,13 +943,13 @@ def _infer_col_type(col_name: str) -> str:
 
 # ─── Rapport lisible ──────────────────────────────────────────────────────────
 
-def ast_summary(ast: PasserelleAST) -> str:
+def ast_summary(ast: ManifestAST) -> str:
     """Retourne un résumé lisible de l'AST parsé."""
     lines = [
         f"FILE_TYPE : {ast.header.file_type}",
         f"FILE_ID   : {ast.header.file_id}",
         f"VERSION   : {ast.header.version}",
-        f"",
+        "",
         f"DEF       : {len(ast.defs)} variable(s)",
         f"COL       : {len(ast.cols)} colonne(s)",
         f"BIND      : {len(ast.binds)} lien(s)",

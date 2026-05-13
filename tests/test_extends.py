@@ -16,7 +16,7 @@ import pytest
 from src.parser import (
     ExtendsNode, FileHeader, DefNode, PullNode, BindNode,
     PushNode, ValidateNode, ColNode, ParseError,
-    PasserelleAST, parse_lines, parse_mxl_file,
+    ManifestAST, parse_lines, parse_mxl_file,
     merge_asts, resolve_extends,
 )
 
@@ -27,8 +27,8 @@ def _make_ast(
     file_type="uo_instance", file_id="UO-001", version="1", doc="",
     extends=None, defs=None, pulls=None, cols=None,
     validates=None, binds=None, pushes=None,
-) -> PasserelleAST:
-    ast = PasserelleAST()
+) -> ManifestAST:
+    ast = ManifestAST()
     ast.header = FileHeader(file_type=file_type, file_id=file_id,
                             version=version, doc=doc)
     ast.extends   = extends

@@ -29,15 +29,21 @@ class StatutLivrable(str, Enum):
 
 
 class Role(str, Enum):
-    INGENIEUR_SYS       = "ingenieur_sys"
-    PILOTE_TECH         = "pilote_tech"
-    ENGAGEMENT_MGR      = "engagement_mgr"
-    IT_MANAGER          = "it_manager"
-    DONNEUR_ORDRE       = "donneur_ordre"
-    PILOTE_TECH_CLIENT  = "pilote_tech_client"
-    RESP_PROJET_CLIENT  = "resp_projet_client"
-    EXPERT_CLIENT       = "expert_client"
-    FOURNISSEUR         = "fournisseur"
+    INGENIEUR_SYS           = "ingenieur_sys"
+    INGENIEUR_SYS_CLIENT    = "ingenieur_sys_client"
+    PILOTE_TECH             = "pilote_tech"
+    PILOTE_METIER           = "pilote_metier"
+    PILOTE_POLE             = "pilote_pole"
+    ENGAGEMENT_MGR          = "engagement_mgr"
+    IT_MANAGER              = "it_manager"
+    DONNEUR_ORDRE           = "donneur_ordre"
+    DONNEUR_ORDRE_POLE      = "donneur_ordre_pole"
+    DONNEUR_ORDRE_METIER    = "donneur_ordre_metier"
+    EXPERT_TECHNIQUE        = "expert_technique"
+    PILOTE_TECH_CLIENT      = "pilote_tech_client"
+    RESP_PROJET_CLIENT      = "resp_projet_client"
+    EXPERT_CLIENT           = "expert_client"
+    FOURNISSEUR             = "fournisseur"
 
 
 class TypeFiltre(str, Enum):

@@ -14,21 +14,19 @@ Génère Creator.xlsx — console d'administration centrale de l'écosystème.
   10 Créer Fichier    — interface de création d'un nouveau fichier XLS
 """
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, PatternFill
-from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from src.config_loader import (
     load_acteurs, load_projects, load_registre,
-    load_systems, load_uo_instances, load_uo_types,
+    load_systems, load_uo_types,
 )
 from src.styles import (
     BLUE_DARK, BLUE_MID, BLUE_LIGHT,
-    GREEN, GREEN_LIGHT, ORANGE_LIGHT, GREY_LIGHT, GREY_MID, WHITE,
+    GREEN_LIGHT, ORANGE_LIGHT, GREY_LIGHT, WHITE,
     YELLOW_LIGHT, RED_LIGHT,
     THIN_BORDER, solid_fill, header_font, body_font,
     center, left, set_column_widths, freeze_top_row,
@@ -565,11 +563,6 @@ def _sheet_creer_fichier(wb: Workbook) -> None:
         ws.cell(row=11, column=col, value=h)
     style_header_row(ws, 11, 1, 6, BLUE_MID)
 
-    feuilles_defaut = {
-        "cockpit":        [("Cockpit",        "Vue synthétique UO", "uo.avancement_global;uo.heures_realisees", "uo.activites", "1")],
-        "pilote_tech":    [("Suivi Pilote",   "Vue périmètre",      "uo.avancement_global",                    "uo.activites", "1")],
-        "engagement_mgr": [("Vue Globale",    "Multi-projets",      "projet.nom",                              "uo.activites", "1")],
-    }
     for i in range(8):
         row = 12 + i
         for col in range(1, 7):
