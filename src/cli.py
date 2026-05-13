@@ -162,7 +162,7 @@ def cmd_lineage(args: argparse.Namespace) -> int:
         print(_json.dumps(lineage_dict(), ensure_ascii=False, indent=2))
         return 0
 
-    _header(f"ExoSync — Lineage (Exomap v2)")
+    _header("ExoSync — Lineage (Exomap v2)")
 
     text = lineage_text(file_id=file_id)
     print(text)
@@ -187,7 +187,7 @@ def cmd_lineage(args: argparse.Namespace) -> int:
         if file_id:
             entrees = [e for e in entrees if e.id == file_id]
         if entrees:
-            print(f"\n  --- Owners ---")
+            print("\n  --- Owners ---")
             for e in entrees:
                 owner_str = "<non assigné>"
                 if e.owner_id:

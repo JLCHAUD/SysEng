@@ -23,8 +23,8 @@ class TestLoadFileTypes:
         from src.config_loader import load_file_types
         ft = load_file_types()
         assert set(ft.keys()) == {
-            "uo_instance", "referentiel_uo", "referentiel_projet",
-            "cockpit", "pilote", "consolidation", "client",
+            "uo_instance", "referentiel_uo", "referentiel_acteurs",
+            "projet_v", "cockpit_metier", "cockpit_ingenieur",
         }
 
     def test_owner_role_present_sur_chaque_type(self):
@@ -37,12 +37,11 @@ class TestLoadFileTypes:
         from src.config_loader import load_file_types
         ft = load_file_types()
         assert ft["uo_instance"]["owner_role"] == "ingenieur_sys"
-        assert ft["cockpit"]["owner_role"] == "pilote_tech"
-        assert ft["pilote"]["owner_role"] == "pilote_tech"
-        assert ft["client"]["owner_role"] == "donneur_ordre"
-        assert ft["consolidation"]["owner_role"] == "engagement_mgr"
-        assert ft["referentiel_projet"]["owner_role"] == "engagement_mgr"
-        assert ft["referentiel_uo"]["owner_role"] == "it_manager"
+        assert ft["cockpit_ingenieur"]["owner_role"] == "ingenieur_sys"
+        assert ft["cockpit_metier"]["owner_role"] == "pilote_metier"
+        assert ft["projet_v"]["owner_role"] == "pilote_metier"
+        assert ft["referentiel_acteurs"]["owner_role"] == "pilote_pole"
+        assert ft["referentiel_uo"]["owner_role"] == "pilote_pole"
 
 
 # ─── EntreeRegistre.owner_id ──────────────────────────────────────────────────
