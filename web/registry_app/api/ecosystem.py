@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from web.schemas.models import EcosystemGraph, EcosystemNode, EcosystemEdge
-from web.services.config_service import load_ecosystem
+from web.registry_app.services.config_service import load_ecosystem
 
 router = APIRouter()
 

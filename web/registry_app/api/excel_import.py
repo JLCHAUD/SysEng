@@ -12,11 +12,12 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import openpyxl
 
-from web.services.config_service import (
+from web.registry_app.services.config_service import (
     load_registre, save_registre,
     load_tables, save_tables,
     load_file_types,
     load_hierarchy, save_hierarchy,
+    get_file_types_path,
 )
 
 router = APIRouter()
@@ -367,7 +368,6 @@ def register_excel(body: RegisterRequest):
 
     if body.update_class_fields and body.field_mappings and body.type_fichier:
         import yaml
-        from web.services.config_service import FILE_TYPES_PATH
         ft = ft_all[body.type_fichier]
         existing_names = {f["name"] for f in ft.get("min_fields", [])}
         for fm in body.field_mappings:
@@ -379,10 +379,11 @@ def register_excel(body: RegisterRequest):
                 "source": fm.source, "required": fm.required, "pushable": fm.pushable,
             })
         ft_all[body.type_fichier] = ft
-        with open(FILE_TYPES_PATH, encoding="utf-8") as f:
+        ft_path = get_file_types_path()
+        with open(ft_path, encoding="utf-8") as f:
             doc = yaml.safe_load(f) or {}
         doc["file_types"] = ft_all
-        with open(FILE_TYPES_PATH, "w", encoding="utf-8") as f:
+        with open(ft_path, "w", encoding="utf-8") as f:
             yaml.dump(doc, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
     if body.collect_mappings:

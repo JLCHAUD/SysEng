@@ -1,7 +1,7 @@
 """Lecture seule des types de fichiers (Classes N1) — utilisé par le wizard Import Excel N2."""
 from fastapi import APIRouter
 from web.schemas.models import FileType
-from web.services.config_service import load_file_types
+from web.registry_app.services.config_service import load_file_types
 
 router = APIRouter()
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from web.schemas.models import Actor, ActorCreate
-from web.services.config_service import load_acteurs, save_acteurs
+from web.registry_app.services.config_service import load_acteurs, save_acteurs
 
 router = APIRouter()
 

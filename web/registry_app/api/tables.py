@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from web.schemas.models import TableDef
-from web.services.config_service import load_tables, save_tables, load_ecosystem
+from web.registry_app.services.config_service import load_tables, save_tables, load_ecosystem
 
 router = APIRouter()
 

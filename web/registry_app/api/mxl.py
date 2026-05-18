@@ -1,7 +1,7 @@
 """Génère le contenu MXL d'un fichier depuis sa config (tables + ecosystem + pulls déclarés)."""
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
-from web.services.config_service import (
+from web.registry_app.services.config_service import (
     load_registre, load_tables, load_hierarchy, load_ecosystem
 )
 

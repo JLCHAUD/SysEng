@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from web.schemas.models import ListDeclaration, CollectMapping
-from web.services.config_service import load_hierarchy, save_hierarchy
+from web.registry_app.services.config_service import load_hierarchy, save_hierarchy
 
 router = APIRouter()
 

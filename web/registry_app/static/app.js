@@ -1521,10 +1521,131 @@ const ViewEcosystem = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Ecosystem Manager (Espace de travail)
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewEcosystemManager = {
+  setup() {
+    const ecosystems = ref([]);
+    const current = ref(null);
+    const showNew = ref(false);
+    const newForm = ref({ name: '', path: '' });
+    const loading = ref(false);
+
+    async function load() {
+      try {
+        [ecosystems.value, current.value] = await Promise.all([
+          GET('/api/ecosystem/list'),
+          GET('/api/ecosystem/current'),
+        ]);
+      } catch(e) { toastErr(e); }
+    }
+
+    async function activate(path) {
+      try {
+        await POST('/api/ecosystem/open', { path });
+        await load();
+        toast('Écosystème activé');
+      } catch(e) { toastErr(e); }
+    }
+
+    async function createNew() {
+      if (!newForm.value.name || !newForm.value.path) return;
+      loading.value = true;
+      try {
+        await POST('/api/ecosystem/new', newForm.value);
+        newForm.value = { name: '', path: '' };
+        showNew.value = false;
+        await load();
+        toast('Écosystème créé et activé');
+      } catch(e) { toastErr(e); }
+      finally { loading.value = false; }
+    }
+
+    async function remove(name) {
+      if (!confirm(`Retirer "${name}" de la liste ?`)) return;
+      try {
+        await DEL(`/api/ecosystem/${encodeURIComponent(name)}`);
+        await load();
+        toast('Écosystème retiré');
+      } catch(e) { toastErr(e); }
+    }
+
+    onMounted(load);
+    return { ecosystems, current, showNew, newForm, loading, activate, createNew, remove };
+  },
+  template: `
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Espace de travail actif</span>
+        </div>
+        <div v-if="current" style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+          <span style="font-size:1.5rem;">◎</span>
+          <div>
+            <div style="font-weight:600;">{{ current.name }}</div>
+            <div style="font-size:0.75rem;color:var(--text-dim);">{{ current.path }}</div>
+          </div>
+          <span class="badge" :class="current.valid ? 'badge-green' : 'badge-orange'" style="margin-left:auto;">
+            {{ current.valid ? 'valide' : 'invalide' }}
+          </span>
+          <span class="badge badge-blue">{{ current.post_count }} posts</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Écosystèmes connus</span>
+          <button class="btn btn-primary btn-sm" @click="showNew=!showNew">+ Nouveau</button>
+        </div>
+
+        <div v-if="showNew" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group" style="margin:0;">
+              <label>Nom</label>
+              <input v-model="newForm.name" placeholder="Mon écosystème" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Chemin (absolu ou relatif au projet)</label>
+              <input v-model="newForm.path" placeholder="config_projet2" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" @click="showNew=false">Annuler</button>
+            <button class="btn btn-primary btn-sm" :disabled="loading" @click="createNew">Créer et activer</button>
+          </div>
+        </div>
+
+        <table>
+          <thead><tr>
+            <th>Nom</th><th>Chemin</th><th>Posts</th><th>État</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="eco in ecosystems" :key="eco.path">
+              <td>
+                <span style="font-weight:500;">{{ eco.name }}</span>
+                <span v-if="eco.active" class="badge badge-blue" style="margin-left:8px;">actif</span>
+              </td>
+              <td style="font-size:0.75rem;color:var(--text-dim);">{{ eco.path }}</td>
+              <td>{{ eco.post_count }}</td>
+              <td><span class="badge" :class="eco.valid ? 'badge-green' : 'badge-orange'">{{ eco.valid ? 'valide' : 'invalide' }}</span></td>
+              <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+                <button v-if="!eco.active" class="btn btn-ghost btn-sm" @click="activate(eco.path)">Activer</button>
+                <button v-if="!eco.active" class="btn btn-danger btn-sm" @click="remove(eco.name)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const VIEW_MAP = {
   dashboard:      ViewDashboard,
+  workspace:      ViewEcosystemManager,
   registry:       ViewRegistry,
   actors:         ViewActors,
   hierarchy:      ViewHierarchy,
@@ -1540,14 +1661,19 @@ const App = {
   setup() {
     const view = ref('dashboard');
     const ecosystemStatus = ref(null);
+    const ecosystemCurrent = ref(null);
 
     onMounted(async () => {
-      ecosystemStatus.value = await GET('/api/ecosystem/status').catch(() => null);
+      [ecosystemStatus.value, ecosystemCurrent.value] = await Promise.all([
+        GET('/api/ecosystem/status').catch(() => null),
+        GET('/api/ecosystem/current').catch(() => null),
+      ]);
     });
 
     const nav = [
-      { id:'dashboard',    icon:'⊞', label:'Tableau de bord',   group:'Principal' },
-      { id:'registry',     icon:'◧', label:'Registre des Posts', group:'Population' },
+      { id:'dashboard',    icon:'⊞', label:'Tableau de bord',        group:'Principal' },
+      { id:'workspace',    icon:'◎', label:'Espace de travail',      group:'Configuration' },
+      { id:'registry',     icon:'◧', label:'Registre des Posts',     group:'Population' },
       { id:'actors',       icon:'◉', label:'Acteurs',            group:'Population' },
       { id:'excel-import', icon:'⤵', label:'Importer Excel',     group:'Population' },
       { id:'hierarchy',    icon:'⬡', label:'Hiérarchie LIST+COLLECT', group:'Structure' },
@@ -1565,6 +1691,7 @@ const App = {
 
     const titles = {
       dashboard:    'Tableau de bord',
+      workspace:    'Gestion des espaces de travail',
       registry:     'Registre des Posts',
       actors:       'Acteurs',
       hierarchy:    'Hiérarchie — LIST & COLLECT',
@@ -1577,7 +1704,7 @@ const App = {
 
     const currentView = computed(() => VIEW_MAP[view.value] || ViewDashboard);
 
-    return { view, navGroups, titles, ecosystemStatus, toasts, currentView };
+    return { view, navGroups, titles, ecosystemStatus, ecosystemCurrent, toasts, currentView };
   },
   template: `
     <div id="sidebar">
@@ -1598,6 +1725,7 @@ const App = {
       </nav>
       <div class="sidebar-status">
         <span class="status-dot" :class="ecosystemStatus?.errors===0?'ok':'err'"></span>
+        <span v-if="ecosystemCurrent" style="font-weight:600;display:block;margin-bottom:2px;">{{ ecosystemCurrent.name }}</span>
         {{ ecosystemStatus ? ecosystemStatus.total_files + ' Posts · ' + ecosystemStatus.edge_count + ' arêtes' : 'Chargement…' }}
       </div>
     </div>

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from web.schemas.models import FileInstance, FileInstanceCreate
-from web.services.config_service import load_registre, save_registre
+from web.registry_app.services.config_service import load_registre, save_registre
 
 router = APIRouter()
 
