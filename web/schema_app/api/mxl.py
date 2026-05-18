@@ -66,10 +66,12 @@ def _generate_class_mxl(class_id: str) -> str:
 
     # ── En-tête ────────────────────────────────────────────────────────────────
     placeholder_id = class_id.upper() + "_ID"
+    default_style = ft.get("default_style", "default")
     lines += [
         f"FILE_TYPE  {class_id}",
         f"FILE_ID    {placeholder_id}",
         f"VERSION    1",
+        f"STYLE:     {default_style}",
         "",
     ]
 

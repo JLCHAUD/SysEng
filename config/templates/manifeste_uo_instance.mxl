@@ -5,30 +5,38 @@ MANIFESTE_V=1
 FILE_TYPE  uo_instance
 FILE_ID    {id}
 VERSION    1
+STYLE:     standard
 
 # ── Definition de la table des activites ─────────────────────────────────────
-DEF  $activites  GET_TABLE  Activites  TabActivites
+DEF $activites = GET_TABLE(Activites, TabActivites)
 
-COL  $activites.id           type=str   header="ID Activite"
-COL  $activites.libelle      type=str   header="Libelle"
-COL  $activites.avancement   type=float header="% Avancement"  write=engineer
-COL  $activites.heures       type=float header="Heures"        write=engineer
+COL $activites.id           : KEY   HEADER="ID Activite"
+COL $activites.libelle      : DATA  HEADER="Libelle"
+COL $activites.avancement   : DATA  HEADER="% Avancement"  WRITE=engineer
+COL $activites.heures       : DATA  HEADER="Heures"        WRITE=engineer
 
 # ── Import depuis le store ────────────────────────────────────────────────────
-# PULL  $types_uo  FROM  ref.types_uo  INTO  TabTypesUO
+# PULL ref.activites_type -> FILL_TABLE(Activites, TabActivites) MODE=APPEND_NEW KEY=id
 
 # ── Calculs ───────────────────────────────────────────────────────────────────
-DEF  $avancement_global  COMPUTE  MEAN_WEIGHTED($activites.avancement, $activites.heures)
-DEF  $total_heures       COMPUTE  SUM($activites.heures)
+DEF $avancement_global = MEAN_WEIGHTED($activites.avancement, $activites.heures)
+DEF $total_heures      = SUM($activites.heures)
+DEF $statut_global     = SWITCH_RANGE($avancement_global,
+  [0,  29] : "ROUGE",
+  [30, 69] : "ORANGE",
+  [70, 100]: "VERT"
+)
 
 # ── Validation ───────────────────────────────────────────────────────────────
-VALIDATE  $activites.avancement  :  RANGE(0, 100)
-VALIDATE  $activites.heures      :  NON_NEGATIVE
-VALIDATE  $activites.libelle     :  NOT_EMPTY
+VALIDATE $activites.avancement : RANGE(0, 100)
+VALIDATE $activites.heures     : NON_NEGATIVE
+VALIDATE $activites.libelle    : NOT_EMPTY
 
 # ── Export vers le store ──────────────────────────────────────────────────────
-PUSH  $avancement_global  TO  uo.{id}.avancement
-PUSH  $total_heures       TO  uo.{id}.heures_totales
+PUSH $avancement_global -> uo.{id}.avancement  ONLY_IF $total_heures > 0
+PUSH $total_heures      -> uo.{id}.heures_totales
+PUSH $statut_global     -> uo.{id}.statut      ONLY_IF $total_heures > 0
 
 # ── Liaison Dashboard ─────────────────────────────────────────────────────────
-# BIND  $avancement_global  TO  Dashboard.AvancementGlobal
+# BIND $avancement_global -> Dashboard.AvancementGlobal
+# BIND $statut_global     -> Dashboard.StatutGlobal

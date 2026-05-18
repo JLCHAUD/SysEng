@@ -4,17 +4,18 @@ MANIFESTE_V=1
 FILE_TYPE  referentiel_uo
 FILE_ID    REF-UO
 VERSION    1
+STYLE:     default
 
 # ── Definition de la table de reference ──────────────────────────────────────
-DEF  $types_uo  GET_TABLE  TypesUO  TabTypesUO
+DEF $types_uo = GET_TABLE(TypesUO, TabTypesUO)
 
-COL  $types_uo.id           type=str   header="ID Type"
-COL  $types_uo.nom          type=str   header="Nom"
-COL  $types_uo.charge_std   type=float header="Charge Standard (h)"
+COL $types_uo.id          : KEY  HEADER="ID Type"
+COL $types_uo.nom         : DATA HEADER="Nom"
+COL $types_uo.charge_std  : DATA HEADER="Charge Standard (h)"
 
 # ── Validation ───────────────────────────────────────────────────────────────
-VALIDATE  $types_uo.id        :  NOT_EMPTY
-VALIDATE  $types_uo.charge_std:  POSITIVE
+VALIDATE $types_uo.id         : NOT_EMPTY
+VALIDATE $types_uo.charge_std : POSITIVE
 
 # ── Export vers le store ──────────────────────────────────────────────────────
-PUSH  $types_uo  TO  ref.types_uo
+PUSH $types_uo -> ref.types_uo

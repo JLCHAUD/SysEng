@@ -4,16 +4,17 @@ MANIFESTE_V=1
 FILE_TYPE  cockpit
 FILE_ID    COCKPIT
 VERSION    1
+STYLE:     default
 
 # ── Import des avancements UO ─────────────────────────────────────────────────
-# PULL  $av_uo001  FROM  uo.UO-001.avancement
-# PULL  $av_uo002  FROM  uo.UO-002.avancement
+# PULL uo.UO-001.avancement -> $av_uo001
+# PULL uo.UO-002.avancement -> $av_uo002
 
 # ── Calculs de consolidation ─────────────────────────────────────────────────
-# DEF  $avancement_moyen  COMPUTE  AVG($av_uo001, $av_uo002)
+# DEF $avancement_moyen = AVG($av_uo001, $av_uo002)
 
 # ── Export ───────────────────────────────────────────────────────────────────
-# PUSH  $avancement_moyen  TO  cockpit.avancement_global
+# PUSH $avancement_moyen -> cockpit.avancement_global
 
 # ── Liaison Dashboard ─────────────────────────────────────────────────────────
-# BIND  $avancement_moyen  TO  Dashboard.AvancementGlobal
+# BIND $avancement_moyen -> Dashboard.AvancementGlobal

@@ -1,5 +1,44 @@
 {
   "version": "1",
   "lists": [],
-  "collects": []
+  "collects": [],
+  "pulls": [
+    {
+      "id": "a2949e4b",
+      "source_file_id": "UO-basic",
+      "source_table": "Donnees_Entree",
+      "target_file_id": "COCKPIT-POLE-01",
+      "target_table": "Donnees_Entree",
+      "columns": [
+        "Type ",
+        "Origine",
+        "PIC ",
+        "Status",
+        "Date reception",
+        "Maturité",
+        "Date  Update",
+        "Comments",
+        "Désignation",
+        "ID"
+      ]
+    },
+    {
+      "id": "68c0693b",
+      "source_file_id": "UO-basic",
+      "source_table": "Livrables",
+      "target_file_id": "COCKPIT-POLE-01",
+      "target_table": "Livrables",
+      "columns": [
+        "ID",
+        "Désignation",
+        "Type ",
+        "Date Attendue initiale",
+        "PIC ",
+        "Status",
+        "Date revisée",
+        "Date  livraison",
+        "Comments"
+      ]
+    }
+  ]
 }
