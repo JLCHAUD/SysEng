@@ -319,8 +319,13 @@ const ViewClasses = {
     });
     const newClass = ref(emptyClass());
 
+    const functions  = ref([]);
+
     const load = async () => {
-      classes.value = await GET('/api/classes').catch(() => []);
+      [classes.value, functions.value] = await Promise.all([
+        GET('/api/classes').catch(() => []),
+        GET('/api/functions').catch(() => []),
+      ]);
       if (props.initialClassId) {
         const found = classes.value.find(c => c.id === props.initialClassId);
         if (found) selectClass(found);
@@ -381,7 +386,7 @@ const ViewClasses = {
     watch(activeTab, t => { if (t === 'mxl' && selected.value) loadMxl(); });
 
     return {
-      classes, selected, activeTab, showCreate, newClass,
+      classes, functions, selected, activeTab, showCreate, newClass,
       mxlPreview, mxlLoading,
       selectClass, save, create, deleteClass, load,
     };
@@ -479,7 +484,7 @@ const ViewClasses = {
           <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">
             Tables Excel standard pour cette Classe — déclarées en <span style="color:var(--accent2);font-family:monospace">DEF … = GET_TABLE()</span>
           </p>
-          <table-std-editor v-model="selected.std_tables" />
+          <table-std-editor v-model="selected.std_tables" :writeFunctions="functions" />
         </div>
 
         <!-- Onglet Aperçu MXL -->
@@ -771,10 +776,13 @@ const ViewTemplates = {
 
     const empty = () => ({ id:'', label:'', class_id:'', description:'', extra_sheets:[], field_defaults:{}, std_tables:[], mxl_defaults:{}, source_file:'' });
 
+    const functions = ref([]);
+
     const load = async () => {
-      [templates.value, classes.value] = await Promise.all([
+      [templates.value, classes.value, functions.value] = await Promise.all([
         GET('/api/templates').catch(() => []),
         GET('/api/classes').catch(() => []),
+        GET('/api/functions').catch(() => []),
       ]);
     };
     onMounted(load);
@@ -804,7 +812,7 @@ const ViewTemplates = {
       await load();
     };
 
-    return { templates, classes, filterCls, filtered, showModal, editing, classLabel, openCreate, openEdit, save, del };
+    return { templates, classes, functions, filterCls, filtered, showModal, editing, classLabel, openCreate, openEdit, save, del };
   },
   template: `
     <div>
@@ -859,7 +867,7 @@ const ViewTemplates = {
           </div>
           <div class="form-group">
             <label>Tables supplémentaires</label>
-            <table-std-editor v-model="editing.std_tables" />
+            <table-std-editor v-model="editing.std_tables" :writeFunctions="functions" />
           </div>
           <div class="form-actions">
             <button class="btn btn-ghost" @click="showModal=false">Annuler</button>

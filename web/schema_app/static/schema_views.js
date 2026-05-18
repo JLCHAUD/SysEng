@@ -5,7 +5,6 @@
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const COL_TYPES   = ['string', 'int', 'float', 'date', 'bool', 'ref', 'pct', 'KEY'];
-const WRITE_MODES = ['', 'ingenieur_sys', 'pilote_metier', 'pilote_pole', 'system', 'user'];
 const FIELD_NATURES  = ['identitaire', 'operationnel', 'parametre'];
 const FIELD_SOURCES  = ['user_input', 'system', 'computed', 'reference'];
 const FIELD_TYPES    = ['string', 'int', 'float', 'date', 'bool', 'ref'];
@@ -58,15 +57,19 @@ const TagsInput = {
 // ── ColEditor ─────────────────────────────────────────────────────────────────
 
 const ColEditor = {
-  props: ['modelValue'],
+  props: {
+    modelValue:     { default: () => [] },
+    writeFunctions: { default: () => [] },
+  },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
-    const cols = Vue.computed(() => props.modelValue || []);
+    const cols   = Vue.computed(() => props.modelValue || []);
+    const wFuncs = Vue.computed(() => props.writeFunctions || []);
     const newCol = () => ({ name:'', col_type:'string', header:'', write:'', is_key:false, required:true, description:'' });
     const add    = () => emit('update:modelValue', [...cols.value, newCol()]);
     const remove = i => emit('update:modelValue', cols.value.filter((_,j) => j!==i));
     const upd    = (i, k, v) => emit('update:modelValue', cols.value.map((c,j) => j===i ? {...c,[k]:v} : c));
-    return { cols, add, remove, upd, COL_TYPES, WRITE_MODES };
+    return { cols, wFuncs, add, remove, upd, COL_TYPES };
   },
   template: `
     <div>
@@ -87,8 +90,15 @@ const ColEditor = {
             </td>
             <td><input :value="col.header"   @input="upd(i,'header',$event.target.value)"   placeholder="Libellé" /></td>
             <td>
-              <select :value="col.write" @change="upd(i,'write',$event.target.value)" style="min-width:80px">
-                <option v-for="w in WRITE_MODES" :key="w" :value="w">{{ w||'—' }}</option>
+              <select :value="col.write" @change="upd(i,'write',$event.target.value)" style="min-width:120px">
+                <option value="">— (libre)</option>
+                <option v-for="f in wFuncs" :key="f.id" :value="f.id"
+                        :title="f.description||''">{{ f.label }}</option>
+                <!-- fallback : valeur inconnue déjà en base -->
+                <option v-if="col.write && !wFuncs.find(f=>f.id===col.write)"
+                        :value="col.write" disabled style="color:var(--text-dim)">
+                  {{ col.write }} (hors liste)
+                </option>
               </select>
             </td>
             <td style="text-align:center"><input type="checkbox" :checked="col.is_key"  @change="upd(i,'is_key',$event.target.checked)"  style="width:auto;accent-color:var(--accent)" /></td>
@@ -107,7 +117,10 @@ const ColEditor = {
 
 const TableStdEditor = {
   components: { ColEditor },
-  props: ['modelValue'],
+  props: {
+    modelValue:     { default: () => [] },
+    writeFunctions: { default: () => [] },
+  },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
     const tables   = Vue.computed(() => props.modelValue || []);
@@ -146,7 +159,8 @@ const TableStdEditor = {
               <input :value="tbl.sheet" @input="upd(i,'sheet',$event.target.value)" placeholder="Activites" />
             </div>
           </div>
-          <col-editor :modelValue="tbl.columns" @update:modelValue="upd(i,'columns',$event)" />
+          <col-editor :modelValue="tbl.columns" @update:modelValue="upd(i,'columns',$event)"
+                      :writeFunctions="writeFunctions" />
         </div>
       </div>
       <div v-if="!tables.length" style="color:var(--text-dim);font-size:0.78rem;padding:8px 0">
