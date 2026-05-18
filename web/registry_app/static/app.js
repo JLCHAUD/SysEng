@@ -880,7 +880,7 @@ const ViewTissage = {
           <div v-if="!pendingDrop" class="drop-zone" :class="{over:dropOver}"
                @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
             <div style="font-size:1.5rem;margin-bottom:8px">⇩</div>
-            {{ targetFileId ? 'Déposer une table ici' : 'Sélectionner un Post cible d\'abord' }}
+            {{ targetFileId ? 'Déposer une table ici' : "Sélectionner un Post cible d'abord" }}
           </div>
 
           <!-- Panneau de configuration après drop -->
