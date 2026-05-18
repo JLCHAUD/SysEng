@@ -61,7 +61,15 @@ class ClassSchema(BaseModel):
 def _ft_to_class(fid: str, ft: dict) -> ClassSchema:
     tables_data = load_tables().get("tables", {})
     std_tables = [
-        TableStd(**{k: v for k, v in t.items() if k in TableStd.model_fields})
+        TableStd(
+            name=t.get("table_name", t.get("name", "")),
+            sheet=t.get("sheet", ""),
+            description=t.get("description", ""),
+            columns=[
+                ColumnMin(**{k: v for k, v in c.items() if k in ColumnMin.model_fields})
+                for c in t.get("columns", [])
+            ],
+        )
         for t in tables_data.values()
         if t.get("file_id") == f"__class__{fid}"
     ]
