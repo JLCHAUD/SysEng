@@ -3,19 +3,40 @@
 La différence avec web/services/config_service.py :
 - Tous les chemins passent par get_active_config(), modifiable via set_active_config().
 - Cela permet de gérer plusieurs écosystèmes (dossiers config distincts).
+- L'écosystème actif est persisté dans .active_registry_ecosystem pour survivre aux reloads.
 """
 import json
 from pathlib import Path
 import yaml
 
-# Écosystème actif — modifiable via set_active_config()
-_DEFAULT_CONFIG = Path(__file__).parent.parent.parent.parent / "config"
-_active_config: Path = _DEFAULT_CONFIG
+_PROJECT_ROOT   = Path(__file__).parent.parent.parent.parent
+_DEFAULT_CONFIG = _PROJECT_ROOT / "config"
+_ACTIVE_FILE    = _PROJECT_ROOT / ".active_registry_ecosystem"
+
+
+def _load_persisted() -> Path:
+    """Lit le chemin persisté sur disque, fallback sur _DEFAULT_CONFIG."""
+    if _ACTIVE_FILE.exists():
+        try:
+            p = Path(_ACTIVE_FILE.read_text(encoding="utf-8").strip())
+            if p.exists():
+                return p
+        except Exception:
+            pass
+    return _DEFAULT_CONFIG
+
+
+# Écosystème actif — initialisé depuis le fichier persisté
+_active_config: Path = _load_persisted()
 
 
 def set_active_config(path: Path) -> None:
     global _active_config
     _active_config = Path(path)
+    try:
+        _ACTIVE_FILE.write_text(str(_active_config), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def get_active_config() -> Path:

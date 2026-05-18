@@ -28,3 +28,9 @@ CONTEXT_NEW_SESSION.md
 
 # Environment
 .env
+
+# Ecosystèmes actifs (locaux, ne pas versionner)
+.active_schema_ecosystem
+.active_registry_ecosystem
+.schema_ecosystems.json
+.registry_ecosystems.json
