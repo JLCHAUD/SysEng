@@ -258,10 +258,10 @@ const MxlHighlight = {
       return this.code
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/^(#.*)$/gm, '<span class="mxl-comment">$1</span>')
-        .replace(/\b(FILE_TYPE|FILE_ID|VERSION|DEF|COL|PUSH|PULL|LIST|COLLECT|GET_TABLE|GET_CELL|FILL_TABLE|FORM|SOURCE|FILTER|WHERE|MODE|INTO|FROM_LIST|COLS|WITH|KEY|WRITE|HEADER|TYPE)\b/g,
+        .replace(/\b(FILE_TYPE|FILE_ID|VERSION|STYLE|DEF|COL|PUSH|PULL|LIST|COLLECT|GET_TABLE|GET_CELL|FILL_TABLE|FORM|SOURCE|FILTER|WHERE|MODE|INTO|FROM_LIST|COLS|WITH|KEY|WRITE|HEADER|TYPE|SWITCH_RANGE|VALIDATE|BIND|EXTENDS|ONLY_IF)\b/g,
                  '<span class="mxl-keyword">$1</span>')
-        .replace(/"([^"]+)"/g, '<span class="mxl-string">"$1"</span>')
-        .replace(/(\$\w+)/g, '<span class="mxl-value">$1</span>');
+        .replace(/"([^"<>]+)"/g, '<span class="mxl-string">"$1"</span>')
+        .replace(/(\$\w+)(?![^<]*>)/g, '<span class="mxl-value">$1</span>');
     }
   },
   template: `<div class="mxl-preview" v-html="html"></div>`
