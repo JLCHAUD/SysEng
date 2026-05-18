@@ -1523,14 +1523,20 @@ const ViewEcosystem = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
+const VIEW_MAP = {
+  dashboard:      ViewDashboard,
+  registry:       ViewRegistry,
+  actors:         ViewActors,
+  hierarchy:      ViewHierarchy,
+  tables:         ViewTables,
+  tissage:        ViewTissage,
+  mxl:            ViewMxl,
+  'excel-import': ViewExcelImport,
+  ecosystem:      ViewEcosystem,
+};
+
 const App = {
-  components: {
-    ToastLayer,
-    ViewDashboard, ViewRegistry, ViewActors,
-    ViewHierarchy, ViewTables,
-    ViewTissage, ViewMxl,
-    ViewExcelImport, ViewEcosystem,
-  },
+  components: { ToastLayer },
   setup() {
     const view = ref('dashboard');
     const ecosystemStatus = ref(null);
@@ -1569,7 +1575,9 @@ const App = {
       ecosystem:    'Graphe de l\'écosystème',
     };
 
-    return { view, navGroups, titles, ecosystemStatus, toasts };
+    const currentView = computed(() => VIEW_MAP[view.value] || ViewDashboard);
+
+    return { view, navGroups, titles, ecosystemStatus, toasts, currentView };
   },
   template: `
     <div id="sidebar">
@@ -1601,15 +1609,7 @@ const App = {
         <span style="font-size:0.72rem;color:var(--text-dim)">N2 — Population</span>
       </div>
       <div class="content">
-        <view-dashboard    v-if="view==='dashboard'" />
-        <view-registry     v-else-if="view==='registry'" />
-        <view-actors       v-else-if="view==='actors'" />
-        <view-hierarchy    v-else-if="view==='hierarchy'" />
-        <view-tables       v-else-if="view==='tables'" />
-        <view-tissage      v-else-if="view==='tissage'" />
-        <view-mxl          v-else-if="view==='mxl'" />
-        <view-excel-import v-else-if="view==='excel-import'" />
-        <view-ecosystem    v-else-if="view==='ecosystem'" />
+        <component :is="currentView" :key="view" />
       </div>
     </div>
 
