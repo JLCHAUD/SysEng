@@ -319,12 +319,14 @@ const ViewClasses = {
     });
     const newClass = ref(emptyClass());
 
-    const functions  = ref([]);
+    const functions   = ref([]);
+    const namespaces  = ref([]);
 
     const load = async () => {
-      [classes.value, functions.value] = await Promise.all([
+      [classes.value, functions.value, namespaces.value] = await Promise.all([
         GET('/api/classes').catch(() => []),
         GET('/api/functions').catch(() => []),
+        GET('/api/namespaces').catch(() => []),
       ]);
       if (props.initialClassId) {
         const found = classes.value.find(c => c.id === props.initialClassId);
@@ -385,10 +387,20 @@ const ViewClasses = {
 
     watch(activeTab, t => { if (t === 'mxl' && selected.value) loadMxl(); });
 
+    const toggleNs = (id, checked) => {
+      if (!selected.value) return;
+      if (checked) {
+        if (!selected.value.allowed_namespaces.includes(id))
+          selected.value.allowed_namespaces.push(id);
+      } else {
+        selected.value.allowed_namespaces = selected.value.allowed_namespaces.filter(n => n !== id);
+      }
+    };
+
     return {
-      classes, functions, selected, activeTab, showCreate, newClass,
+      classes, functions, namespaces, selected, activeTab, showCreate, newClass,
       mxlPreview, mxlLoading,
-      selectClass, save, create, deleteClass, load,
+      selectClass, save, create, deleteClass, load, toggleNs,
     };
   },
   template: `
@@ -463,7 +475,21 @@ const ViewClasses = {
           </div>
           <div class="form-group">
             <label>Namespaces autorisés</label>
-            <tags-input v-model="selected.allowed_namespaces" placeholder="uo., ref.…" />
+            <div v-if="namespaces.length" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
+              <label v-for="ns in namespaces" :key="ns.id"
+                     style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:4px"
+                     :style="selected.allowed_namespaces.includes(ns.id) ? 'border-color:var(--accent);background:rgba(99,102,241,.08)' : ''">
+                <input type="checkbox"
+                       :checked="selected.allowed_namespaces.includes(ns.id)"
+                       @change="toggleNs(ns.id, $event.target.checked)"
+                       style="width:auto;accent-color:var(--accent)" />
+                <span :title="ns.description">{{ ns.label || ns.id }}</span>
+                <span v-if="ns.prefix" style="font-family:monospace;color:var(--accent2);font-size:0.73rem">{{ ns.prefix }}</span>
+              </label>
+            </div>
+            <div v-else style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">
+              Aucun namespace défini — créez-en dans la vue <em>Namespaces</em>.
+            </div>
           </div>
           <div class="form-group">
             <label>Template MXL (chemin)</label>
@@ -938,25 +964,166 @@ const ViewMxlPreview = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Namespaces (CRUD)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ViewNamespaces = {
+  setup() {
+    const namespaces = ref([]);
+    const showForm   = ref(false);
+    const editing    = ref(null);   // id du namespace en édition, ou null
+    const form       = ref({ id: '', label: '', prefix: '', description: '' });
+
+    const emptyForm  = () => ({ id: '', label: '', prefix: '', description: '' });
+
+    const load = async () => {
+      namespaces.value = await GET('/api/namespaces').catch(() => []);
+    };
+    onMounted(load);
+
+    const startCreate = () => {
+      form.value = emptyForm();
+      editing.value = null;
+      showForm.value = true;
+    };
+
+    const startEdit = ns => {
+      form.value = { ...ns };
+      editing.value = ns.id;
+      showForm.value = true;
+    };
+
+    const save = async () => {
+      try {
+        if (editing.value) {
+          await PUT(`/api/namespaces/${editing.value}`, form.value);
+          toast('Namespace mis à jour');
+        } else {
+          await POST('/api/namespaces', form.value);
+          toast('Namespace créé');
+        }
+        showForm.value = false;
+        editing.value = null;
+        await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async ns => {
+      if (!confirm(`Supprimer le namespace "${ns.label || ns.id}" ?`)) return;
+      await DEL(`/api/namespaces/${ns.id}`).catch(toastErr);
+      await load();
+    };
+
+    const cancel = () => { showForm.value = false; editing.value = null; };
+
+    return { namespaces, form, editing, showForm, startCreate, startEdit, save, del, cancel };
+  },
+  template: `
+    <div>
+      <div class="card-header" style="margin-bottom:16px">
+        <span class="card-title">Namespaces de l'écosystème</span>
+        <button class="btn btn-primary btn-sm" @click="startCreate">+ Nouveau</button>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:20px">
+        Un namespace déclare un préfixe d'identifiant au niveau de l'écosystème.
+        Les Classes peuvent ensuite se voir associer un ou plusieurs namespaces autorisés.
+      </p>
+
+      <!-- Formulaire création / édition -->
+      <div v-if="showForm" class="card" style="margin-bottom:20px">
+        <div class="card-title" style="margin-bottom:12px">{{ editing ? 'Modifier' : 'Nouveau' }} namespace</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ID technique</label>
+            <input v-model="form.id" :disabled="!!editing"
+                   :style="editing ? 'opacity:.6;cursor:not-allowed' : ''"
+                   placeholder="uo" />
+          </div>
+          <div class="form-group">
+            <label>Libellé</label>
+            <input v-model="form.label" placeholder="Unités Opérationnelles" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Préfixe</label>
+            <input v-model="form.prefix" placeholder="uo." style="font-family:monospace" />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input v-model="form.description" placeholder="Description optionnelle…" />
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-ghost btn-sm" @click="cancel">Annuler</button>
+          <button class="btn btn-primary btn-sm" @click="save">💾 Sauvegarder</button>
+        </div>
+      </div>
+
+      <!-- Liste -->
+      <div v-if="namespaces.length">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Libellé</th><th>Préfixe</th><th>Description</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="ns in namespaces" :key="ns.id">
+              <td style="font-family:monospace;font-size:0.82rem">{{ ns.id }}</td>
+              <td>{{ ns.label }}</td>
+              <td style="font-family:monospace;color:var(--accent2)">{{ ns.prefix }}</td>
+              <td style="font-size:0.78rem;color:var(--text-dim)">{{ ns.description }}</td>
+              <td style="text-align:right;white-space:nowrap">
+                <button class="btn btn-ghost btn-xs" @click="startEdit(ns)">✏</button>
+                <button class="btn btn-danger btn-xs" @click="del(ns)" style="margin-left:4px">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else-if="!showForm" style="color:var(--text-dim);font-size:0.78rem;padding:32px;text-align:center">
+        Aucun namespace défini dans cet écosystème.
+      </div>
+    </div>
+  `
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VIEW: Import Excel → Classe (Wizard 3 étapes)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const ViewImportExcel = {
   setup() {
-    const step      = ref(1);
-    const scan      = ref(null);
-    const classes   = ref([]);
-    const preview   = ref(null);
-    const targetId  = ref('');
-    const createNew = ref(false);
-    const newLabel  = ref('');
-    const uploading = ref(false);
-    const applying  = ref(false);
-    const done      = ref(null);
+    const step            = ref(1);
+    const scan            = ref(null);
+    const classes         = ref([]);
+    const preview         = ref(null);
+    const targetId        = ref('');
+    const createNew       = ref(false);
+    const newLabel        = ref('');
+    const uploading       = ref(false);
+    const applying        = ref(false);
+    const done            = ref(null);
+    const sheetSelections = ref({});   // sheet → 'obligatoire' | 'optionnelle' | 'ignorer'
 
     onMounted(async () => {
       classes.value = await GET('/api/classes').catch(() => []);
     });
+
+    // Pré-sélection automatique des feuilles après le scan
+    const computeSheetSelections = () => {
+      if (!scan.value) return;
+      const usedSheets = new Set(scan.value.tables.map(t => t.sheet));
+      const sels = {};
+      scan.value.sheets.forEach(s => {
+        if (s.startsWith('_'))        sels[s] = 'ignorer';
+        else if (usedSheets.has(s))   sels[s] = 'obligatoire';
+        else                          sels[s] = 'optionnelle';
+      });
+      sheetSelections.value = sels;
+    };
 
     const onFileDrop = async e => {
       const file = (e.dataTransfer || e.target).files[0];
@@ -968,6 +1135,7 @@ const ViewImportExcel = {
         const r = await fetch('/api/excel/scan-upload', { method: 'POST', body: fd });
         if (!r.ok) throw new Error((await r.json()).detail);
         scan.value = await r.json();
+        computeSheetSelections();
         step.value = 2;
         await buildPreview();
       } catch(e) { toastErr(e); }
@@ -985,11 +1153,14 @@ const ViewImportExcel = {
       applying.value = true;
       try {
         const classId = targetId.value || preview.value?.class_id || 'nouvelle_classe';
+        const sel = sheetSelections.value;
         const r = await POST('/api/excel/apply-class', {
           class_id: classId,
           label: newLabel.value || classId,
           field_mappings: preview.value?.suggested_fields || [],
           table_mappings: preview.value?.suggested_tables || [],
+          min_sheets:      Object.entries(sel).filter(([,v]) => v === 'obligatoire').map(([k]) => k),
+          optional_sheets: Object.entries(sel).filter(([,v]) => v === 'optionnelle').map(([k]) => k),
           create_if_missing: true,
         });
         done.value = r;
@@ -999,12 +1170,16 @@ const ViewImportExcel = {
       finally { applying.value = false; }
     };
 
-    const reset = () => { step.value=1; scan.value=null; preview.value=null; targetId.value=''; done.value=null; createNew.value=false; newLabel.value=''; };
+    const reset = () => {
+      step.value=1; scan.value=null; preview.value=null; targetId.value='';
+      done.value=null; createNew.value=false; newLabel.value=''; sheetSelections.value={};
+    };
 
     const toggleField = (f, val) => { f.include = val; };
     const toggleTable = (t, val) => { t.include = val; };
 
-    return { step, scan, classes, preview, targetId, createNew, newLabel, uploading, applying, done, onFileDrop, apply, reset, toggleField, toggleTable };
+    return { step, scan, classes, preview, targetId, createNew, newLabel, uploading, applying, done,
+             sheetSelections, onFileDrop, apply, reset, toggleField, toggleTable };
   },
   template: `
     <div>
@@ -1064,6 +1239,31 @@ const ViewImportExcel = {
             <label>Nom de la nouvelle Classe</label>
             <input v-model="newLabel" placeholder="Identifiant (ex: cockpit_new)" />
           </div>
+        </div>
+
+        <!-- Feuilles -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="margin-bottom:12px">Feuilles détectées</div>
+          <table>
+            <thead><tr><th>Feuille</th><th>Rôle dans la Classe</th><th>Tables liées</th></tr></thead>
+            <tbody>
+              <tr v-for="sheet in scan.sheets" :key="sheet">
+                <td style="font-family:monospace;font-size:0.82rem">{{ sheet }}</td>
+                <td>
+                  <select :value="sheetSelections[sheet]"
+                          @change="sheetSelections[sheet]=$event.target.value"
+                          style="width:150px">
+                    <option value="obligatoire">Obligatoire</option>
+                    <option value="optionnelle">Optionnelle</option>
+                    <option value="ignorer">Ignorer</option>
+                  </select>
+                </td>
+                <td style="font-size:0.75rem;color:var(--text-dim)">
+                  {{ (preview?.suggested_tables||[]).filter(t=>t.sheet===sheet&&t.include).map(t=>t.excel_name).join(', ') || '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div v-if="preview">
@@ -1146,7 +1346,7 @@ const App = {
     ToastLayer,
     ViewEcosystemManager, ViewBlueprint, ViewClasses,
     ViewRelations, ViewFunctions, ViewTemplates,
-    ViewMxlPreview, ViewImportExcel,
+    ViewNamespaces, ViewMxlPreview, ViewImportExcel,
   },
   setup() {
     const view         = ref('ecosystem');
@@ -1182,10 +1382,11 @@ const App = {
         { key: 'blueprint', icon: '◎', label: 'Blueprint' },
       ]},
       { group: 'Schéma N1', items: [
-        { key: 'classes',   icon: '◻', label: 'Classes' },
-        { key: 'relations', icon: '↔', label: 'Relations P/F' },
-        { key: 'functions', icon: '◈', label: 'Fonctions' },
-        { key: 'templates', icon: '⊞', label: 'Templates' },
+        { key: 'classes',    icon: '◻', label: 'Classes' },
+        { key: 'relations',  icon: '↔', label: 'Relations P/F' },
+        { key: 'functions',  icon: '◈', label: 'Fonctions' },
+        { key: 'namespaces', icon: '⬡', label: 'Namespaces' },
+        { key: 'templates',  icon: '⊞', label: 'Templates' },
       ]},
       { group: 'Outils', items: [
         { key: 'mxl',    icon: '⌨', label: 'Générateur MXL' },
@@ -1198,8 +1399,9 @@ const App = {
       blueprint: 'Blueprint — Graphe du Schéma',
       classes:   'Classes',
       relations: 'Relations Père / Fils',
-      functions: 'Fonctions Acteurs',
-      templates: 'Templates de Classe',
+      functions:  'Fonctions Acteurs',
+      namespaces: 'Namespaces',
+      templates:  'Templates de Classe',
       mxl:       'Générateur MXL',
       import:    'Import Excel → Classe',
     };
@@ -1243,6 +1445,7 @@ const App = {
           <view-classes            v-if="view==='classes'"   :initial-class-id="editClassId" />
           <view-relations          v-if="view==='relations'" />
           <view-functions          v-if="view==='functions'" />
+          <view-namespaces         v-if="view==='namespaces'" />
           <view-templates          v-if="view==='templates'" />
           <view-mxl-preview        v-if="view==='mxl'" />
           <view-import-excel       v-if="view==='import'" />

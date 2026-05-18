@@ -29,6 +29,7 @@ _REQUIRED_FILES: dict[str, dict | str] = {
     "functions.json":        {"version": "1", "functions": []},
     "templates.json":        {"version": "1", "templates": []},
     "tables.json":           {"version": "1", "tables": {}},
+    "namespaces.json":       {"version": "1", "namespaces": []},
 }
 
 

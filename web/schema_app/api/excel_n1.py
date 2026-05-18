@@ -89,6 +89,8 @@ class ApplyClassRequest(BaseModel):
     owner_function: str = ""
     field_mappings: list[FieldMapping] = []
     table_mappings: list[TableMapping] = []
+    min_sheets: list[str] = []
+    optional_sheets: list[str] = []
     create_if_missing: bool = True
 
 
@@ -270,6 +272,13 @@ def apply_class(body: ApplyClassRequest):
         }
 
     ft = ft_all[body.class_id]
+
+    # Mise à jour des feuilles (les sélections explicites de l'utilisateur écrasent l'existant)
+    if body.min_sheets:
+        ft["min_sheets"] = body.min_sheets
+        ft["required_sheets"] = body.min_sheets   # alias legacy
+    if body.optional_sheets:
+        ft["optional_sheets"] = body.optional_sheets
 
     # Mise à jour des champs scalaires (ajout seulement, pas écrasement)
     existing_field_names = {f["name"] for f in ft.get("min_fields", [])}

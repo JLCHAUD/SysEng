@@ -127,3 +127,18 @@ def load_tables() -> dict:
 def save_tables(data: dict) -> None:
     with open(_p("tables.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ── namespaces.json ───────────────────────────────────────────────────────────
+
+def load_namespaces() -> list:
+    p = _p("namespaces.json")
+    if not p.exists():
+        return []
+    with open(p, encoding="utf-8") as f:
+        return json.load(f).get("namespaces", [])
+
+
+def save_namespaces(namespaces: list) -> None:
+    with open(_p("namespaces.json"), "w", encoding="utf-8") as f:
+        json.dump({"version": "1", "namespaces": namespaces}, f, ensure_ascii=False, indent=2)

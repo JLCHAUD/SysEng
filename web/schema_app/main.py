@@ -10,6 +10,7 @@ from web.schema_app.api import (
     relations,
     functions,
     templates,
+    namespaces,
     blueprint,
     mxl,
     excel_n1,
@@ -28,8 +29,9 @@ app.include_router(ecosystem_manager.router, prefix="/api/ecosystem", tags=["eco
 app.include_router(classes.router,           prefix="/api/classes",   tags=["classes"])
 app.include_router(relations.router,         prefix="/api/relations", tags=["relations"])
 app.include_router(functions.router,         prefix="/api/functions", tags=["functions"])
-app.include_router(templates.router,         prefix="/api/templates", tags=["templates"])
-app.include_router(blueprint.router,         prefix="/api/blueprint", tags=["blueprint"])
+app.include_router(templates.router,         prefix="/api/templates",  tags=["templates"])
+app.include_router(namespaces.router,        prefix="/api/namespaces", tags=["namespaces"])
+app.include_router(blueprint.router,         prefix="/api/blueprint",  tags=["blueprint"])
 app.include_router(mxl.router,               prefix="/api/mxl",       tags=["mxl"])
 app.include_router(excel_n1.router,          prefix="/api/excel",     tags=["excel"])
 
