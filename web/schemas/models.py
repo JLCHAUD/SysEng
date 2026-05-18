@@ -29,7 +29,7 @@ class FileType(FileTypeBase):
 # ── FileInstance (Registre) ────────────────────────────────────────────────────
 
 class FileInstanceBase(BaseModel):
-    type_fichier: str
+    type_fichier: Optional[str] = None
     chemin: str
     synchro_periodicite: str = "quotidien"
     owner_id: str
