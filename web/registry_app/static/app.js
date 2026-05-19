@@ -1641,6 +1641,223 @@ const ViewEcosystemManager = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Synchronisation
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewSync = {
+  setup() {
+    const posts      = ref([]);
+    const selected   = ref([]);        // IDs cochés
+    const running    = ref(false);
+    const rapport    = ref(null);
+    const reports    = ref([]);
+    const expanded   = ref({});        // logs dépliés par ID
+    const activeReport = ref(null);    // rapport historique ouvert
+
+    async function load() {
+      try {
+        const [reg, status] = await Promise.all([
+          GET('/api/registry'),
+          GET('/api/sync/status'),
+        ]);
+        posts.value = reg;
+        running.value = status.running;
+        if (status.last_rapport) rapport.value = status.last_rapport;
+        reports.value = await GET('/api/sync/reports');
+      } catch(e) { toastErr(e); }
+    }
+
+    function toggleAll() {
+      if (selected.value.length === posts.value.length) {
+        selected.value = [];
+      } else {
+        selected.value = posts.value.map(p => p.id);
+      }
+    }
+
+    function fileStatut(id) {
+      if (!rapport.value) return null;
+      return rapport.value.fichiers?.find(f => f.id === id);
+    }
+
+    async function lancer(idsOverride) {
+      const ids = idsOverride ?? (selected.value.length ? selected.value : []);
+      running.value = true;
+      rapport.value = null;
+      try {
+        rapport.value = await POST('/api/sync/run', { ids, force: false });
+        toast(`Sync terminé — ${rapport.value.nb_ok} OK / ${rapport.value.nb_erreur} erreurs`);
+        await load();
+      } catch(e) {
+        toastErr(e);
+        running.value = false;
+      }
+    }
+
+    async function openHistorique(filename) {
+      try { activeReport.value = await GET(`/api/sync/reports/${filename}`); }
+      catch(e) { toastErr(e); }
+    }
+
+    function statutClass(s) {
+      if (s === 'ok') return 'badge-green';
+      if (s === 'skip_verrouille') return 'badge-orange';
+      if (s === 'erreur') return 'badge-red';
+      return 'badge-gray';
+    }
+
+    onMounted(load);
+    return {
+      posts, selected, running, rapport, reports, expanded, activeReport,
+      toggleAll, fileStatut, lancer, openHistorique, statutClass,
+    };
+  },
+  template: `
+    <div>
+      <!-- Barre d'actions -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Synchronisation ExoSync</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span v-if="running" style="color:var(--accent);font-size:0.85rem;">⟳ Sync en cours…</span>
+            <button class="btn btn-ghost btn-sm" @click="lancer([])" :disabled="running">
+              ↺ Tout synchroniser
+            </button>
+            <button class="btn btn-primary btn-sm"
+                    @click="lancer(selected)" :disabled="running || !selected.length">
+              ▶ Sync sélection ({{ selected.length }})
+            </button>
+          </div>
+        </div>
+
+        <!-- Tableau des Posts -->
+        <table>
+          <thead><tr>
+            <th style="width:32px;"><input type="checkbox" @change="toggleAll"
+                :checked="selected.length === posts.length && posts.length > 0" /></th>
+            <th>ID Post</th><th>Classe</th><th>Dernière sync</th><th>Statut</th>
+          </tr></thead>
+          <tbody>
+            <tr v-if="!posts.length">
+              <td colspan="5" style="text-align:center;color:var(--text-dim);padding:24px;">
+                Registre vide — ajoutez des Posts avant de synchroniser.
+              </td>
+            </tr>
+            <tr v-for="p in posts" :key="p.id">
+              <td><input type="checkbox" :value="p.id" v-model="selected" /></td>
+              <td><strong>{{ p.id }}</strong></td>
+              <td>
+                <span class="badge badge-teal" v-if="p.type_fichier">{{ p.type_fichier }}</span>
+                <span class="badge badge-gray" v-else>libre</span>
+              </td>
+              <td style="font-size:0.78rem;color:var(--text-dim);">
+                {{ p.derniere_synchro ? p.derniere_synchro.replace('T',' ') : '—' }}
+              </td>
+              <td>
+                <span v-if="fileStatut(p.id)" class="badge"
+                      :class="statutClass(fileStatut(p.id).statut)">
+                  {{ fileStatut(p.id).statut }}
+                </span>
+                <span v-else-if="p.statut_dernier_synchro" class="badge"
+                      :class="statutClass(p.statut_dernier_synchro)">
+                  {{ p.statut_dernier_synchro }}
+                </span>
+                <span v-else style="color:var(--text-dim);">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Résultat du dernier sync -->
+      <div v-if="rapport" class="card">
+        <div class="card-header">
+          <span class="card-title">Résultat — {{ rapport.debut?.replace('T',' ') }}</span>
+          <div style="display:flex;gap:8px;">
+            <span class="badge badge-green">{{ rapport.nb_ok }} OK</span>
+            <span v-if="rapport.nb_skip" class="badge badge-orange">{{ rapport.nb_skip }} skip</span>
+            <span v-if="rapport.nb_erreur" class="badge badge-red">{{ rapport.nb_erreur }} erreur(s)</span>
+          </div>
+        </div>
+        <div v-for="f in rapport.fichiers" :key="f.id"
+             style="border-bottom:1px solid var(--border);padding:8px 0;">
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer;"
+               @click="expanded[f.id] = !expanded[f.id]">
+            <span class="badge" :class="statutClass(f.statut)" style="min-width:80px;text-align:center;">
+              {{ f.statut }}
+            </span>
+            <strong>{{ f.id }}</strong>
+            <span style="font-size:0.78rem;color:var(--text-dim);">{{ f.chemin }}</span>
+            <span style="margin-left:auto;font-size:0.75rem;color:var(--text-dim);">
+              {{ expanded[f.id] ? '▲' : '▼' }} logs
+            </span>
+          </div>
+          <div v-if="expanded[f.id]"
+               style="margin-top:8px;background:var(--surface2);border-radius:6px;padding:8px;font-size:0.75rem;font-family:monospace;white-space:pre-wrap;line-height:1.6;">
+            {{ f.log.join('\\n') || '(aucun log)' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Historique des rapports -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historique des synchronisations</span>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Total</th><th>OK</th><th>Erreurs</th><th></th></tr></thead>
+          <tbody>
+            <tr v-if="!reports.length">
+              <td colspan="5" style="text-align:center;color:var(--text-dim);padding:16px;">
+                Aucun rapport disponible.
+              </td>
+            </tr>
+            <tr v-for="r in reports" :key="r.filename">
+              <td style="font-size:0.82rem;">{{ r.debut ? r.debut.replace('T',' ') : r.filename }}</td>
+              <td>{{ r.nb_total }}</td>
+              <td><span class="badge badge-green">{{ r.nb_ok }}</span></td>
+              <td>
+                <span class="badge" :class="r.nb_erreur ? 'badge-red' : 'badge-gray'">
+                  {{ r.nb_erreur }}
+                </span>
+              </td>
+              <td style="text-align:right;">
+                <button class="btn btn-ghost btn-sm" @click="openHistorique(r.filename)">Voir</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal rapport historique -->
+      <div v-if="activeReport" class="modal-overlay" @click.self="activeReport=null">
+        <div class="modal" style="max-width:700px;max-height:80vh;overflow-y:auto;">
+          <div class="modal-title">Rapport — {{ activeReport.debut?.replace('T',' ') }}</div>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <span class="badge badge-green">{{ activeReport.nb_ok }} OK</span>
+            <span v-if="activeReport.nb_skip" class="badge badge-orange">{{ activeReport.nb_skip }} skip</span>
+            <span v-if="activeReport.nb_erreur" class="badge badge-red">{{ activeReport.nb_erreur }} erreur(s)</span>
+          </div>
+          <div v-for="f in activeReport.fichiers" :key="f.id"
+               style="margin-bottom:12px;border:1px solid var(--border);border-radius:6px;padding:10px;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+              <span class="badge" :class="statutClass(f.statut)">{{ f.statut }}</span>
+              <strong>{{ f.id }}</strong>
+              <span style="font-size:0.75rem;color:var(--text-dim);">{{ f.chemin }}</span>
+            </div>
+            <div style="background:var(--surface2);border-radius:4px;padding:8px;font-size:0.73rem;font-family:monospace;white-space:pre-wrap;">
+              {{ f.log.join('\\n') || '(aucun log)' }}
+            </div>
+          </div>
+          <div style="text-align:right;margin-top:12px;">
+            <button class="btn btn-ghost" @click="activeReport=null">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>`
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VIEW: Gabarits & Affaires
 // ═══════════════════════════════════════════════════════════════════════════════
 const ViewGabarits = {
@@ -1889,6 +2106,7 @@ const VIEW_MAP = {
   dashboard:      ViewDashboard,
   workspace:      ViewEcosystemManager,
   gabarits:       ViewGabarits,
+  sync:           ViewSync,
   registry:       ViewRegistry,
   actors:         ViewActors,
   hierarchy:      ViewHierarchy,
@@ -1922,6 +2140,7 @@ const App = {
       { id:'excel-import', icon:'⤵', label:'Importer Excel',     group:'Population' },
       { id:'hierarchy',    icon:'⬡', label:'Hiérarchie LIST+COLLECT', group:'Structure' },
       { id:'tables',       icon:'▦', label:'Tables & colonnes',  group:'Structure' },
+      { id:'sync',         icon:'↻', label:'Synchronisation',     group:'Flux' },
       { id:'tissage',      icon:'⇢', label:'Tissage PULL',       group:'Flux' },
       { id:'mxl',          icon:'⌥', label:'Générateur MXL',     group:'Flux' },
       { id:'ecosystem',    icon:'◎', label:'Graphe écosystème',  group:'Visualisation' },
@@ -1941,6 +2160,7 @@ const App = {
       actors:       'Acteurs',
       hierarchy:    'Hiérarchie — LIST & COLLECT',
       tables:       'Tables & colonnes',
+      sync:         'Synchronisation ExoSync',
       tissage:      'Tissage — Déclaration de flux PULL',
       mxl:          'Générateur de Manifeste MXL',
       'excel-import': 'Importer un fichier Excel',

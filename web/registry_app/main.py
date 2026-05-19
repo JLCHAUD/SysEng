@@ -15,6 +15,7 @@ from web.registry_app.api import (
     mxl,
     file_types_ro,
     gabarits,
+    sync,
 )
 
 app = FastAPI(title="ExoSync Studio N2 — Registry Populator", version="1.0.0")
@@ -36,6 +37,7 @@ app.include_router(excel_import.router,  prefix="/api/excel",       tags=["excel
 app.include_router(mxl.router,           prefix="/api/mxl",         tags=["mxl"])
 app.include_router(file_types_ro.router, prefix="/api/file-types",  tags=["file-types"])
 app.include_router(gabarits.router,      prefix="/api/gabarits",    tags=["gabarits"])
+app.include_router(sync.router,          prefix="/api/sync",         tags=["sync"])
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
