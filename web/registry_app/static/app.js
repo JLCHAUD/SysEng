@@ -171,7 +171,7 @@ const ViewRegistry = {
 
     const blank = () => ({
       id: '', type_fichier: '', chemin: '', synchro_periodicite: 'quotidien',
-      owner_id: '', genere_par_script: false
+      owner_role: '', genere_par_script: false
     });
     const form = reactive(blank());
 
@@ -227,7 +227,7 @@ const ViewRegistry = {
                 <span class="badge badge-teal" v-if="f.type_fichier">{{ f.type_fichier }}</span>
                 <span class="badge badge-gray" v-else>libre</span>
               </td>
-              <td><span class="badge badge-gray" v-if="f.owner_id">{{ f.owner_id }}</span><span v-else style="color:var(--text-dim)">—</span></td>
+              <td><span class="badge badge-gray" v-if="f.owner_role">{{ f.owner_role }}</span><span v-else style="color:var(--text-dim)">—</span></td>
               <td><span class="badge badge-gray">{{ f.synchro_periodicite }}</span></td>
               <td>
                 <span class="badge" :class="f.statut_dernier_synchro==='ok'?'badge-green':'badge-orange'">
@@ -266,8 +266,8 @@ const ViewRegistry = {
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Owner (ID acteur)</label>
-              <input v-model="form.owner_id" placeholder="USR001" />
+              <label>Rôle owner</label>
+              <input v-model="form.owner_role" placeholder="chef-projet" />
             </div>
             <div class="form-group">
               <label>Périodicité</label>
@@ -1641,11 +1641,254 @@ const ViewEcosystemManager = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Gabarits & Affaires
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewGabarits = {
+  setup() {
+    const gabarits    = ref([]);
+    const showNew     = ref(false);
+    const showOpen    = ref(false);
+    const showClone   = ref(null);   // gabarit source sélectionné
+    const showExport  = ref(false);
+    const loading     = ref(false);
+
+    const newForm    = reactive({ name: '', path: '', description: '' });
+    const openForm   = reactive({ path: '', name: '', description: '' });
+    const cloneForm  = reactive({ dest_path: '', name: '', activate: true });
+    const exportForm = reactive({ name: '', dest_path: '', description: '' });
+
+    async function load() {
+      try { gabarits.value = await GET('/api/gabarits/list'); }
+      catch(e) { toastErr(e); }
+    }
+
+    async function createNew() {
+      if (!newForm.name || !newForm.path) return;
+      loading.value = true;
+      try {
+        await POST('/api/gabarits/new', { ...newForm });
+        Object.assign(newForm, { name: '', path: '', description: '' });
+        showNew.value = false;
+        await load();
+        toast('Gabarit créé');
+      } catch(e) { toastErr(e); }
+      finally { loading.value = false; }
+    }
+
+    async function openGabarit() {
+      if (!openForm.path) return;
+      loading.value = true;
+      try {
+        await POST('/api/gabarits/open', { ...openForm });
+        Object.assign(openForm, { path: '', name: '', description: '' });
+        showOpen.value = false;
+        await load();
+        toast('Gabarit référencé');
+      } catch(e) { toastErr(e); }
+      finally { loading.value = false; }
+    }
+
+    async function cloneGabarit() {
+      if (!cloneForm.dest_path || !cloneForm.name) return;
+      loading.value = true;
+      try {
+        await POST('/api/gabarits/clone', {
+          source_path: showClone.value.path,
+          dest_path: cloneForm.dest_path,
+          name: cloneForm.name,
+          activate: cloneForm.activate,
+        });
+        Object.assign(cloneForm, { dest_path: '', name: '', activate: true });
+        showClone.value = null;
+        await load();
+        toast(cloneForm.activate ? 'Affaire créée et activée !' : 'Affaire créée');
+      } catch(e) { toastErr(e); }
+      finally { loading.value = false; }
+    }
+
+    async function exportCurrent() {
+      if (!exportForm.name || !exportForm.dest_path) return;
+      loading.value = true;
+      try {
+        await POST('/api/gabarits/from-current', { ...exportForm });
+        Object.assign(exportForm, { name: '', dest_path: '', description: '' });
+        showExport.value = false;
+        await load();
+        toast('Schéma N1 exporté comme Gabarit');
+      } catch(e) { toastErr(e); }
+      finally { loading.value = false; }
+    }
+
+    async function remove(name) {
+      if (!confirm(`Retirer le Gabarit "${name}" de la liste ?`)) return;
+      try {
+        await DEL(`/api/gabarits/${encodeURIComponent(name)}`);
+        await load();
+        toast('Gabarit retiré');
+      } catch(e) { toastErr(e); }
+    }
+
+    onMounted(load);
+    return {
+      gabarits, showNew, showOpen, showClone, showExport, loading,
+      newForm, openForm, cloneForm, exportForm,
+      createNew, openGabarit, cloneGabarit, exportCurrent, remove,
+    };
+  },
+  template: `
+    <div>
+      <!-- Explication -->
+      <div class="card" style="background:var(--surface2);border-left:3px solid var(--accent);">
+        <div style="display:flex;gap:16px;align-items:flex-start;">
+          <span style="font-size:1.4rem;">◈</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Gabarits & Affaires</div>
+            <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.5;">
+              Un <strong>Gabarit</strong> est un schéma N1 pré-configuré (Classes, Relations, Fonctions).
+              Il sert de point de départ réutilisable.<br>
+              Une <strong>Affaire</strong> est un écosystème complet N1+N2 créé depuis un Gabarit.
+              Elle vit de façon indépendante après le clonage.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Liste des Gabarits -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Gabarits disponibles <span class="topbar-badge">{{ gabarits.length }}</span></span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" @click="showExport=!showExport">↑ Exporter l'Affaire active</button>
+            <button class="btn btn-ghost btn-sm" @click="showOpen=!showOpen">⊕ Référencer</button>
+            <button class="btn btn-primary btn-sm" @click="showNew=!showNew">+ Nouveau</button>
+          </div>
+        </div>
+
+        <!-- Formulaire : Nouveau Gabarit -->
+        <div v-if="showNew" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:600;margin-bottom:12px;">Nouveau Gabarit vide</div>
+          <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-group" style="margin:0;">
+              <label>Nom *</label>
+              <input v-model="newForm.name" placeholder="Gabarit UO standard" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Chemin *</label>
+              <input v-model="newForm.path" placeholder="gabarits/uo-standard" />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>Description</label>
+            <input v-model="newForm.description" placeholder="Description optionnelle" />
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" @click="showNew=false">Annuler</button>
+            <button class="btn btn-primary btn-sm" :disabled="loading" @click="createNew">Créer</button>
+          </div>
+        </div>
+
+        <!-- Formulaire : Référencer un dossier existant -->
+        <div v-if="showOpen" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:600;margin-bottom:12px;">Référencer un dossier existant comme Gabarit</div>
+          <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-group" style="margin:0;">
+              <label>Chemin *</label>
+              <input v-model="openForm.path" placeholder="chemin/vers/dossier-n1" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Nom (optionnel)</label>
+              <input v-model="openForm.name" placeholder="Nom du gabarit" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" @click="showOpen=false">Annuler</button>
+            <button class="btn btn-primary btn-sm" :disabled="loading" @click="openGabarit">Référencer</button>
+          </div>
+        </div>
+
+        <!-- Formulaire : Exporter l'Affaire active comme Gabarit -->
+        <div v-if="showExport" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:600;margin-bottom:12px;">Exporter le schéma N1 de l'Affaire active</div>
+          <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-group" style="margin:0;">
+              <label>Nom du Gabarit *</label>
+              <input v-model="exportForm.name" placeholder="Gabarit MI20" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Destination *</label>
+              <input v-model="exportForm.dest_path" placeholder="gabarits/mi20" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" @click="showExport=false">Annuler</button>
+            <button class="btn btn-primary btn-sm" :disabled="loading" @click="exportCurrent">Exporter</button>
+          </div>
+        </div>
+
+        <!-- Tableau des Gabarits -->
+        <table>
+          <thead><tr>
+            <th>Nom</th><th>Classes</th><th>Description</th><th>État</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr v-if="gabarits.length === 0">
+              <td colspan="5" style="text-align:center;color:var(--text-dim);padding:24px;">
+                Aucun Gabarit — créez-en un ou référencez un dossier N1 existant.
+              </td>
+            </tr>
+            <tr v-for="g in gabarits" :key="g.path">
+              <td>
+                <div style="font-weight:500;">{{ g.name }}</div>
+                <div style="font-size:0.72rem;color:var(--text-dim);">{{ g.path }}</div>
+              </td>
+              <td><span class="badge badge-teal">{{ g.class_count }} classe(s)</span></td>
+              <td style="font-size:0.8rem;color:var(--text-dim);">{{ g.description || '—' }}</td>
+              <td><span class="badge" :class="g.valid ? 'badge-green' : 'badge-orange'">{{ g.valid ? 'valide' : 'invalide' }}</span></td>
+              <td style="display:flex;gap:6px;justify-content:flex-end;">
+                <button class="btn btn-primary btn-sm" @click="showClone = g">⎘ Cloner → Affaire</button>
+                <button class="btn btn-danger btn-sm" @click="remove(g.name)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal : Cloner vers une Affaire -->
+      <div v-if="showClone" class="modal-overlay" @click.self="showClone=null">
+        <div class="modal">
+          <div class="modal-title">Cloner "{{ showClone.name }}" → nouvelle Affaire</div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:16px;">
+            Le schéma N1 sera copié. L'Affaire sera ensuite indépendante du Gabarit.
+          </div>
+          <div class="form-group">
+            <label>Nom de l'Affaire *</label>
+            <input v-model="cloneForm.name" placeholder="Affaire Projet X" />
+          </div>
+          <div class="form-group">
+            <label>Chemin de destination *</label>
+            <input v-model="cloneForm.dest_path" placeholder="affaires/projet-x" />
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="cb-activate" v-model="cloneForm.activate" />
+            <label for="cb-activate" style="margin:0;cursor:pointer;">Activer immédiatement cette Affaire</label>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+            <button class="btn btn-ghost" @click="showClone=null">Annuler</button>
+            <button class="btn btn-primary" :disabled="loading" @click="cloneGabarit">⎘ Créer l'Affaire</button>
+          </div>
+        </div>
+      </div>
+    </div>`
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const VIEW_MAP = {
   dashboard:      ViewDashboard,
   workspace:      ViewEcosystemManager,
+  gabarits:       ViewGabarits,
   registry:       ViewRegistry,
   actors:         ViewActors,
   hierarchy:      ViewHierarchy,
@@ -1673,6 +1916,7 @@ const App = {
     const nav = [
       { id:'dashboard',    icon:'⊞', label:'Tableau de bord',        group:'Principal' },
       { id:'workspace',    icon:'◎', label:'Espace de travail',      group:'Configuration' },
+      { id:'gabarits',     icon:'◈', label:'Gabarits & Affaires',    group:'Configuration' },
       { id:'registry',     icon:'◧', label:'Registre des Posts',     group:'Population' },
       { id:'actors',       icon:'◉', label:'Acteurs',            group:'Population' },
       { id:'excel-import', icon:'⤵', label:'Importer Excel',     group:'Population' },
@@ -1692,6 +1936,7 @@ const App = {
     const titles = {
       dashboard:    'Tableau de bord',
       workspace:    'Gestion des espaces de travail',
+      gabarits:     'Gabarits & Affaires',
       registry:     'Registre des Posts',
       actors:       'Acteurs',
       hierarchy:    'Hiérarchie — LIST & COLLECT',

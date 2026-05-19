@@ -32,7 +32,7 @@ class FileInstanceBase(BaseModel):
     type_fichier: Optional[str] = None
     chemin: str
     synchro_periodicite: str = "quotidien"
-    owner_id: str
+    owner_role: str = ""
     genere_par_script: bool = False
 
 
@@ -94,7 +94,7 @@ class TableDef(BaseModel):
 # ── Hierarchy ─────────────────────────────────────────────────────────────────
 
 class ListDeclaration(BaseModel):
-    id: str
+    id: Optional[str] = None
     owner_file_id: str
     list_name: str
     form: str = "TABLE"
@@ -104,7 +104,7 @@ class ListDeclaration(BaseModel):
 
 
 class CollectMapping(BaseModel):
-    id: str
+    id: Optional[str] = None
     owner_file_id: str
     source_table: str
     list_name: str
