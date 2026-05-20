@@ -15,12 +15,15 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from web.schema_app.services.config_service import set_active_config, get_active_config
+from web.workspace_service import load_workspace
 
 router = APIRouter()
 
 # Racine du projet (SysEng/)
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 _REGISTRY_FILE = _PROJECT_ROOT / ".schema_ecosystems.json"
+
+_INVALID_NAME_CHARS = set(r'\/:*?"<>|')
 
 # Fichiers requis pour un écosystème valide, avec leur contenu initial
 _REQUIRED_FILES: dict[str, dict | str] = {
@@ -81,8 +84,7 @@ class EcosystemInfo(BaseModel):
 
 
 class NewEcosystemRequest(BaseModel):
-    name: str
-    path: str   # chemin absolu ou relatif au projet
+    name: str   # nom court → gabarits_dir/<name>/ créé automatiquement
 
 
 class OpenEcosystemRequest(BaseModel):
@@ -119,9 +121,17 @@ def list_ecosystems():
 
 @router.post("/new", response_model=EcosystemInfo, status_code=201)
 def new_ecosystem(body: NewEcosystemRequest):
-    path = Path(body.path)
-    if not path.is_absolute():
-        path = _PROJECT_ROOT / body.path
+    """Crée un nouvel écosystème vide sous gabarits_dir/<name>/."""
+    ws = load_workspace()
+    gabarits_dir = ws.get("gabarits_dir", "")
+    if not gabarits_dir:
+        raise HTTPException(422, "gabarits_dir non configuré — définissez-le dans N1 (onglet Workspace)")
+
+    if not body.name or any(c in _INVALID_NAME_CHARS for c in body.name):
+        raise HTTPException(422, f"Nom invalide : '{body.name}' (caractères interdits: \\ / : * ? \" < > |)")
+
+    path = Path(gabarits_dir) / body.name
+
     if path.exists() and any(path.iterdir()):
         raise HTTPException(409, f"Le dossier '{path}' existe déjà et n'est pas vide")
 

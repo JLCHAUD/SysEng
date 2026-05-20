@@ -57,7 +57,6 @@ const ViewEcosystemManager = {
     const showNew = ref(false);
     const showOpen = ref(false);
     const newName = ref('');
-    const newPath = ref('');
     const openPath = ref('');
 
     const load = async () => {
@@ -76,10 +75,10 @@ const ViewEcosystemManager = {
 
     const createEco = async () => {
       try {
-        await POST('/api/ecosystem/new', { name: newName.value, path: newPath.value });
+        await POST('/api/ecosystem/new', { name: newName.value });
         toast(`Écosystème "${newName.value}" créé`);
         showNew.value = false;
-        newName.value = ''; newPath.value = '';
+        newName.value = '';
         await load();
         emit('open', newName.value);
       } catch(e) { toastErr(e); }
@@ -102,7 +101,7 @@ const ViewEcosystemManager = {
       await load();
     };
 
-    return { ecosystems, showNew, showOpen, newName, newPath, openPath, openEco, createEco, doOpen, deleteEco };
+    return { ecosystems, showNew, showOpen, newName, openPath, openEco, createEco, doOpen, deleteEco };
   },
   template: `
     <div>
@@ -139,17 +138,16 @@ const ViewEcosystemManager = {
       <div v-if="showNew" class="modal-overlay" @click.self="showNew=false">
         <div class="modal">
           <div class="modal-title">Nouvel écosystème</div>
-          <div class="form-group">
-            <label>Nom</label>
-            <input v-model="newName" placeholder="Mon projet" autofocus />
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:16px;">
+            Un sous-dossier sera créé automatiquement sous <code>gabarits_dir/&lt;nom&gt;/</code>.
           </div>
           <div class="form-group">
-            <label>Chemin du dossier config (absolu ou relatif au projet)</label>
-            <input v-model="newPath" placeholder="config_monprojet" />
+            <label>Nom *</label>
+            <input v-model="newName" placeholder="SysEng-v2" autofocus />
           </div>
           <div class="form-actions">
             <button class="btn btn-ghost" @click="showNew=false">Annuler</button>
-            <button class="btn btn-primary" @click="createEco" :disabled="!newName||!newPath">Créer</button>
+            <button class="btn btn-primary" @click="createEco" :disabled="!newName">Créer</button>
           </div>
         </div>
       </div>
