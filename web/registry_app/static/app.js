@@ -1915,10 +1915,10 @@ const ViewGabarits = {
     const showExport  = ref(false);
     const loading     = ref(false);
 
-    const newForm    = reactive({ name: '', path: '', description: '' });
+    const newForm    = reactive({ name: '', description: '' });
     const openForm   = reactive({ path: '', name: '', description: '' });
-    const cloneForm  = reactive({ dest_path: '', name: '', activate: true });
-    const exportForm = reactive({ name: '', dest_path: '', description: '' });
+    const cloneForm  = reactive({ name: '', activate: true });
+    const exportForm = reactive({ name: '', description: '' });
 
     async function load() {
       try { gabarits.value = await GET('/api/gabarits/list'); }
@@ -1926,11 +1926,11 @@ const ViewGabarits = {
     }
 
     async function createNew() {
-      if (!newForm.name || !newForm.path) return;
+      if (!newForm.name) return;
       loading.value = true;
       try {
         await POST('/api/gabarits/new', { ...newForm });
-        Object.assign(newForm, { name: '', path: '', description: '' });
+        Object.assign(newForm, { name: '', description: '' });
         showNew.value = false;
         await load();
         toast('Gabarit créé');
@@ -1952,16 +1952,15 @@ const ViewGabarits = {
     }
 
     async function cloneGabarit() {
-      if (!cloneForm.dest_path || !cloneForm.name) return;
+      if (!cloneForm.name) return;
       loading.value = true;
       try {
         await POST('/api/gabarits/clone', {
           source_path: showClone.value.path,
-          dest_path: cloneForm.dest_path,
           name: cloneForm.name,
           activate: cloneForm.activate,
         });
-        Object.assign(cloneForm, { dest_path: '', name: '', activate: true });
+        Object.assign(cloneForm, { name: '', activate: true });
         showClone.value = null;
         await load();
         toast(cloneForm.activate ? 'Affaire créée et activée !' : 'Affaire créée');
@@ -1970,11 +1969,11 @@ const ViewGabarits = {
     }
 
     async function exportCurrent() {
-      if (!exportForm.name || !exportForm.dest_path) return;
+      if (!exportForm.name) return;
       loading.value = true;
       try {
         await POST('/api/gabarits/from-current', { ...exportForm });
-        Object.assign(exportForm, { name: '', dest_path: '', description: '' });
+        Object.assign(exportForm, { name: '', description: '' });
         showExport.value = false;
         await load();
         toast('Schéma N1 exporté comme Gabarit');
@@ -2030,19 +2029,18 @@ const ViewGabarits = {
         <!-- Formulaire : Nouveau Gabarit -->
         <div v-if="showNew" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
           <div style="font-weight:600;margin-bottom:12px;">Nouveau Gabarit vide</div>
+          <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;">
+            Un sous-dossier sera créé automatiquement sous <code>gabarits_dir/&lt;nom&gt;/</code>.
+          </div>
           <div class="form-row" style="margin-bottom:10px;">
             <div class="form-group" style="margin:0;">
               <label>Nom *</label>
-              <input v-model="newForm.name" placeholder="Gabarit UO standard" />
+              <input v-model="newForm.name" placeholder="SysEng-v2" />
             </div>
             <div class="form-group" style="margin:0;">
-              <label>Chemin *</label>
-              <input v-model="newForm.path" placeholder="gabarits/uo-standard" />
+              <label>Description</label>
+              <input v-model="newForm.description" placeholder="Description optionnelle" />
             </div>
-          </div>
-          <div class="form-group" style="margin-bottom:10px;">
-            <label>Description</label>
-            <input v-model="newForm.description" placeholder="Description optionnelle" />
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost btn-sm" @click="showNew=false">Annuler</button>
@@ -2072,14 +2070,17 @@ const ViewGabarits = {
         <!-- Formulaire : Exporter l'Affaire active comme Gabarit -->
         <div v-if="showExport" style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;">
           <div style="font-weight:600;margin-bottom:12px;">Exporter le schéma N1 de l'Affaire active</div>
+          <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;">
+            Un sous-dossier sera créé automatiquement sous <code>gabarits_dir/&lt;nom&gt;/</code>.
+          </div>
           <div class="form-row" style="margin-bottom:10px;">
             <div class="form-group" style="margin:0;">
               <label>Nom du Gabarit *</label>
-              <input v-model="exportForm.name" placeholder="Gabarit MI20" />
+              <input v-model="exportForm.name" placeholder="SysEng-export" />
             </div>
             <div class="form-group" style="margin:0;">
-              <label>Destination *</label>
-              <input v-model="exportForm.dest_path" placeholder="gabarits/mi20" />
+              <label>Description</label>
+              <input v-model="exportForm.description" placeholder="Description optionnelle" />
             </div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -2121,15 +2122,11 @@ const ViewGabarits = {
         <div class="modal">
           <div class="modal-title">Cloner "{{ showClone.name }}" → nouvelle Affaire</div>
           <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:16px;">
-            Le schéma N1 sera copié. L'Affaire sera ensuite indépendante du Gabarit.
+            Le schéma N1 sera copié dans <code>workspace_dir/&lt;nom&gt;/</code>. L'Affaire sera indépendante du Gabarit.
           </div>
           <div class="form-group">
             <label>Nom de l'Affaire *</label>
-            <input v-model="cloneForm.name" placeholder="Affaire Projet X" />
-          </div>
-          <div class="form-group">
-            <label>Chemin de destination *</label>
-            <input v-model="cloneForm.dest_path" placeholder="affaires/projet-x" />
+            <input v-model="cloneForm.name" placeholder="SNCF-2026" />
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="cb-activate" v-model="cloneForm.activate" />
