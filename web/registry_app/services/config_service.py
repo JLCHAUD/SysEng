@@ -184,7 +184,7 @@ def save_templates(templates: list) -> None:
 def load_dirs() -> dict:
     p = _p("directories.json")
     if not p.exists():
-        return {"affaire_dir": "", "posts_dir": "posts"}
+        return {"posts_dir": ""}
     with open(p, encoding="utf-8") as f:
         return json.load(f)
 
