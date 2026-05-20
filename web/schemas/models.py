@@ -54,9 +54,6 @@ class FileInstance(FileInstanceBase):
 class ActorBase(BaseModel):
     nom: str
     role: str
-    filtre_type: str = "ALL"
-    filtre_valeur: str = "ALL"
-    acces: str = "read"
     email: Optional[str] = ""
 
 

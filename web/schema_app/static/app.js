@@ -1833,6 +1833,7 @@ const App = {
         </div>
         <div class="content">
           <view-ecosystem-manager v-if="view==='ecosystem'"  @open="onEcoOpen" />
+          <view-workspace          v-if="view==='workspace'" />
           <view-blueprint          v-if="view==='blueprint'" @edit-class="onEditClass" />
           <view-classes            v-if="view==='classes'"   :initial-class-id="editClassId" />
           <view-relations          v-if="view==='relations'" />

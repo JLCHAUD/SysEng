@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from web.registry_app.api import (
     registry,
     actors,
+    functions,
     hierarchy,
     tables,
     ecosystem,
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(registry.router,          prefix="/api/registry",    tags=["registry"])
 app.include_router(actors.router,            prefix="/api/actors",      tags=["actors"])
+app.include_router(functions.router,         prefix="/api/functions",   tags=["functions"])
 app.include_router(hierarchy.router,         prefix="/api/hierarchy",   tags=["hierarchy"])
 app.include_router(tables.router,            prefix="/api/tables",      tags=["tables"])
 app.include_router(ecosystem_manager.router, prefix="/api/ecosystem",   tags=["ecosystem"])

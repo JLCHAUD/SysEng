@@ -28,11 +28,7 @@ function toast(msg, type = 'ok') {
 function toastErr(e) { toast(e instanceof Error ? e.message : String(e), 'error'); }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const ROLES = [
-  'pilote_pole','pilote_metier','ingenieur_sys','it_manager',
-  'donneur_ordre_pole','donneur_ordre_metier',
-  'ingenieur_sys_client','expert_technique','fournisseur','correspondant_projet'
-];
+// ROLES est maintenant chargé dynamiquement depuis /api/functions (functions.json partagé avec N1)
 const PERIODICITES = ['quotidien','hebdomadaire','mensuel','manuel'];
 const COL_TYPES    = ['string','float','int','date','pct','bool','KEY'];
 const WRITE_MODES  = ['','creation','engineer','admin'];
@@ -299,28 +295,61 @@ const ViewRegistry = {
 const ViewActors = {
   setup() {
     const items     = ref([]);
+    const functions = ref([]);   // chargé depuis /api/functions
     const showModal = ref(false);
     const editing   = ref(null);
-    const ACCES       = ['read','read/write','read_filtered','read_summary','admin'];
-    const FILTRE_TYPES = ['ALL','ingenieur','projet'];
-
-    const blank = () => ({ id:'', nom:'', role:'ingenieur_sys', filtre_type:'ALL', filtre_valeur:'ALL', acces:'read', email:'' });
-    const form = reactive(blank());
+    const blank = () => ({ id:'', nom:'', role:'', email:'' });
+    const form    = reactive(blank());
+    const formErr = ref('');
 
     const load = async () => {
-      try { items.value = await GET('/api/actors'); } catch(e) { toastErr(e); }
+      try {
+        [items.value, functions.value] = await Promise.all([
+          GET('/api/actors'),
+          GET('/api/functions'),
+        ]);
+      } catch(e) { toastErr(e); }
     };
     onMounted(load);
 
-    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
-    const openEdit   = item => { Object.assign(form, { ...item }); editing.value = item.id; showModal.value = true; };
+    const roleLabel = id => {
+      const f = functions.value.find(f => f.id === id);
+      return f ? f.label : id;
+    };
+    const roleSide = id => {
+      const f = functions.value.find(f => f.id === id);
+      return f ? f.side : 'interne';
+    };
+    const roleBadgeClass = id => roleSide(id) === 'externe' ? 'badge-green' : (ROLE_BADGE[id] || 'badge-blue');
+
+    const openCreate = async () => {
+      Object.assign(form, blank());
+      formErr.value = '';
+      if (functions.value.length) form.role = functions.value[0].id;
+      // suggère le prochain ID
+      try { const r = await GET('/api/actors/next-id'); form.id = r.id; } catch(_) {}
+      editing.value = null;
+      showModal.value = true;
+    };
+    const openEdit = item => {
+      Object.assign(form, { id: item.id, nom: item.nom, role: item.role, email: item.email || '' });
+      formErr.value = '';
+      editing.value = item.id;
+      showModal.value = true;
+    };
 
     const save = async () => {
+      formErr.value = '';
+      if (!form.id || !form.id.trim()) { formErr.value = "L'ID ne peut pas être vide."; return; }
+      if (!form.nom || !form.nom.trim()) { formErr.value = "Le nom ne peut pas être vide."; return; }
+      if (!editing.value && items.value.some(a => a.id === form.id.trim())) {
+        formErr.value = `L'ID "${form.id.trim()}" est déjà utilisé.`; return;
+      }
       try {
         if (editing.value) { await PUT(`/api/actors/${editing.value}`, form); toast('Acteur mis à jour'); }
-        else { await POST('/api/actors', form); toast('Acteur créé'); }
+        else               { await POST('/api/actors', form);                 toast('Acteur créé'); }
         showModal.value = false; await load();
-      } catch(e) { toastErr(e); }
+      } catch(e) { formErr.value = e.message; toastErr(e); }
     };
 
     const del = async id => {
@@ -329,28 +358,51 @@ const ViewActors = {
       catch(e) { toastErr(e); }
     };
 
-    return { items, showModal, editing, form, ROLES, ACCES, FILTRE_TYPES, ROLE_BADGE, openCreate, openEdit, save, del };
+    const purgeEmpty = async () => {
+      try { await DEL('/api/actors/purge-empty'); await load(); toast('Acteurs vides purgés'); }
+      catch(e) { toastErr(e); }
+    };
+
+    const hasEmpty = computed(() => items.value.some(a => !a.id || !a.id.trim()));
+
+    return { items, functions, showModal, editing, form, formErr, ROLE_BADGE,
+             roleLabel, roleSide, roleBadgeClass, hasEmpty,
+             openCreate, openEdit, save, del, purgeEmpty };
   },
   template: `
     <div>
+      <!-- Bannière alerte IDs vides -->
+      <div v-if="hasEmpty" style="margin-bottom:12px;padding:10px 16px;background:#7f1d1d;border-radius:8px;
+                display:flex;align-items:center;justify-content:space-between;font-size:0.83rem;">
+        <span style="color:#fca5a5;">⚠ Des acteurs avec un ID vide ont été détectés (données corrompues).</span>
+        <button class="btn btn-danger btn-sm" @click="purgeEmpty">Purger les IDs vides</button>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">Acteurs <span class="topbar-badge">{{ items.length }}</span></span>
           <button class="btn btn-primary" @click="openCreate">+ Nouvel acteur</button>
         </div>
         <table>
-          <thead><tr><th>ID</th><th>Nom</th><th>Rôle</th><th>Accès</th><th>Filtre</th><th>Email</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>Nom</th><th>Rôle</th><th>Email</th><th></th></tr></thead>
           <tbody>
             <tr v-for="a in items" :key="a.id">
               <td><code style="color:var(--accent);font-size:0.8rem">{{ a.id }}</code></td>
               <td><strong>{{ a.nom }}</strong></td>
-              <td><span class="badge" :class="ROLE_BADGE[a.role]||'badge-gray'">{{ a.role }}</span></td>
-              <td><span class="badge badge-gray">{{ a.acces }}</span></td>
-              <td style="font-size:0.76rem;color:var(--text-dim)">{{ a.filtre_type }} : {{ a.filtre_valeur }}</td>
+              <td>
+                <span class="badge" :class="roleBadgeClass(a.role)" :title="roleSide(a.role)">
+                  {{ roleLabel(a.role) }}
+                </span>
+              </td>
               <td style="font-size:0.78rem;color:var(--text-dim)">{{ a.email }}</td>
               <td style="display:flex;gap:6px;justify-content:flex-end">
                 <button class="btn btn-ghost btn-sm" @click="openEdit(a)">Éditer</button>
                 <button class="btn btn-danger btn-sm" @click="del(a.id)">✕</button>
+              </td>
+            </tr>
+            <tr v-if="!items.length">
+              <td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px">
+                Aucun acteur — cliquez sur "+ Nouvel acteur"
               </td>
             </tr>
           </tbody>
@@ -360,40 +412,34 @@ const ViewActors = {
       <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
         <div class="modal">
           <div class="modal-title">{{ editing ? 'Modifier' : 'Nouvel' }} acteur</div>
+          <div v-if="formErr" style="margin-bottom:12px;padding:8px 12px;background:#7f1d1d;
+                border-radius:6px;font-size:0.82rem;color:#fca5a5;">⚠ {{ formErr }}</div>
           <div class="form-row">
             <div class="form-group">
               <label>ID *</label>
-              <input v-model="form.id" :disabled="!!editing" placeholder="USR009" />
+              <input v-model="form.id" :disabled="!!editing" placeholder="USR013" />
             </div>
             <div class="form-group">
               <label>Nom *</label>
               <input v-model="form.nom" placeholder="Prénom Nom" />
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Rôle *</label>
-              <select v-model="form.role">
-                <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Accès</label>
-              <select v-model="form.acces">
-                <option v-for="a in ACCES" :key="a" :value="a">{{ a }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Type de filtre</label>
-              <select v-model="form.filtre_type">
-                <option v-for="f in FILTRE_TYPES" :key="f" :value="f">{{ f }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Valeur du filtre</label>
-              <input v-model="form.filtre_valeur" placeholder="ALL" />
+          <div class="form-group" style="margin-top:12px">
+            <label>Rôle *</label>
+            <select v-model="form.role">
+              <optgroup label="Interne">
+                <option v-for="f in functions.filter(f=>f.side==='interne')" :key="f.id" :value="f.id">
+                  {{ f.label }}
+                </option>
+              </optgroup>
+              <optgroup label="Externe">
+                <option v-for="f in functions.filter(f=>f.side==='externe')" :key="f.id" :value="f.id">
+                  {{ f.label }}
+                </option>
+              </optgroup>
+            </select>
+            <div v-if="!functions.length" style="font-size:0.75rem;color:#f87171;margin-top:4px;">
+              ⚠ Aucun rôle défini — créez des rôles dans "Rôles & Fonctions"
             </div>
           </div>
           <div class="form-group">
@@ -2264,6 +2310,143 @@ const ViewDirectories = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Rôles & Fonctions (CRUD — source de vérité partagée avec N1)
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewFunctions = {
+  setup() {
+    const items     = ref([]);
+    const showModal = ref(false);
+    const editing   = ref(null);
+
+    const blank = () => ({ id:'', label:'', side:'interne', description:'' });
+    const form  = reactive(blank());
+
+    const load = async () => {
+      try { items.value = await GET('/api/functions'); } catch(e) { toastErr(e); }
+    };
+    onMounted(load);
+
+    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
+    const openEdit   = item => { Object.assign(form, { ...item }); editing.value = item.id; showModal.value = true; };
+
+    const save = async () => {
+      try {
+        if (editing.value) { await PUT(`/api/functions/${editing.value}`, form); toast('Rôle mis à jour'); }
+        else               { await POST('/api/functions', form);              toast('Rôle créé'); }
+        showModal.value = false; await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async id => {
+      if (!confirm(`Supprimer le rôle "${id}" ? Les acteurs associés devront être mis à jour.`)) return;
+      try { await DEL(`/api/functions/${id}`); await load(); toast('Rôle supprimé'); }
+      catch(e) { toastErr(e); }
+    };
+
+    return { items, showModal, editing, form, openCreate, openEdit, save, del };
+  },
+  template: `
+    <div>
+      <!-- Info -->
+      <div style="margin-bottom:16px;padding:12px 16px;background:var(--surface2);border-radius:8px;
+                  border-left:3px solid #a5b4fc;font-size:0.82rem;color:var(--text-dim);line-height:1.6;">
+        Les <strong style="color:var(--text)">Rôles & Fonctions</strong> sont stockés dans
+        <code style="color:#a5b4fc;">functions.json</code> et partagés avec N1 (Schema Designer).
+        Toute modification ici est immédiatement reflétée dans les deux applications.
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            Rôles
+            <span class="topbar-badge">{{ items.length }}</span>
+            <span style="margin-left:8px;font-size:0.75rem;color:var(--text-dim)">
+              — {{ items.filter(f=>f.side==='interne').length }} internes ·
+                 {{ items.filter(f=>f.side==='externe').length }} externes
+            </span>
+          </span>
+          <button class="btn btn-primary" @click="openCreate">+ Nouveau rôle</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID technique</th>
+              <th>Libellé</th>
+              <th>Côté</th>
+              <th>Description</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="f in items" :key="f.id">
+              <td><code style="color:var(--accent);font-size:0.8rem">{{ f.id }}</code></td>
+              <td><strong>{{ f.label }}</strong></td>
+              <td>
+                <span class="badge" :class="f.side==='externe' ? 'badge-green' : 'badge-blue'">
+                  {{ f.side }}
+                </span>
+              </td>
+              <td style="font-size:0.78rem;color:var(--text-dim)">{{ f.description }}</td>
+              <td style="display:flex;gap:6px;justify-content:flex-end">
+                <button class="btn btn-ghost btn-sm" @click="openEdit(f)">Éditer</button>
+                <button class="btn btn-danger btn-sm" @click="del(f.id)">✕</button>
+              </td>
+            </tr>
+            <tr v-if="!items.length">
+              <td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px">
+                Aucun rôle défini — cliquez sur "+ Nouveau rôle"
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal CRUD -->
+      <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
+        <div class="modal">
+          <div class="modal-title">{{ editing ? 'Modifier le rôle' : 'Nouveau rôle' }}</div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ID technique *</label>
+              <input v-model="form.id" :disabled="!!editing" placeholder="ex: chef_projet" />
+              <div style="font-size:0.75rem;color:var(--text-dim);margin-top:3px">
+                Identifiant interne (snake_case, sans espaces)
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Libellé *</label>
+              <input v-model="form.label" placeholder="ex: Chef de Projet" />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:12px">
+            <label>Côté</label>
+            <select v-model="form.side">
+              <option value="interne">Interne (équipe projet)</option>
+              <option value="externe">Externe (client, fournisseur)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-top:12px">
+            <label>Description</label>
+            <textarea v-model="form.description" rows="2"
+              placeholder="Responsabilités, périmètre d'action…"
+              style="width:100%;resize:vertical;"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-ghost" @click="showModal=false">Annuler</button>
+            <button class="btn btn-primary" @click="save">{{ editing ? 'Enregistrer' : 'Créer' }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const VIEW_MAP = {
@@ -2275,6 +2458,7 @@ const VIEW_MAP = {
   sync:           ViewSync,
   registry:       ViewRegistry,
   actors:         ViewActors,
+  functions:      ViewFunctions,
   hierarchy:      ViewHierarchy,
   tables:         ViewTables,
   tissage:        ViewTissage,
@@ -2303,8 +2487,9 @@ const App = {
       { id:'gabarits',     icon:'◈', label:'Gabarits & Affaires',    group:'Configuration' },
       { id:'wsglobal',     icon:'⌂', label:'Workspace global',       group:'Configuration' },
       { id:'registry',     icon:'◧', label:'Registre des Posts',     group:'Population' },
-      { id:'actors',       icon:'◉', label:'Acteurs',            group:'Population' },
-      { id:'excel-import', icon:'⤵', label:'Importer Excel',     group:'Population' },
+      { id:'actors',       icon:'◉', label:'Acteurs',              group:'Population' },
+      { id:'functions',    icon:'◈', label:'Rôles & Fonctions',    group:'Population' },
+      { id:'excel-import', icon:'⤵', label:'Importer Excel',       group:'Population' },
       { id:'hierarchy',    icon:'⬡', label:'Hiérarchie LIST+COLLECT', group:'Structure' },
       { id:'tables',       icon:'▦', label:'Tables & colonnes',  group:'Structure' },
       { id:'directories',  icon:'⌂', label:'Répertoires',          group:'Configuration' },
@@ -2326,6 +2511,7 @@ const App = {
       gabarits:     'Gabarits & Affaires',
       registry:     'Registre des Posts',
       actors:       'Acteurs',
+      functions:    'Rôles & Fonctions',
       hierarchy:    'Hiérarchie — LIST & COLLECT',
       tables:       'Tables & colonnes',
       directories:  'Répertoires — Affaire & Posts',
