@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from web.registry_app.services.config_service import set_active_config, get_active_config
+from web.workspace_service import get_gabarits_dir, get_workspace_dir
 
 router = APIRouter()
 
@@ -98,10 +99,10 @@ class OpenGabaritRequest(BaseModel):
 
 
 class CloneRequest(BaseModel):
-    source_path: str    # chemin du gabarit (ou affaire) source
-    dest_path: str      # chemin de destination de la nouvelle Affaire
-    name: str           # nom de la nouvelle Affaire
-    activate: bool = True  # activer immédiatement après clonage
+    source_path: str        # chemin du gabarit (ou affaire) source
+    dest_path: str = ""     # chemin de destination — si vide : workspace_dir/name
+    name: str               # nom de la nouvelle Affaire
+    activate: bool = True   # activer immédiatement après clonage
 
 
 class SaveAsGabaritRequest(BaseModel):
@@ -114,6 +115,39 @@ class SaveAsGabaritRequest(BaseModel):
 
 @router.get("/list", response_model=list[GabaritInfo])
 def list_gabarits():
+    """Liste les gabarits disponibles.
+
+    Priorité :
+    1. Si gabarits_dir défini dans le workspace → scan automatique du dossier
+    2. Sinon → fallback sur .gabarits.json (liste explicite)
+    """
+    gabarits_dir = get_gabarits_dir()
+
+    if gabarits_dir and gabarits_dir.is_dir():
+        # Scan automatique : chaque sous-dossier valide = un gabarit
+        result = []
+        for sub in sorted(gabarits_dir.iterdir()):
+            if sub.is_dir() and _is_valid_gabarit(sub):
+                # Lire description depuis un éventuel gabarit.json
+                desc = ""
+                meta_file = sub / "gabarit.json"
+                if meta_file.exists():
+                    try:
+                        import json as _json
+                        meta = _json.loads(meta_file.read_text(encoding="utf-8"))
+                        desc = meta.get("description", "")
+                    except Exception:
+                        pass
+                result.append(GabaritInfo(
+                    name=sub.name,
+                    path=str(sub),
+                    valid=True,
+                    class_count=_count_classes(sub),
+                    description=desc,
+                ))
+        return result
+
+    # Fallback : liste explicite .gabarits.json
     known = _load_known()
     result = []
     for g in known:
@@ -228,9 +262,16 @@ def clone_gabarit(body: CloneRequest):
     if not _is_valid_gabarit(source):
         raise HTTPException(422, f"Source invalide : file_types.yaml manquant dans '{source}'")
 
-    dest = Path(body.dest_path)
-    if not dest.is_absolute():
-        dest = _PROJECT_ROOT / body.dest_path
+    # dest_path optionnel — défaut : workspace_dir/name
+    if body.dest_path:
+        dest = Path(body.dest_path)
+        if not dest.is_absolute():
+            dest = _PROJECT_ROOT / body.dest_path
+    else:
+        ws_dir = get_workspace_dir()
+        if not ws_dir:
+            raise HTTPException(422, "dest_path non fourni et workspace_dir non défini dans le workspace global")
+        dest = ws_dir / body.name
 
     if dest.exists() and any(dest.iterdir()):
         raise HTTPException(409, f"Le dossier '{dest}' existe déjà et n'est pas vide")

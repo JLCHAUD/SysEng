@@ -30,6 +30,7 @@ from web.registry_app.services.config_service import (
     load_registre as n2_load_registre,
     save_registre as n2_save_registre,
 )
+from web.registry_app.api.directories import get_posts_base_path
 
 router = APIRouter()
 ROOT = Path(__file__).parent.parent.parent.parent
@@ -54,12 +55,22 @@ class SyncStatusResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _to_entree(f: dict) -> EntreeRegistre:
-    """Convertit un dict registre N2 en EntreeRegistre (src.models)."""
+def _to_entree(f: dict, posts_base: Path | None = None) -> EntreeRegistre:
+    """Convertit un dict registre N2 en EntreeRegistre (src.models).
+
+    Si posts_base est défini et que chemin est relatif, résout le chemin
+    complet = posts_base / chemin. Permet au moteur de trouver les fichiers
+    quel que soit le répertoire de travail courant.
+    """
+    raw = f["chemin"]
+    if posts_base and raw and not Path(raw).is_absolute():
+        chemin = str(posts_base / raw)
+    else:
+        chemin = raw
     return EntreeRegistre(
         id=f["id"],
         type_fichier=f.get("type_fichier") or "",   # optionnel en N2, requis ici
-        chemin=f["chemin"],
+        chemin=chemin,
         synchro_periodicite=f.get("synchro_periodicite", "quotidien"),
         derniere_synchro=f.get("derniere_synchro"),
         statut_dernier_synchro=f.get("statut_dernier_synchro"),
@@ -83,8 +94,11 @@ def _run_sync(ids: list[str], force: bool) -> dict:
         if ids:
             fichiers_n2 = [f for f in fichiers_n2 if f["id"] in ids]
 
+        # Résoudre le répertoire Posts (affaire_dir / posts_dir) pour les chemins relatifs
+        posts_base = get_posts_base_path()
+
         # Convertir en EntreeRegistre
-        entrees = [_to_entree(f) for f in fichiers_n2]
+        entrees = [_to_entree(f, posts_base) for f in fichiers_n2]
 
         # Trier par ordre de traitement (référentiels d'abord)
         def _ordre(e: EntreeRegistre) -> int:

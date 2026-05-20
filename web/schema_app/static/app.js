@@ -1624,13 +1624,117 @@ const ViewImportExcel = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Workspace global (partagé N1 + N2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ViewWorkspace = {
+  setup() {
+    const form    = ref({ gabarits_dir: '', workspace_dir: '' });
+    const loading = ref(true);
+    const saved   = ref(false);
+    const err     = ref('');
+
+    onMounted(async () => {
+      try {
+        const d = await GET('/api/workspace');
+        form.value = { gabarits_dir: d.gabarits_dir || '', workspace_dir: d.workspace_dir || '' };
+      } catch(e) { toastErr(e); }
+      loading.value = false;
+    });
+
+    const save = async () => {
+      err.value = '';
+      try {
+        await PUT('/api/workspace', form.value);
+        saved.value = true;
+        setTimeout(() => saved.value = false, 2000);
+        toast('Workspace enregistré');
+      } catch(e) { err.value = e.message; toastErr(e); }
+    };
+
+    const reset = async () => {
+      if (!confirm('Réinitialiser le workspace global ?')) return;
+      await DEL('/api/workspace');
+      form.value = { gabarits_dir: '', workspace_dir: '' };
+      toast('Workspace réinitialisé');
+    };
+
+    return { form, loading, saved, err, save, reset };
+  },
+  template: `
+    <div v-if="loading" class="loading">Chargement…</div>
+    <div v-else style="max-width:640px;">
+
+      <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid #a5b4fc;font-size:0.82rem;color:var(--text-dim);line-height:1.6;">
+        Le <strong style="color:var(--text)">Workspace global</strong> est partagé entre N1 (Schema Designer)
+        et N2 (Registry Populator). Ces chemins sont stockés dans
+        <code style="color:#a5b4fc;">.exosync_workspace.json</code> à la racine du projet.
+      </div>
+
+      <!-- Gabarits dir -->
+      <div class="form-group">
+        <label class="form-label">Bibliothèque de Gabarits</label>
+        <input v-model="form.gabarits_dir" class="form-control"
+          placeholder="ex: C:\\ExoSync\\Gabarits  ou  /home/user/gabarits" />
+        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
+          Dossier contenant les sous-dossiers gabarits (chacun avec <code>file_types.yaml</code>).
+          Lu par N2 pour lister les gabarits disponibles.
+        </div>
+      </div>
+
+      <!-- Workspace dir -->
+      <div class="form-group" style="margin-top:16px;">
+        <label class="form-label">Répertoire Workspace (Affaires)</label>
+        <input v-model="form.workspace_dir" class="form-control"
+          placeholder="ex: C:\\ExoSync\\Affaires  ou  /home/user/affaires" />
+        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
+          Dossier parent où les nouvelles Affaires sont créées par défaut lors du clonage d'un gabarit.
+        </div>
+      </div>
+
+      <!-- Erreur -->
+      <div v-if="err" style="margin-top:12px;padding:10px 14px;background:#7f1d1d;border-radius:6px;font-size:0.82rem;color:#fca5a5;">
+        ⚠ {{ err }}
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn btn-primary" @click="save">
+          {{ saved ? '✓ Enregistré' : '💾 Enregistrer' }}
+        </button>
+        <button class="btn btn-ghost" @click="reset" style="color:#ef4444;border-color:#ef4444;">
+          ✕ Réinitialiser
+        </button>
+      </div>
+
+      <!-- Structure attendue -->
+      <div style="margin-top:24px;padding:12px 16px;background:var(--surface2);border-radius:8px;font-size:0.78rem;color:var(--text-dim);">
+        <div style="font-weight:600;color:var(--text);margin-bottom:8px;">Structure attendue</div>
+        <pre style="font-family:monospace;font-size:0.75rem;line-height:1.7;margin:0;color:var(--text-dim);">{{ form.gabarits_dir || 'gabarits_dir' }}/
+  gabarit_syseng/         ← sous-dossier gabarit
+    file_types.yaml       ← requis
+    schema_relations.json
+    ...
+  gabarit_v2/
+    file_types.yaml
+
+{{ form.workspace_dir || 'workspace_dir' }}/
+  PRJ-001/                ← Affaire créée par clonage
+  PRJ-002/</pre>
+      </div>
+    </div>
+  `
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // APP ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const App = {
   components: {
     ToastLayer,
-    ViewEcosystemManager, ViewBlueprint, ViewClasses,
+    ViewEcosystemManager, ViewWorkspace, ViewBlueprint, ViewClasses,
     ViewRelations, ViewFunctions, ViewTemplates,
     ViewNamespaces, ViewMxlPreview, ViewImportExcel,
   },
@@ -1664,8 +1768,9 @@ const App = {
 
     const NAV = [
       { group: 'Espace de travail', items: [
-        { key: 'ecosystem', icon: '⬡', label: 'Écosystèmes' },
-        { key: 'blueprint', icon: '◎', label: 'Blueprint' },
+        { key: 'ecosystem',  icon: '⬡', label: 'Écosystèmes' },
+        { key: 'workspace',  icon: '⌂', label: 'Workspace global' },
+        { key: 'blueprint',  icon: '◎', label: 'Blueprint' },
       ]},
       { group: 'Schéma N1', items: [
         { key: 'classes',    icon: '◻', label: 'Classes' },
@@ -1681,8 +1786,9 @@ const App = {
     ];
 
     const VIEW_TITLES = {
-      ecosystem: 'Gestionnaire d\'Écosystèmes',
-      blueprint: 'Blueprint — Graphe du Schéma',
+      ecosystem:  'Gestionnaire d\'Écosystèmes',
+      workspace:  'Workspace Global — Gabarits & Affaires',
+      blueprint:  'Blueprint — Graphe du Schéma',
       classes:   'Classes',
       relations: 'Relations Père / Fils',
       functions:  'Fonctions Acteurs',

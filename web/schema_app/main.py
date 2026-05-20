@@ -14,6 +14,7 @@ from web.schema_app.api import (
     blueprint,
     mxl,
     excel_n1,
+    workspace,
 )
 
 app = FastAPI(title="ExoSync Studio N1 — Schema Designer", version="1.0.0")
@@ -34,6 +35,7 @@ app.include_router(namespaces.router,        prefix="/api/namespaces", tags=["na
 app.include_router(blueprint.router,         prefix="/api/blueprint",  tags=["blueprint"])
 app.include_router(mxl.router,               prefix="/api/mxl",       tags=["mxl"])
 app.include_router(excel_n1.router,          prefix="/api/excel",     tags=["excel"])
+app.include_router(workspace.router,         prefix="/api/workspace", tags=["workspace"])
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

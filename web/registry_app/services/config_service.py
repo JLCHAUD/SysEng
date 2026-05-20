@@ -179,6 +179,21 @@ def save_templates(templates: list) -> None:
         json.dump({"version": "1", "templates": templates}, f, ensure_ascii=False, indent=2)
 
 
+# ── directories.json ─────────────────────────────────────────────────────────
+
+def load_dirs() -> dict:
+    p = _p("directories.json")
+    if not p.exists():
+        return {"affaire_dir": "", "posts_dir": "posts"}
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_dirs(data: dict) -> None:
+    with open(_p("directories.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 # ── ecosystem.json (lecture seule) ────────────────────────────────────────────
 
 def load_ecosystem() -> dict:
