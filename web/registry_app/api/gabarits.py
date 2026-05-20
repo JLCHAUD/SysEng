@@ -106,8 +106,7 @@ class CloneRequest(BaseModel):
 
 
 class SaveAsGabaritRequest(BaseModel):
-    name: str
-    dest_path: str      # où copier les fichiers N1
+    name: str           # nom court → gabarits_dir/<name>/ créé automatiquement
     description: str = ""
 
 
@@ -224,25 +223,24 @@ def save_current_as_gabarit(body: SaveAsGabaritRequest):
     if not _is_valid_gabarit(source):
         raise HTTPException(422, "L'affaire active n'a pas de file_types.yaml valide")
 
-    dest = Path(body.dest_path)
-    if not dest.is_absolute():
-        dest = _PROJECT_ROOT / body.dest_path
+    gabarits_dir = get_gabarits_dir()
+    if not gabarits_dir:
+        raise HTTPException(422, "gabarits_dir non configuré — définissez-le dans N1 (Workspace)")
+
+    if not body.name or any(c in _INVALID_NAME_CHARS for c in body.name):
+        raise HTTPException(422, f"Nom invalide : '{body.name}'")
+
+    dest = gabarits_dir / body.name
 
     if dest.exists() and any(dest.iterdir()):
         raise HTTPException(409, f"Le dossier '{dest}' existe déjà et n'est pas vide")
 
     dest.mkdir(parents=True, exist_ok=True)
 
-    # Copier uniquement les fichiers N1
     for fname in _N1_FILES:
         src_file = source / fname
         if src_file.exists():
             shutil.copy2(src_file, dest / fname)
-
-    known = _load_known()
-    if not any(Path(k["path"]).resolve() == dest.resolve() for k in known):
-        known.append({"name": body.name, "path": str(dest), "description": body.description})
-        _save_known(known)
 
     return GabaritInfo(name=body.name, path=str(dest), valid=True,
                        class_count=_count_classes(dest), description=body.description)
