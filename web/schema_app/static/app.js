@@ -738,7 +738,13 @@ const ViewClasses = {
           <div class="form-row">
             <div class="form-group">
               <label>Fonction owner (rôle requis)</label>
-              <input v-model="selected.owner_function" placeholder="ingenieur_sys" />
+              <select v-model="selected.owner_function">
+                <option value="">— aucune —</option>
+                <option v-for="fn in functions" :key="fn.id" :value="fn.id">
+                  {{ fn.label || fn.id }}
+                  <template v-if="fn.side"> ({{ fn.side }})</template>
+                </option>
+              </select>
             </div>
             <div class="form-group">
               <label>Push prefix (namespace)</label>
@@ -824,7 +830,13 @@ const ViewClasses = {
           </div>
           <div class="form-group">
             <label>Fonction owner</label>
-            <input v-model="newClass.owner_function" placeholder="ingenieur_sys" />
+            <select v-model="newClass.owner_function">
+              <option value="">— aucune —</option>
+              <option v-for="fn in functions" :key="fn.id" :value="fn.id">
+                {{ fn.label || fn.id }}
+                <template v-if="fn.side"> ({{ fn.side }})</template>
+              </option>
+            </select>
           </div>
           <div class="form-actions">
             <button class="btn btn-ghost" @click="showCreate=false">Annuler</button>
