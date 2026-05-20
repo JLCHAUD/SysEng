@@ -34,3 +34,8 @@ CONTEXT_NEW_SESSION.md
 .active_registry_ecosystem
 .schema_ecosystems.json
 .registry_ecosystems.json
+
+# Données config (locales, générées pendant les tests)
+config/file_types.yaml
+config/tables.json
+config/hierarchy.json
