@@ -181,7 +181,8 @@ const ViewBlueprint = {
     const loading   = ref(true);
     const panel     = ref(null);   // nœud (Classe) cliqué
     const edgePanel = ref(null);   // arête (Relation) cliquée
-    const allClasses = ref([]);    // cache pour les tables par classe
+    const allClasses  = ref([]);    // cache pour les tables par classe
+    const allNamespaces = ref([]);  // liste des namespaces — pour colonnes COLLECT
     let cy = null;
 
     // ── Flux helpers ──────────────────────────────────────────────────────────
@@ -280,17 +281,38 @@ const ViewBlueprint = {
         const srcTable = srcClass?.std_tables?.find(t => t.name === table);
         const srcCols  = srcTable?.columns ?? [];
 
-        // Colonnes namespace (COLLECT uniquement) = min_fields identitaires du child
+        // Colonnes namespace (COLLECT uniquement) — deux sources :
+        // 1. min_fields identitaires du child (champs scalaires identitaires)
+        // 2. allowed_namespaces du child (un préfixe = une colonne d'identifiant)
         // Chaque ligne collectée doit porter l'identité complète du Post source
         let nsCols = [];
         if (mode === 'COLLECT') {
-          nsCols = (ep.child?.min_fields ?? [])
+          // Source 1 : champs identitaires
+          const idCols = (ep.child?.min_fields ?? [])
             .filter(f => f.nature === 'identitaire')
             .map(f => ({
               name: f.name, col_type: f.field_type || 'string',
               header: f.label || f.name, is_key: true,
               required: true, write: '', description: `namespace: ${f.label || f.name}`,
             }));
+
+          // Source 2 : namespaces associés → un identifiant par namespace
+          const nsIds = ep.child?.allowed_namespaces ?? [];
+          const nsDefs = nsIds.map(nsId => {
+            const ns = allNamespaces.value.find(n => n.id === nsId);
+            const label = ns?.label || nsId;
+            const prefix = ns?.prefix || '';
+            return {
+              name: nsId, col_type: 'string',
+              header: label, is_key: true,
+              required: true, write: '',
+              description: `namespace: ${label}${prefix ? ' (' + prefix + ')' : ''}`,
+            };
+          });
+
+          // Fusionner : éviter les doublons (un identitaire peut déjà couvrir le namespace)
+          const seen = new Set(idCols.map(c => c.name));
+          nsCols = [...idCols, ...nsDefs.filter(c => !seen.has(c.name))];
         }
 
         // Pour un scalaire collecté (non-Tab) → forcer création en std_table
@@ -326,11 +348,13 @@ const ViewBlueprint = {
     }
 
     onMounted(async () => {
-      const [data, classes] = await Promise.all([
+      const [data, classes, namespaces] = await Promise.all([
         GET('/api/blueprint').catch(() => ({ classes: [], relations: [] })),
         GET('/api/classes').catch(() => []),
+        GET('/api/namespaces').catch(() => []),
       ]);
-      allClasses.value = classes;
+      allClasses.value   = classes;
+      allNamespaces.value = namespaces;
       loading.value = false;
 
       await nextTick();
