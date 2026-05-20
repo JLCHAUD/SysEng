@@ -2216,11 +2216,11 @@ const ViewWorkspaceGlobal = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// VIEW: Répertoires — Affaire + Posts
+// VIEW: Répertoires de l'Affaire — Posts
 // ═══════════════════════════════════════════════════════════════════════════════
 const ViewDirectories = {
   setup() {
-    const form    = ref({ affaire_dir: '', posts_dir: '' });
+    const form    = ref({ posts_dir: '' });
     const saved   = ref(false);
     const loading = ref(true);
     const err     = ref('');
@@ -2228,7 +2228,7 @@ const ViewDirectories = {
     onMounted(async () => {
       try {
         const d = await GET('/api/directories');
-        form.value = { affaire_dir: d.affaire_dir || '', posts_dir: d.posts_dir || '' };
+        form.value = { posts_dir: d.posts_dir || '' };
       } catch(e) { toastErr(e); }
       loading.value = false;
     });
@@ -2239,15 +2239,15 @@ const ViewDirectories = {
         await PUT('/api/directories', form.value);
         saved.value = true;
         setTimeout(() => saved.value = false, 2000);
-        toast('Répertoires enregistrés');
+        toast('Répertoire Posts enregistré');
       } catch(e) { err.value = e.message; toastErr(e); }
     };
 
     const reset = async () => {
-      if (!confirm('Remettre les répertoires à zéro ?')) return;
+      if (!confirm('Remettre le répertoire Posts à zéro ?')) return;
       await DEL('/api/directories');
-      form.value = { affaire_dir: '', posts_dir: 'posts' };
-      toast('Répertoires réinitialisés');
+      form.value = { posts_dir: '' };
+      toast('Répertoire Posts réinitialisé');
     };
 
     return { form, saved, loading, err, save, reset };
@@ -2257,37 +2257,26 @@ const ViewDirectories = {
     <div v-else style="max-width:640px;">
 
       <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);font-size:0.82rem;color:var(--text-dim);line-height:1.6;">
-        Définissez la racine de l'<strong style="color:var(--text)">Affaire</strong> (dossier projet Excel)
-        et le sous-dossier <strong style="color:var(--text)">Posts</strong> qui contient les fichiers Excel des Posts.
-        Ces chemins sont utilisés par le moteur de synchronisation pour localiser les fichiers.
+        Définissez le dossier <strong style="color:var(--text)">Posts</strong> qui contient les fichiers Excel
+        de cette Affaire. Ce chemin est utilisé par le moteur de synchronisation pour localiser les Posts.
       </div>
 
-      <!-- Affaire dir -->
       <div class="form-group">
-        <label class="form-label">Répertoire Affaire <span style="color:var(--accent)">*</span></label>
-        <input v-model="form.affaire_dir" class="form-control" placeholder="ex: C:\\Projets\\PRJ-001  ou  /home/user/projets/PRJ-001" />
-        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">Chemin absolu vers la racine du projet.</div>
-      </div>
-
-      <!-- Posts dir -->
-      <div class="form-group" style="margin-top:16px;">
-        <label class="form-label">Répertoire Posts <span style="color:var(--accent)">*</span></label>
+        <label class="form-label">Répertoire Posts (Excel)</label>
         <input v-model="form.posts_dir" class="form-control"
-          placeholder="ex: C:\Users\fabie\OneDrive\ExoSync\Posts  ou  /home/user/posts" />
+          placeholder="ex: C:\\\\Users\\\\user\\\\OneDrive\\\\ExoSync\\\\Posts" />
         <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
-          Chemin <strong>absolu</strong> vers le dossier contenant les fichiers Excel Posts.
-          Peut pointer vers OneDrive, un réseau ou tout autre emplacement.
+          Chemin <strong>absolu</strong>. Peut pointer vers OneDrive, un réseau ou tout autre emplacement.
+          Un chemin non encore existant est accepté (synchronisation OneDrive différée).
         </div>
       </div>
 
-      <!-- Erreur -->
       <div v-if="err" style="margin-top:12px;padding:10px 14px;background:#7f1d1d;border-radius:6px;font-size:0.82rem;color:#fca5a5;">
         ⚠ {{ err }}
       </div>
 
-      <!-- Actions -->
       <div style="display:flex;gap:10px;margin-top:20px;">
-        <button class="btn btn-primary" @click="save" :disabled="!form.affaire_dir">
+        <button class="btn btn-primary" @click="save">
           {{ saved ? '✓ Enregistré' : '💾 Enregistrer' }}
         </button>
         <button class="btn btn-ghost" @click="reset" style="color:#ef4444;border-color:#ef4444;">
@@ -2295,12 +2284,11 @@ const ViewDirectories = {
         </button>
       </div>
 
-      <!-- Info sync -->
       <div style="margin-top:24px;padding:12px 16px;background:var(--surface2);border-radius:8px;font-size:0.78rem;color:var(--text-dim);">
         <div style="font-weight:600;color:var(--text);margin-bottom:6px;">Impact sur le moteur Sync</div>
         <div>Les chemins relatifs des Posts dans le Registre sont résolus comme :</div>
         <div style="font-family:monospace;margin:6px 0;color:var(--accent);">
-          {{ form.posts_dir || '[posts_dir]' }} \ [chemin du Post]
+          {{ form.posts_dir || '[posts_dir]' }} \\ [chemin du Post]
         </div>
         <div>Les chemins absolus dans le Registre ne sont pas affectés.</div>
       </div>
