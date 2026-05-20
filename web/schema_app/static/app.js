@@ -197,6 +197,8 @@ const ViewBlueprint = {
         ]);
         edgePanel.value = {
           rel: full,
+          parent,                                                       // données fraîches (re-fetchées à chaque ouverture)
+          child,                                                        // idem — namespace/min_fields toujours à jour
           parentId:     rel.source,                                    // consommateur (dashboard)
           childId:      rel.target,                                    // source de données (posts)
           childTables:  child?.std_tables?.map(t => t.name)  ?? [],   // tables de l'enfant
@@ -272,18 +274,17 @@ const ViewBlueprint = {
         // 2. Récupérer colonnes source + colonnes namespace si COLLECT
         //    PULL/COLLECT : source = child  ⟹  dest = parent
         //    PUSH         : source = parent ⟹  dest = child
-        const srcClassId = (source === 'child') ? ep.childId  : ep.parentId;
-        const destId     = (source === 'child') ? ep.parentId : ep.childId;
-        const srcClass   = allClasses.value.find(c => c.id === srcClassId);
-        const srcTable   = srcClass?.std_tables?.find(t => t.name === table);
-        const srcCols    = srcTable?.columns ?? [];
+        const destId   = (source === 'child') ? ep.parentId : ep.childId;
+        // Utiliser les données fraîches stockées dans edgePanel (fetched à l'ouverture)
+        const srcClass = (source === 'child') ? ep.child : ep.parent;
+        const srcTable = srcClass?.std_tables?.find(t => t.name === table);
+        const srcCols  = srcTable?.columns ?? [];
 
         // Colonnes namespace (COLLECT uniquement) = min_fields identitaires du child
         // Chaque ligne collectée doit porter l'identité complète du Post source
         let nsCols = [];
         if (mode === 'COLLECT') {
-          const childClass = allClasses.value.find(c => c.id === ep.childId);
-          nsCols = (childClass?.min_fields ?? [])
+          nsCols = (ep.child?.min_fields ?? [])
             .filter(f => f.nature === 'identitaire')
             .map(f => ({
               name: f.name, col_type: f.field_type || 'string',
