@@ -24,6 +24,7 @@ from web.workspace_service import get_gabarits_dir, get_workspace_dir
 router = APIRouter()
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+_INVALID_NAME_CHARS = set(r'\/:*?"<>|')
 _GABARITS_FILE = _PROJECT_ROOT / ".gabarits.json"
 
 # Fichiers N1 copiés lors d'un clonage
@@ -87,8 +88,7 @@ class GabaritInfo(BaseModel):
 
 
 class NewGabaritRequest(BaseModel):
-    name: str
-    path: str           # absolu ou relatif au projet
+    name: str           # nom court → gabarits_dir/<name>/ créé automatiquement
     description: str = ""
 
 
@@ -164,21 +164,24 @@ def list_gabarits():
 
 @router.post("/new", response_model=GabaritInfo, status_code=201)
 def new_gabarit(body: NewGabaritRequest):
-    """Crée un nouveau Gabarit vide (N1 seulement)."""
-    path = Path(body.path)
-    if not path.is_absolute():
-        path = _PROJECT_ROOT / body.path
+    """Crée un nouveau Gabarit vide sous gabarits_dir/<name>/."""
+    gabarits_dir = get_gabarits_dir()
+    if not gabarits_dir:
+        raise HTTPException(422, "gabarits_dir non configuré — définissez-le dans N1 (Workspace)")
+
+    if not body.name or any(c in _INVALID_NAME_CHARS for c in body.name):
+        raise HTTPException(422, f"Nom invalide : '{body.name}' (caractères interdits: \\ / : * ? \" < > |)")
+
+    path = gabarits_dir / body.name
 
     if path.exists() and any(path.iterdir()):
         raise HTTPException(409, f"Le dossier '{path}' existe déjà et n'est pas vide")
 
     path.mkdir(parents=True, exist_ok=True)
 
-    # file_types.yaml minimal
     with open(path / "file_types.yaml", "w", encoding="utf-8") as f:
         yaml.dump({"file_types": {}}, f, allow_unicode=True, default_flow_style=False)
 
-    # JSON N1 vides
     for fname, init in [
         ("schema_relations.json", {"version": "1", "relations": []}),
         ("functions.json",        {"version": "1", "functions": []}),
@@ -187,11 +190,6 @@ def new_gabarit(body: NewGabaritRequest):
     ]:
         with open(path / fname, "w", encoding="utf-8") as f:
             json.dump(init, f, ensure_ascii=False, indent=2)
-
-    known = _load_known()
-    if not any(k["path"] == str(path) for k in known):
-        known.append({"name": body.name, "path": str(path), "description": body.description})
-        _save_known(known)
 
     return GabaritInfo(name=body.name, path=str(path), valid=True, class_count=0,
                        description=body.description)
