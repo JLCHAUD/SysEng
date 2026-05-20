@@ -2146,11 +2146,12 @@ const ViewGabarits = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// VIEW: Workspace Global (partagé N1 + N2)
+// VIEW: Configuration globale (workspace partagé N1 + N2)
 // ═══════════════════════════════════════════════════════════════════════════════
 const ViewWorkspaceGlobal = {
   setup() {
-    const form    = ref({ gabarits_dir: '', workspace_dir: '' });
+    const workspace_dir  = ref('');
+    const gabarits_dir   = ref('');   // lecture seule — géré par N1
     const loading = ref(true);
     const saved   = ref(false);
     const err     = ref('');
@@ -2158,7 +2159,8 @@ const ViewWorkspaceGlobal = {
     onMounted(async () => {
       try {
         const d = await GET('/api/workspace');
-        form.value = { gabarits_dir: d.gabarits_dir || '', workspace_dir: d.workspace_dir || '' };
+        workspace_dir.value = d.workspace_dir || '';
+        gabarits_dir.value  = d.gabarits_dir  || '';
       } catch(e) { toastErr(e); }
       loading.value = false;
     });
@@ -2166,45 +2168,53 @@ const ViewWorkspaceGlobal = {
     const save = async () => {
       err.value = '';
       try {
-        await PUT('/api/workspace', form.value);
+        await PUT('/api/workspace', { workspace_dir: workspace_dir.value });
         saved.value = true;
         setTimeout(() => saved.value = false, 2000);
-        toast('Workspace enregistré');
+        toast('Répertoire des Affaires enregistré');
       } catch(e) { err.value = e.message; toastErr(e); }
     };
 
     const reset = async () => {
-      if (!confirm('Réinitialiser le workspace global ?')) return;
+      if (!confirm('Réinitialiser le répertoire des Affaires ?')) return;
       await DEL('/api/workspace');
-      form.value = { gabarits_dir: '', workspace_dir: '' };
-      toast('Workspace réinitialisé');
+      workspace_dir.value = '';
+      toast('Répertoire des Affaires réinitialisé');
     };
 
-    return { form, loading, saved, err, save, reset };
+    return { workspace_dir, gabarits_dir, loading, saved, err, save, reset };
   },
   template: `
     <div v-if="loading" class="loading">Chargement…</div>
     <div v-else style="max-width:640px;">
       <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid #a5b4fc;font-size:0.82rem;color:var(--text-dim);line-height:1.6;">
-        Paramètres partagés entre N1 et N2. Stockés dans
+        Paramètres globaux partagés entre N1 et N2. Stockés dans
         <code style="color:#a5b4fc;">.exosync_workspace.json</code> à la racine du projet.
       </div>
+
+      <!-- workspace_dir — éditable N2 -->
       <div class="form-group">
-        <label class="form-label">Bibliothèque de Gabarits</label>
-        <input v-model="form.gabarits_dir" class="form-control"
-          placeholder="ex: C:\\ExoSync\\Gabarits" />
+        <label class="form-label">Répertoire des Affaires</label>
+        <input v-model="workspace_dir" class="form-control"
+          placeholder="ex: C:\\\\ExoSync\\\\Affaires" />
         <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
-          Dossier scanné automatiquement pour lister les gabarits disponibles.
+          Dossier parent où les nouvelles Affaires sont créées automatiquement lors du clonage d'un gabarit.
         </div>
       </div>
+
+      <!-- gabarits_dir — lecture seule, géré par N1 -->
       <div class="form-group" style="margin-top:16px;">
-        <label class="form-label">Répertoire Workspace (Affaires)</label>
-        <input v-model="form.workspace_dir" class="form-control"
-          placeholder="ex: C:\\ExoSync\\Affaires" />
+        <label class="form-label" style="color:var(--text-dim);">
+          Répertoire des Gabarits
+          <span style="font-size:0.72rem;background:var(--surface2);padding:2px 6px;border-radius:4px;margin-left:6px;color:#a5b4fc;">défini dans N1</span>
+        </label>
+        <input :value="gabarits_dir || '(non configuré — ouvrir N1 › Workspace)'" class="form-control"
+          style="color:var(--text-dim);cursor:not-allowed;" disabled />
         <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
-          Dossier parent par défaut pour créer de nouvelles Affaires.
+          Lecture seule depuis N2. Pour modifier, ouvrir <strong>N1 Schema Designer</strong> › onglet Workspace.
         </div>
       </div>
+
       <div v-if="err" style="margin-top:12px;padding:10px 14px;background:#7f1d1d;border-radius:6px;font-size:0.82rem;color:#fca5a5;">⚠ {{ err }}</div>
       <div style="display:flex;gap:10px;margin-top:20px;">
         <button class="btn btn-primary" @click="save">{{ saved ? '✓ Enregistré' : '💾 Enregistrer' }}</button>
