@@ -204,7 +204,7 @@ const ViewRegistry = {
       catch(e) { toastErr(e); }
     };
 
-    return { items, fileTypes, showModal, editing, form, ROLES, PERIODICITES,
+    return { items, fileTypes, showModal, editing, form, PERIODICITES,
              openCreate, openEdit, save, del };
   },
   template: `
@@ -1228,7 +1228,7 @@ const ViewExcelImport = {
       fileTypes, availableTables, selectedClass, tableComparisons,
       tableMappings, collectMappings, isCockpit, form, availableOwnerRoles,
       onDrop, onFileInput, handleFile, scanFile, compareAndProceed, proceedFromMapping,
-      register, verdictClass, ROLES,
+      register, verdictClass,
     };
   },
   template: `
@@ -1401,7 +1401,7 @@ const ViewExcelImport = {
               <label>Rôle owner</label>
               <select v-model="form.owner_role">
                 <option value="">— Choisir —</option>
-                <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
+                <option v-for="r in availableOwnerRoles" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
             <div class="form-group">
