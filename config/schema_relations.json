@@ -7,7 +7,17 @@
       "child_class": "cockpit_ingenieur",
       "qualifier": "PRESCRIBED",
       "cardinality": "1..N",
-      "description": "Tout ingénieur est rattaché à un pilote métier."
+      "description": "Tout ingénieur est rattaché à un pilote métier.",
+      "flux": [
+        {
+          "id": "flux-85d22450",
+          "table": "TableTest",
+          "mode": "PULL",
+          "description": "",
+          "from_table": "",
+          "to_table": ""
+        }
+      ]
     },
     {
       "id": "rel-003",
@@ -31,7 +41,17 @@
       "child_class": "uo_instance",
       "qualifier": "TYPICAL",
       "cardinality": "1..N",
-      "description": "L'UO consomme le registre d'acteurs pour ses correspondants techniques."
+      "description": "L'UO consomme le registre d'acteurs pour ses correspondants techniques.",
+      "flux": [
+        {
+          "id": "flux-699156fb",
+          "table": "testte",
+          "mode": "PULL",
+          "description": "",
+          "from_table": "",
+          "to_table": ""
+        }
+      ]
     },
     {
       "id": "rel-006",
@@ -39,7 +59,18 @@
       "child_class": "uo_instance",
       "qualifier": "PRESCRIBED",
       "cardinality": "1..N",
-      "description": "Toute UO est rattachée à un projet. PULL de la feuille Projet."
+      "description": "Toute UO est rattachée à un projet. PULL de la feuille Projet.",
+      "flux": [
+        {
+          "id": "flux-3c15a420",
+          "table": "Tableau1",
+          "source": "child",
+          "mode": "COLLECT",
+          "description": "",
+          "from_table": "",
+          "to_table": ""
+        }
+      ]
     },
     {
       "id": "rel-007",
@@ -47,7 +78,27 @@
       "child_class": "uo_instance",
       "qualifier": "PRESCRIBED",
       "cardinality": "1..N",
-      "description": "Toute UO est pilotée par un pilote métier (vue transverse directe, hors hiérarchie ingénieur)."
+      "description": "Toute UO est pilotée par un pilote métier (vue transverse directe, hors hiérarchie ingénieur).",
+      "flux": [
+        {
+          "id": "flux-180de1c6",
+          "table": "Tableau1",
+          "source": "child",
+          "mode": "COLLECT",
+          "description": "",
+          "from_table": "",
+          "to_table": ""
+        },
+        {
+          "id": "flux-3bb34213",
+          "table": "TableTest",
+          "source": "parent",
+          "mode": "PUSH",
+          "description": "",
+          "from_table": "",
+          "to_table": ""
+        }
+      ]
     }
   ]
 }

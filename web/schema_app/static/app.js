@@ -180,12 +180,158 @@ const ViewEcosystemManager = {
 const ViewBlueprint = {
   emits: ['edit-class'],
   setup(_, { emit }) {
-    const loading = ref(true);
-    const panel   = ref(null);  // Classe cliquée
+    const loading   = ref(true);
+    const panel     = ref(null);   // nœud (Classe) cliqué
+    const edgePanel = ref(null);   // arête (Relation) cliquée
+    const allClasses = ref([]);    // cache pour les tables par classe
     let cy = null;
 
+    // ── Flux helpers ──────────────────────────────────────────────────────────
+    const customChild  = ref('');
+    const customParent = ref('');
+
+    async function openEdgePanel(rel) {
+      try {
+        const [full, parent, child] = await Promise.all([
+          GET(`/api/relations/${rel.id}`),
+          GET(`/api/classes/${rel.source}`).catch(() => null),
+          GET(`/api/classes/${rel.target}`).catch(() => null),
+        ]);
+        edgePanel.value = {
+          rel: full,
+          parentId:     rel.source,                                    // consommateur (dashboard)
+          childId:      rel.target,                                    // source de données (posts)
+          childTables:  child?.std_tables?.map(t => t.name)  ?? [],   // tables de l'enfant
+          parentTables: parent?.std_tables?.map(t => t.name) ?? [],   // tables du parent
+          isOneToMany:  (full.cardinality || '1..N').includes('N'),   // PULL interdit si 1..N
+        };
+        panel.value = null;
+        customChild.value  = '';
+        customParent.value = '';
+      } catch(e) { console.error(e); }
+    }
+
+    function getFluxEntry(table, source, mode) {
+      return edgePanel.value?.rel?.flux?.find(
+        f => f.table === table && (f.source || 'child') === source && f.mode === mode
+      ) ?? null;
+    }
+
+    function isActive(table, source, mode) {
+      return !!getFluxEntry(table, source, mode);
+    }
+
+    // Auto-crée une table (std_tables) ou un scalaire (min_fields) dans une Classe si absent.
+    // sourceColumns : colonnes à recopier (namespace + data). forceTable : forcer std_tables même pour un scalaire.
+    // Retourne true si création effectuée, false si déjà présent.
+    async function ensureInClass(classId, name, sourceColumns = [], forceTable = false) {
+      const isTable = name.startsWith('Tab') || forceTable;
+      try {
+        const cls = await GET(`/api/classes/${classId}`);
+        if (isTable) {
+          if (cls.std_tables?.some(t => t.name === name)) return false;
+          await PUT(`/api/classes/${classId}`, {
+            ...cls,
+            std_tables: [...(cls.std_tables || []), {
+              name, sheet: name,
+              columns: sourceColumns,   // structure copiée depuis la classe source
+            }],
+          });
+        } else {
+          if (cls.min_fields?.some(f => f.name === name)) return false;
+          await PUT(`/api/classes/${classId}`, {
+            ...cls,
+            min_fields: [...(cls.min_fields || []), {
+              name, label: name, field_type: 'string',
+              nature: 'operationnel', source: 'user_input',
+              required: false, pushable: false,
+            }],
+          });
+        }
+        return true;
+      } catch(e) {
+        console.error('ensureInClass:', e);
+        return false;
+      }
+    }
+
+    async function toggleFluxEntry(table, source, mode) {
+      if (!table) return;
+      const ep = edgePanel.value;
+      if (!ep) return;
+      const existing = getFluxEntry(table, source, mode);
+      if (existing) {
+        await DEL(`/api/relations/${ep.rel.id}/flux/${existing.id}`);
+        ep.rel.flux = ep.rel.flux.filter(f => f.id !== existing.id);
+        toast('Flux retiré');
+      } else {
+        // 1. Déclarer le flux
+        const created = await POST(`/api/relations/${ep.rel.id}/flux`, { table, source, mode });
+        ep.rel.flux.push(created);
+        if (source === 'child')  customChild.value  = '';
+        if (source === 'parent') customParent.value = '';
+
+        // 2. Récupérer colonnes source + colonnes namespace si COLLECT
+        //    PULL/COLLECT : source = child  ⟹  dest = parent
+        //    PUSH         : source = parent ⟹  dest = child
+        const srcClassId = (source === 'child') ? ep.childId  : ep.parentId;
+        const destId     = (source === 'child') ? ep.parentId : ep.childId;
+        const srcClass   = allClasses.value.find(c => c.id === srcClassId);
+        const srcTable   = srcClass?.std_tables?.find(t => t.name === table);
+        const srcCols    = srcTable?.columns ?? [];
+
+        // Colonnes namespace (COLLECT uniquement) = min_fields identitaires du child
+        // Chaque ligne collectée doit porter l'identité complète du Post source
+        let nsCols = [];
+        if (mode === 'COLLECT') {
+          const childClass = allClasses.value.find(c => c.id === ep.childId);
+          nsCols = (childClass?.min_fields ?? [])
+            .filter(f => f.nature === 'identitaire')
+            .map(f => ({
+              name: f.name, col_type: f.field_type || 'string',
+              header: f.label || f.name, is_key: true,
+              required: true, write: '', description: `namespace: ${f.label || f.name}`,
+            }));
+        }
+
+        // Pour un scalaire collecté (non-Tab) → forcer création en std_table
+        // avec colonnes namespace + colonne valeur (le scalaire devient une ligne par Post)
+        const isScalarCollect = mode === 'COLLECT' && !table.startsWith('Tab');
+        const forceTable = isScalarCollect;
+        const scalarValueCol = isScalarCollect ? [{
+          name: table, col_type: srcClass?.min_fields?.find(f => f.name === table)?.field_type || 'string',
+          header: table, is_key: false, required: false, write: '', description: '',
+        }] : [];
+        const finalCols = [...nsCols, ...srcCols, ...scalarValueCol];
+
+        // 3. Auto-créer dans la Classe réceptrice
+        const wasCreated = await ensureInClass(destId, table, finalCols, forceTable);
+        if (wasCreated) {
+          const palette = (source === 'child') ? ep.parentTables : ep.childTables;
+          if (!palette.includes(table)) palette.push(table);
+          const nsInfo  = nsCols.length  ? ` +${nsCols.length} ns`  : '';
+          const colInfo = srcCols.length ? ` ${srcCols.length} col.` : '';
+          toast(`"${table}" créé dans ${destId}${nsInfo}${colInfo}`);
+        } else {
+          toast('Flux ajouté');
+        }
+      }
+    }
+
+    async function removeFlux(fluxId) {
+      const ep = edgePanel.value;
+      if (!ep) return;
+      await DEL(`/api/relations/${ep.rel.id}/flux/${fluxId}`);
+      ep.rel.flux = ep.rel.flux.filter(f => f.id !== fluxId);
+      toast('Flux supprimé');
+    }
+
     onMounted(async () => {
-      const data = await GET('/api/blueprint').catch(() => ({ classes: [], relations: [] }));
+      const [data, classes] = await Promise.all([
+        GET('/api/blueprint').catch(() => ({ classes: [], relations: [] })),
+        GET('/api/classes').catch(() => []),
+      ]);
+      allClasses.value = classes;
       loading.value = false;
 
       await nextTick();
@@ -245,24 +391,33 @@ const ViewBlueprint = {
 
       cy.on('tap', 'node', e => {
         panel.value = e.target.data();
+        edgePanel.value = null;
       });
       cy.on('dbltap', 'node', e => {
         emit('edit-class', e.target.data().id);
       });
+      cy.on('tap', 'edge', e => {
+        panel.value = null;
+        openEdgePanel(e.target.data());
+      });
       cy.on('tap', e => {
-        if (e.target === cy) panel.value = null;
+        if (e.target === cy) { panel.value = null; edgePanel.value = null; }
       });
     });
 
     const relayout = () => cy && cy.layout({ name: 'cose', padding: 40 }).run();
 
-    return { loading, panel, relayout, emit };
+    return {
+      loading, panel, edgePanel, relayout, emit,
+      customChild, customParent,
+      isActive, toggleFluxEntry, removeFlux,
+    };
   },
   template: `
     <div style="position:relative">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <span style="font-size:0.78rem;color:var(--text-dim)">
-          Cliquez un nœud pour voir les détails · Double-cliquez pour éditer
+          Cliquez un nœud · Double-cliquez pour éditer · Cliquez une arête pour définir les flux
         </span>
         <button class="btn btn-ghost btn-sm" @click="relayout">⟳ Réorganiser</button>
         <span style="margin-left:auto;display:flex;gap:10px;font-size:0.75rem;color:var(--text-dim)">
@@ -273,7 +428,8 @@ const ViewBlueprint = {
       <div v-if="loading" class="loading">Chargement du Blueprint…</div>
       <div style="position:relative" v-show="!loading">
         <div id="cy-blueprint"></div>
-        <!-- Panneau latéral classe -->
+
+        <!-- Panneau latéral : Classe (nœud) -->
         <div v-if="panel" style="position:absolute;top:0;right:0;width:260px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;z-index:10">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <span style="font-weight:600;font-size:0.9rem">{{ panel.label }}</span>
@@ -291,7 +447,137 @@ const ViewBlueprint = {
             ✏ Éditer cette Classe
           </button>
         </div>
+
       </div>
+
+      <!-- Modal Flux de Schéma (arête cliquée) -->
+      <div v-if="edgePanel" class="modal-overlay" @click.self="edgePanel=null">
+        <div class="modal" style="max-width:740px;width:95%;">
+          <!-- En-tête -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <div>
+              <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">Flux de Schéma N1</div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <span class="badge badge-teal">{{ edgePanel.parentId }}</span>
+                <span style="color:var(--text-dim);">→</span>
+                <span class="badge badge-teal">{{ edgePanel.childId }}</span>
+                <span class="badge" :class="edgePanel.rel.qualifier==='PRESCRIBED'?'badge-red':'badge-gray'">
+                  {{ edgePanel.rel.qualifier }}
+                </span>
+                <span style="font-size:0.75rem;color:var(--text-dim);">{{ edgePanel.rel.cardinality }}</span>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="edgePanel=null">✕</button>
+          </div>
+
+          <!-- Deux colonnes -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+            <!-- Colonne gauche : deux palettes (child + parent) -->
+            <div>
+
+              <!-- Section CHILD : source de données (Posts) -->
+              <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:10px;">
+                <div style="font-size:0.72rem;font-weight:600;color:#6ee7b7;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">
+                  {{ edgePanel.childId }} <span style="font-weight:400;opacity:.7;">(source de données)</span>
+                </div>
+                <div v-if="!edgePanel.childTables.length"
+                     style="font-size:0.78rem;color:var(--text-dim);font-style:italic;padding:4px 0 8px;">
+                  Aucune table standard définie.
+                </div>
+                <div v-for="t in edgePanel.childTables" :key="'c-'+t"
+                     style="display:flex;align-items:center;gap:5px;padding:5px 6px;margin-bottom:4px;background:var(--surface);border-radius:5px;font-family:monospace;font-size:0.8rem;">
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t }}</span>
+                  <button v-if="!edgePanel.isOneToMany"
+                    @click="toggleFluxEntry(t,'child','PULL')"
+                    :style="{fontSize:'0.67rem',padding:'2px 7px',borderRadius:'4px',border:'1px solid',cursor:'pointer',transition:'all .15s',
+                             background: isActive(t,'child','PULL') ? '#6366f1' : 'transparent',
+                             borderColor: isActive(t,'child','PULL') ? '#6366f1' : 'var(--border)',
+                             color: isActive(t,'child','PULL') ? '#fff' : 'var(--text-dim)'}">PULL</button>
+                  <button @click="toggleFluxEntry(t,'child','COLLECT')"
+                    :style="{fontSize:'0.67rem',padding:'2px 7px',borderRadius:'4px',border:'1px solid',cursor:'pointer',transition:'all .15s',
+                             background: isActive(t,'child','COLLECT') ? '#d97706' : 'transparent',
+                             borderColor: isActive(t,'child','COLLECT') ? '#d97706' : 'var(--border)',
+                             color: isActive(t,'child','COLLECT') ? '#fff' : 'var(--text-dim)'}">COL</button>
+                </div>
+                <!-- Saisie libre child -->
+                <div style="display:flex;gap:4px;margin-top:8px;">
+                  <input v-model="customChild" placeholder="Autre table / scalaire…"
+                    style="flex:1;font-size:0.75rem;padding:4px 7px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);min-width:0;" />
+                  <button v-if="!edgePanel.isOneToMany"
+                    @click="toggleFluxEntry(customChild,'child','PULL')" :disabled="!customChild"
+                    style="font-size:0.67rem;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;flex-shrink:0;">PULL</button>
+                  <button @click="toggleFluxEntry(customChild,'child','COLLECT')" :disabled="!customChild"
+                    style="font-size:0.67rem;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;flex-shrink:0;">COL</button>
+                </div>
+              </div>
+
+              <!-- Section PARENT : config descendante (Dashboard → Posts) -->
+              <div style="background:var(--surface2);border-radius:8px;padding:12px;">
+                <div style="font-size:0.72rem;font-weight:600;color:#a5b4fc;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">
+                  {{ edgePanel.parentId }} <span style="font-weight:400;opacity:.7;">(config → enfants)</span>
+                </div>
+                <div v-if="!edgePanel.parentTables.length"
+                     style="font-size:0.78rem;color:var(--text-dim);font-style:italic;padding:4px 0 8px;">
+                  Aucune table standard définie.
+                </div>
+                <div v-for="t in edgePanel.parentTables" :key="'p-'+t"
+                     style="display:flex;align-items:center;gap:5px;padding:5px 6px;margin-bottom:4px;background:var(--surface);border-radius:5px;font-family:monospace;font-size:0.8rem;">
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t }}</span>
+                  <button @click="toggleFluxEntry(t,'parent','PUSH')"
+                    :style="{fontSize:'0.67rem',padding:'2px 7px',borderRadius:'4px',border:'1px solid',cursor:'pointer',transition:'all .15s',
+                             background: isActive(t,'parent','PUSH') ? '#0891b2' : 'transparent',
+                             borderColor: isActive(t,'parent','PUSH') ? '#0891b2' : 'var(--border)',
+                             color: isActive(t,'parent','PUSH') ? '#fff' : 'var(--text-dim)'}">PUSH</button>
+                </div>
+                <!-- Saisie libre parent -->
+                <div style="display:flex;gap:4px;margin-top:8px;">
+                  <input v-model="customParent" placeholder="Autre table / scalaire…"
+                    style="flex:1;font-size:0.75rem;padding:4px 7px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);min-width:0;" />
+                  <button @click="toggleFluxEntry(customParent,'parent','PUSH')" :disabled="!customParent"
+                    style="font-size:0.67rem;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;flex-shrink:0;">PUSH</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Colonne droite : flux déclarés -->
+            <div style="background:var(--surface2);border-radius:8px;padding:12px;">
+              <div style="font-size:0.75rem;font-weight:600;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">
+                Flux déclarés · {{ edgePanel.rel.flux?.length ?? 0 }}
+              </div>
+              <div v-if="!edgePanel.rel.flux?.length"
+                   style="font-size:0.78rem;color:var(--text-dim);font-style:italic;padding:8px 0;">
+                Cliquez un bouton à gauche pour déclarer un flux.
+              </div>
+              <div v-for="fx in edgePanel.rel.flux" :key="fx.id"
+                   style="display:flex;align-items:center;gap:5px;padding:7px 8px;margin-bottom:5px;background:var(--surface);border-radius:6px;font-family:monospace;font-size:0.78rem;">
+                <!-- Origine → destination -->
+                <span style="font-size:0.67rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">
+                  {{ (fx.source||'child')==='child' ? edgePanel.childId : edgePanel.parentId }}
+                  → {{ (fx.source||'child')==='child' ? edgePanel.parentId : edgePanel.childId }}
+                </span>
+                <!-- Badge mode -->
+                <span :style="{
+                  fontSize:'0.64rem',padding:'1px 6px',borderRadius:'3px',fontWeight:'700',flexShrink:0,
+                  background: fx.mode==='PULL' ? '#312e81' : fx.mode==='PUSH' ? '#164e63' : '#78350f',
+                  color:'#fff'}">{{ fx.mode }}</span>
+                <!-- Nom table -->
+                <span style="color:var(--accent);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ fx.table }}</span>
+                <button class="btn btn-danger btn-xs" style="flex-shrink:0;" @click="removeFlux(fx.id)">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Légende -->
+          <div style="margin-top:14px;font-size:0.73rem;color:var(--text-dim);border-top:1px solid var(--border);padding-top:10px;display:flex;gap:16px;flex-wrap:wrap;">
+            <span><span style="color:#6366f1;font-weight:600;">PULL</span> — parent lit depuis un enfant</span>
+            <span><span style="color:#d97706;font-weight:600;">COL</span> — parent agrège tous les enfants</span>
+            <span><span style="color:#0891b2;font-weight:600;">PUSH</span> — parent pousse vers les enfants</span>
+            <span style="margin-left:auto;opacity:.6;">Patrons MXL · Pré-remplissage Tissage N2</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   `
 };

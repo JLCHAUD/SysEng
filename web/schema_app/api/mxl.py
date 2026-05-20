@@ -26,7 +26,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from web.schema_app.services.config_service import load_file_types, load_tables
+from web.schema_app.services.config_service import load_file_types, load_tables, load_relations
 
 router = APIRouter()
 
@@ -124,6 +124,33 @@ def _generate_class_mxl(class_id: str) -> str:
             lines.append(f"PUSH {var} -> {store_key}")
 
         lines.append("")
+
+    # ── Flux entrants (Tissage N1) → patrons PULL commentés ──────────────────
+    relations = load_relations()
+    # Cette classe est-elle parente (dashboard) qui consomme des classes enfants ?
+    flux_sortants = [
+        r for r in relations
+        if r.get("parent_class") == class_id and r.get("flux")
+    ]
+    if flux_sortants:
+        lines.append("")
+        lines.append("# ── Flux N1 (patrons définis en Schéma N1) ───────────────────────────────")
+        for rel in flux_sortants:
+            child     = rel["child_class"]
+            qualifier = rel.get("qualifier", "TYPICAL")
+            lines.append(f"# Relation {qualifier} : {class_id} ↔ {child}")
+            for fx in rel.get("flux", []):
+                table  = fx.get("table", "")
+                mode   = fx.get("mode", "PULL")
+                source = fx.get("source", "child")
+                if source == "child":
+                    if mode == "COLLECT":
+                        lines.append(f"# COLLECT {child}.*.{table} -> FILL_TABLE({{sheet}}, {table}) MODE=APPEND")
+                    else:  # PULL
+                        lines.append(f"# PULL {child}.{{source_id}}.{table} -> FILL_TABLE({{sheet}}, {table}) MODE=OVERWRITE")
+                else:  # source == "parent"
+                    lines.append(f"# PUSH {table} -> {child}.{{target_id}}.{table}")
+            lines.append("#")
 
     return "\n".join(lines).strip()
 
