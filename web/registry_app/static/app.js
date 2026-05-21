@@ -204,8 +204,10 @@ const ViewRegistry = {
       catch(e) { toastErr(e); }
     };
 
+    const generateXlsx = id => { window.open(`/api/xlsx/${encodeURIComponent(id)}`, '_blank'); };
+
     return { items, fileTypes, showModal, editing, form, PERIODICITES,
-             openCreate, openEdit, save, del };
+             openCreate, openEdit, save, del, generateXlsx };
   },
   template: `
     <div>
@@ -232,6 +234,7 @@ const ViewRegistry = {
               </td>
               <td style="font-size:0.73rem;color:var(--text-dim);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.chemin }}</td>
               <td style="display:flex;gap:6px;justify-content:flex-end">
+                <button class="btn btn-ghost btn-sm" @click="generateXlsx(f.id)" :disabled="!f.type_fichier" :title="f.type_fichier ? 'Générer le fichier Excel' : 'Post libre — Classe requise'">⬇ Excel</button>
                 <button class="btn btn-ghost btn-sm" @click="openEdit(f)">Éditer</button>
                 <button class="btn btn-danger btn-sm" @click="del(f.id)">✕</button>
               </td>
@@ -2442,6 +2445,100 @@ const ViewFunctions = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Schéma — Classes
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewSchemaClasses = {
+  setup() {
+    const classes  = ref([]);
+    const showModal = ref(false);
+    const editing  = ref(null);
+    const blank = () => ({
+      id:'', label:'', description:'', owner_function:'',
+      min_sheets:[], optional_sheets:[], allowed_namespaces:[],
+      push_prefix:'', template:'', min_fields:[], std_tables:[],
+    });
+    const form = reactive(blank());
+
+    const load = async () => {
+      classes.value = await GET('/api/schema/classes').catch(() => []);
+    };
+    onMounted(load);
+
+    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
+    const openEdit   = (c)  => { Object.assign(form, JSON.parse(JSON.stringify(c))); editing.value = c.id; showModal.value = true; };
+
+    const save = async () => {
+      try {
+        if (editing.value) {
+          await PUT(`/api/schema/classes/${editing.value}`, form);
+          toast('Classe mise à jour — les Posts concernés sont signalés comme périmés');
+        } else {
+          await POST('/api/schema/classes', form);
+          toast('Classe créée');
+        }
+        showModal.value = false;
+        await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async (id) => {
+      if (!confirm(`Supprimer la Classe "${id}" ?`)) return;
+      try { await DEL(`/api/schema/classes/${id}`); await load(); toast('Classe supprimée'); }
+      catch(e) { toastErr(e); }
+    };
+
+    return { classes, showModal, editing, form, openCreate, openEdit, save, del };
+  },
+  template: `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Classes <span class="topbar-badge">{{ classes.length }}</span></span>
+        <button class="btn btn-primary" @click="openCreate">+ Nouvelle Classe</button>
+      </div>
+      <div v-if="!classes.length" class="empty">Aucune Classe définie</div>
+      <table v-else>
+        <thead><tr><th>ID</th><th>Label</th><th>Version schéma</th><th>Feuilles requises</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="c in classes" :key="c.id">
+            <td><code style="font-size:0.8rem">{{ c.id }}</code></td>
+            <td>{{ c.label }}</td>
+            <td><span class="badge badge-blue">v{{ c.schema_version || 1 }}</span></td>
+            <td style="font-size:0.78rem;color:var(--text-dim)">{{ (c.min_sheets||[]).join(', ') || '—' }}</td>
+            <td>
+              <button class="btn btn-ghost btn-sm" @click="openEdit(c)">Modifier</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444" @click="del(c.id)">Suppr.</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="showModal" class="modal-backdrop">
+      <div class="modal" style="max-width:540px">
+        <div class="modal-title">{{ editing ? 'Modifier' : 'Nouvelle' }} Classe</div>
+        <div class="form-group"><label>ID *</label>
+          <input v-model="form.id" :disabled="!!editing" placeholder="ma_classe" />
+        </div>
+        <div class="form-group"><label>Label *</label><input v-model="form.label" /></div>
+        <div class="form-group"><label>Description</label><input v-model="form.description" /></div>
+        <div class="form-group"><label>Push prefix</label><input v-model="form.push_prefix" placeholder="ns.{id}" /></div>
+        <div class="form-group"><label>Feuilles requises (séparées par virgule)</label>
+          <input :value="(form.min_sheets||[]).join(',')"
+                 @input="form.min_sheets = $event.target.value.split(',').map(s=>s.trim()).filter(Boolean)" />
+        </div>
+        <div class="form-group"><label>Feuilles optionnelles</label>
+          <input :value="(form.optional_sheets||[]).join(',')"
+                 @input="form.optional_sheets = $event.target.value.split(',').map(s=>s.trim()).filter(Boolean)" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showModal=false">Annuler</button>
+          <button class="btn btn-primary" @click="save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const VIEW_MAP = {
@@ -2460,6 +2557,7 @@ const VIEW_MAP = {
   mxl:            ViewMxl,
   'excel-import': ViewExcelImport,
   ecosystem:      ViewEcosystem,
+  'schema-classes':    ViewSchemaClasses,
 };
 
 const App = {
@@ -2482,6 +2580,10 @@ const App = {
       { id:'gabarits',     icon:'◈', label:'Gabarits & Affaires',    group:'Configuration' },
       { id:'wsglobal',     icon:'⌂', label:'Workspace global',       group:'Configuration' },
       { id:'registry',     icon:'◧', label:'Registre des Posts',     group:'Population' },
+      { id:'schema-classes',   icon:'◫', label:'Schéma — Classes',   group:'Schéma' },
+      { id:'schema-relations', icon:'⇔', label:'Schéma — Relations', group:'Schéma' },
+      { id:'schema-functions', icon:'◈', label:'Schéma — Fonctions', group:'Schéma' },
+      { id:'schema-templates', icon:'◉', label:'Schéma — Templates', group:'Schéma' },
       { id:'actors',       icon:'◉', label:'Acteurs',              group:'Population' },
       { id:'functions',    icon:'◈', label:'Rôles & Fonctions',    group:'Population' },
       { id:'excel-import', icon:'⤵', label:'Importer Excel',       group:'Population' },
@@ -2516,6 +2618,10 @@ const App = {
       mxl:          'Générateur de Manifeste MXL',
       'excel-import': 'Importer un fichier Excel',
       ecosystem:    'Graphe de l\'écosystème',
+      'schema-classes':   'Schéma — Classes',
+      'schema-relations': 'Schéma — Relations',
+      'schema-functions': 'Schéma — Fonctions',
+      'schema-templates': 'Schéma — Templates',
     };
 
     const currentView = computed(() => VIEW_MAP[view.value] || ViewDashboard);
