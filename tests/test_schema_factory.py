@@ -311,3 +311,43 @@ def test_file_instance_schema_fields_optional():
     f = FileInstance(id="F-002", type_fichier=None, chemin="/path/f.xlsx")
     assert f.schema_version is None
     assert f.schema_outdated is None
+
+
+from web.registry_app.api import registry as registry_mod
+from web.registry_app.services import config_service as reg_cfg
+
+
+def _make_registry_app(tmp_path):
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir()
+
+    ft_file = cfg_dir / "file_types.yaml"
+    ft_file.write_text(
+        "file_types:\n  cls1:\n    label: C1\n    schema_version: 3\n    required_sheets: []\n    optional_sheets: []\n",
+        encoding="utf-8",
+    )
+
+    reg_file = cfg_dir / "registre.json"
+    reg_file.write_text(json.dumps({"version": "1", "fichiers": [
+        {"id": "P-001", "type_fichier": "cls1", "chemin": "/p1.xlsx",
+         "synchro_periodicite": "manuel", "owner_role": "", "genere_par_script": False,
+         "schema_version": 3},
+        {"id": "P-002", "type_fichier": "cls1", "chemin": "/p2.xlsx",
+         "synchro_periodicite": "manuel", "owner_role": "", "genere_par_script": False,
+         "schema_version": 1},
+    ]}), encoding="utf-8")
+
+    reg_cfg.set_active_config(cfg_dir)
+
+    app = FastAPI()
+    app.include_router(registry_mod.router, prefix="/api/registry")
+    return TestClient(app)
+
+
+def test_registry_schema_outdated_flag(tmp_path):
+    client = _make_registry_app(tmp_path)
+    r = client.get("/api/registry")
+    assert r.status_code == 200
+    posts = {p["id"]: p for p in r.json()}
+    assert posts["P-001"]["schema_outdated"] is False
+    assert posts["P-002"]["schema_outdated"] is True
