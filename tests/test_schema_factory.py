@@ -294,3 +294,20 @@ def test_templates_make_router(tmp_path):
         "mxl_defaults": {}, "source_file": "",
     })
     assert r.status_code == 201
+
+
+def test_file_instance_has_schema_fields():
+    from web.schemas.models import FileInstance
+    f = FileInstance(
+        id="F-001", type_fichier="cls1", chemin="/path/f.xlsx",
+        schema_version=3, schema_outdated=True,
+    )
+    assert f.schema_version == 3
+    assert f.schema_outdated is True
+
+
+def test_file_instance_schema_fields_optional():
+    from web.schemas.models import FileInstance
+    f = FileInstance(id="F-002", type_fichier=None, chemin="/path/f.xlsx")
+    assert f.schema_version is None
+    assert f.schema_outdated is None

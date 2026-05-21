@@ -34,6 +34,7 @@ class FileInstanceBase(BaseModel):
     synchro_periodicite: str = "quotidien"
     owner_role: str = ""
     genere_par_script: bool = False
+    schema_version: Optional[int] = None
 
 
 class FileInstanceCreate(FileInstanceBase):
@@ -44,6 +45,7 @@ class FileInstance(FileInstanceBase):
     id: str
     derniere_synchro: Optional[str] = None
     statut_dernier_synchro: Optional[str] = None
+    schema_outdated: Optional[bool] = None
 
     class Config:
         from_attributes = True
