@@ -119,6 +119,79 @@ def _make_cfg_rel(tmp_path: Path) -> SchemaConfigService:
     )
 
 
+def _make_full_cfg(tmp_path: Path) -> SchemaConfigService:
+    """Crée une SchemaConfigService avec tous les fichiers file-backed."""
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir()
+    ft_file = cfg_dir / "file_types.yaml"
+    ft_file.write_text("file_types: {}\n", encoding="utf-8")
+    tbl_file = cfg_dir / "tables.json"
+    tbl_file.write_text('{"version":"1","tables":{}}', encoding="utf-8")
+    rel_file = cfg_dir / "relations.json"
+    rel_file.write_text('[]', encoding="utf-8")
+    ns_file = cfg_dir / "namespaces.json"
+    ns_file.write_text('[]', encoding="utf-8")
+    fn_file = cfg_dir / "functions.json"
+    fn_file.write_text('[]', encoding="utf-8")
+    tpl_file = cfg_dir / "templates.json"
+    tpl_file.write_text('[]', encoding="utf-8")
+
+    def load_ft():
+        import yaml
+        return (yaml.safe_load(ft_file.read_text()) or {}).get("file_types", {})
+
+    def save_ft(types):
+        import yaml
+        ft_file.write_text(
+            yaml.dump({"file_types": types}, allow_unicode=True, default_flow_style=False),
+            encoding="utf-8",
+        )
+
+    def load_tbl():
+        import json
+        return json.loads(tbl_file.read_text())
+
+    def save_tbl(data):
+        tbl_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_rel():
+        import json
+        return json.loads(rel_file.read_text())
+
+    def save_rel(data):
+        rel_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_ns():
+        import json
+        return json.loads(ns_file.read_text())
+
+    def save_ns(data):
+        ns_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_fn():
+        import json
+        return json.loads(fn_file.read_text())
+
+    def save_fn(data):
+        fn_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_tpl():
+        import json
+        return json.loads(tpl_file.read_text())
+
+    def save_tpl(data):
+        tpl_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return SchemaConfigService(
+        load_file_types=load_ft, save_file_types=save_ft,
+        load_tables=load_tbl, save_tables=save_tbl,
+        load_relations=load_rel, save_relations=save_rel,
+        load_namespaces=load_ns, save_namespaces=save_ns,
+        load_functions=load_fn, save_functions=save_fn,
+        load_templates=load_tpl, save_templates=save_tpl,
+    )
+
+
 def test_classes_make_router_creates_class(tmp_path):
     cfg = _make_cfg(tmp_path)
     app = FastAPI()
@@ -175,3 +248,49 @@ def test_relations_make_router_crud(tmp_path):
 
     r3 = client.delete(f"/api/relations/{rel_id}")
     assert r3.status_code == 204
+
+
+def test_namespaces_make_router(tmp_path):
+    from web.schema_app.api import namespaces as ns_mod
+    cfg = _make_full_cfg(tmp_path)
+    app = FastAPI()
+    app.include_router(ns_mod.make_router(cfg), prefix="/api/namespaces")
+    client = TestClient(app)
+    r = client.post("/api/namespaces", json={"id": "ns1", "label": "NS1", "prefix": "ns1.", "description": ""})
+    assert r.status_code == 201
+    r2 = client.get("/api/namespaces")
+    assert len(r2.json()) == 1
+
+
+def test_functions_make_router(tmp_path):
+    from web.schema_app.api import functions as fn_mod
+    cfg = _make_full_cfg(tmp_path)
+    app = FastAPI()
+    app.include_router(fn_mod.make_router(cfg), prefix="/api/functions")
+    client = TestClient(app)
+    r = client.post("/api/functions", json={"label": "Pilote", "description": "", "side": "interne"})
+    assert r.status_code == 201
+    fn_id = r.json()["id"]
+    r2 = client.get(f"/api/functions/{fn_id}")
+    assert r2.json()["label"] == "Pilote"
+
+
+def test_templates_make_router(tmp_path):
+    from web.schema_app.api import templates as tpl_mod
+    cfg = _make_full_cfg(tmp_path)
+    # Créer une Classe d'abord pour la validation template
+    app = FastAPI()
+    app.include_router(classes_mod.make_router(cfg), prefix="/api/classes")
+    app.include_router(tpl_mod.make_router(cfg), prefix="/api/templates")
+    client = TestClient(app)
+    client.post("/api/classes", json={
+        "id": "cls1", "label": "C1", "description": "", "owner_function": "",
+        "min_sheets": [], "optional_sheets": [], "allowed_namespaces": [],
+        "push_prefix": "", "template": "", "min_fields": [], "std_tables": [],
+    })
+    r = client.post("/api/templates", json={
+        "label": "Tpl1", "class_id": "cls1", "description": "",
+        "extra_sheets": [], "field_defaults": {}, "std_tables": [],
+        "mxl_defaults": {}, "source_file": "",
+    })
+    assert r.status_code == 201
