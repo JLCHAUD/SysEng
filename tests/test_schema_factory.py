@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from web.schema_config import SchemaConfigService
 from web.schema_app.api import classes as classes_mod
+from web.schema_app.api import relations as relations_mod
 
 
 def _make_cfg(tmp_path: Path) -> SchemaConfigService:
@@ -69,6 +70,55 @@ def _make_cfg(tmp_path: Path) -> SchemaConfigService:
     )
 
 
+def _make_cfg_rel(tmp_path: Path) -> SchemaConfigService:
+    """Crée une SchemaConfigService avec relations file-backed."""
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir()
+    ft_file = cfg_dir / "file_types.yaml"
+    ft_file.write_text("file_types: {}\n", encoding="utf-8")
+    tbl_file = cfg_dir / "tables.json"
+    tbl_file.write_text('{"version":"1","tables":{}}', encoding="utf-8")
+    rel_file = cfg_dir / "relations.json"
+    rel_file.write_text('[]', encoding="utf-8")
+
+    def load_ft():
+        import yaml
+        return (yaml.safe_load(ft_file.read_text()) or {}).get("file_types", {})
+
+    def save_ft(types):
+        import yaml
+        ft_file.write_text(
+            yaml.dump({"file_types": types}, allow_unicode=True, default_flow_style=False),
+            encoding="utf-8",
+        )
+
+    def load_tbl():
+        import json
+        return json.loads(tbl_file.read_text())
+
+    def save_tbl(data):
+        tbl_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_rel():
+        import json
+        return json.loads(rel_file.read_text())
+
+    def save_rel(data):
+        rel_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def noop_load(): return []
+    def noop_save(x): pass
+
+    return SchemaConfigService(
+        load_file_types=load_ft, save_file_types=save_ft,
+        load_tables=load_tbl, save_tables=save_tbl,
+        load_relations=load_rel, save_relations=save_rel,
+        load_namespaces=noop_load, save_namespaces=noop_save,
+        load_functions=noop_load, save_functions=noop_save,
+        load_templates=noop_load, save_templates=noop_save,
+    )
+
+
 def test_classes_make_router_creates_class(tmp_path):
     cfg = _make_cfg(tmp_path)
     app = FastAPI()
@@ -105,3 +155,23 @@ def test_classes_make_router_increments_schema_version(tmp_path):
     r = client.put("/api/classes/cls1", json=body)
     assert r.status_code == 200
     assert r.json()["schema_version"] == 2
+
+
+def test_relations_make_router_crud(tmp_path):
+    cfg = _make_cfg_rel(tmp_path)
+    app = FastAPI()
+    app.include_router(relations_mod.make_router(cfg), prefix="/api/relations")
+    client = TestClient(app)
+
+    body = {"parent_class": "cls_a", "child_class": "cls_b",
+            "qualifier": "TYPICAL", "cardinality": "1..N",
+            "description": "", "flux": []}
+    r = client.post("/api/relations", json=body)
+    assert r.status_code == 201
+    rel_id = r.json()["id"]
+
+    r2 = client.get("/api/relations")
+    assert len(r2.json()) == 1
+
+    r3 = client.delete(f"/api/relations/{rel_id}")
+    assert r3.status_code == 204
