@@ -224,6 +224,12 @@ const ViewRegistry = {
               <td>
                 <span class="badge badge-teal" v-if="f.type_fichier">{{ f.type_fichier }}</span>
                 <span class="badge badge-gray" v-else>libre</span>
+                <span v-if="f.schema_outdated"
+                      class="badge"
+                      style="background:#7c2d12;color:#fed7aa;margin-left:4px;font-size:0.68rem"
+                      title="Post périmé — le schéma de cette Classe a été mis à jour">
+                  ⚠ périmé
+                </span>
               </td>
               <td><span class="badge badge-gray" v-if="f.owner_role">{{ f.owner_role }}</span><span v-else style="color:var(--text-dim)">—</span></td>
               <td><span class="badge badge-gray">{{ f.synchro_periodicite }}</span></td>
@@ -234,7 +240,15 @@ const ViewRegistry = {
               </td>
               <td style="font-size:0.73rem;color:var(--text-dim);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.chemin }}</td>
               <td style="display:flex;gap:6px;justify-content:flex-end">
-                <button class="btn btn-ghost btn-sm" @click="generateXlsx(f.id)" :disabled="!f.type_fichier" :title="f.type_fichier ? 'Générer le fichier Excel' : 'Post libre — Classe requise'">⬇ Excel</button>
+                <button class="btn btn-ghost btn-sm"
+                        :style="f.schema_outdated ? 'color:#f97316;border-color:#f97316' : ''"
+                        @click="generateXlsx(f.id)"
+                        :disabled="!f.type_fichier"
+                        :title="f.schema_outdated
+                          ? 'Schéma mis à jour — ce téléchargement applique la version courante'
+                          : f.type_fichier ? 'Générer le fichier Excel' : 'Post libre — Classe requise'">
+                  ⬇ Excel{{ f.schema_outdated ? ' ⚠' : '' }}
+                </button>
                 <button class="btn btn-ghost btn-sm" @click="openEdit(f)">Éditer</button>
                 <button class="btn btn-danger btn-sm" @click="del(f.id)">✕</button>
               </td>
