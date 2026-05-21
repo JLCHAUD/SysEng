@@ -2539,6 +2539,225 @@ const ViewSchemaClasses = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Schéma — Relations
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewSchemaRelations = {
+  setup() {
+    const relations = ref([]);
+    const showModal = ref(false);
+    const editing   = ref(null);
+    const blank = () => ({
+      parent_class:'', child_class:'', qualifier:'TYPICAL',
+      cardinality:'1..N', description:'', flux:[],
+    });
+    const form = reactive(blank());
+
+    const load = async () => { relations.value = await GET('/api/schema/relations').catch(() => []); };
+    onMounted(load);
+
+    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
+    const openEdit   = (r)  => { Object.assign(form, JSON.parse(JSON.stringify(r))); editing.value = r.id; showModal.value = true; };
+
+    const save = async () => {
+      try {
+        if (editing.value) { await PUT(`/api/schema/relations/${editing.value}`, form); toast('Relation mise à jour'); }
+        else { await POST('/api/schema/relations', form); toast('Relation créée'); }
+        showModal.value = false; await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async (id) => {
+      if (!confirm('Supprimer cette relation ?')) return;
+      try { await DEL(`/api/schema/relations/${id}`); await load(); toast('Relation supprimée'); }
+      catch(e) { toastErr(e); }
+    };
+
+    return { relations, showModal, editing, form, openCreate, openEdit, save, del };
+  },
+  template: `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Relations <span class="topbar-badge">{{ relations.length }}</span></span>
+        <button class="btn btn-primary" @click="openCreate">+ Nouvelle Relation</button>
+      </div>
+      <div v-if="!relations.length" class="empty">Aucune Relation définie</div>
+      <table v-else>
+        <thead><tr><th>Classe parent</th><th>Classe enfant</th><th>Qualificateur</th><th>Cardinalité</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="r in relations" :key="r.id">
+            <td><code style="font-size:0.8rem">{{ r.parent_class }}</code></td>
+            <td><code style="font-size:0.8rem">{{ r.child_class }}</code></td>
+            <td><span class="badge badge-blue">{{ r.qualifier }}</span></td>
+            <td>{{ r.cardinality }}</td>
+            <td>
+              <button class="btn btn-ghost btn-sm" @click="openEdit(r)">Modifier</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444" @click="del(r.id)">Suppr.</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="showModal" class="modal-backdrop">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-title">{{ editing ? 'Modifier' : 'Nouvelle' }} Relation</div>
+        <div class="form-group"><label>Classe parent *</label><input v-model="form.parent_class" /></div>
+        <div class="form-group"><label>Classe enfant *</label><input v-model="form.child_class" /></div>
+        <div class="form-group"><label>Qualificateur</label>
+          <select v-model="form.qualifier">
+            <option>TYPICAL</option><option>PRESCRIBED</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Cardinalité</label><input v-model="form.cardinality" placeholder="1..N" /></div>
+        <div class="form-group"><label>Description</label><input v-model="form.description" /></div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showModal=false">Annuler</button>
+          <button class="btn btn-primary" @click="save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Schéma — Fonctions
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewSchemaFunctions = {
+  setup() {
+    const funcs     = ref([]);
+    const showModal = ref(false);
+    const editing   = ref(null);
+    const blank = () => ({ label:'', description:'', side:'interne' });
+    const form  = reactive(blank());
+
+    const load = async () => { funcs.value = await GET('/api/schema/functions').catch(() => []); };
+    onMounted(load);
+
+    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
+    const openEdit   = (f)  => { Object.assign(form, JSON.parse(JSON.stringify(f))); editing.value = f.id; showModal.value = true; };
+
+    const save = async () => {
+      try {
+        if (editing.value) { await PUT(`/api/schema/functions/${editing.value}`, form); toast('Fonction mise à jour'); }
+        else { await POST('/api/schema/functions', form); toast('Fonction créée'); }
+        showModal.value = false; await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async (id) => {
+      if (!confirm('Supprimer cette fonction ?')) return;
+      try { await DEL(`/api/schema/functions/${id}`); await load(); toast('Fonction supprimée'); }
+      catch(e) { toastErr(e); }
+    };
+
+    return { funcs, showModal, editing, form, openCreate, openEdit, save, del };
+  },
+  template: `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Fonctions <span class="topbar-badge">{{ funcs.length }}</span></span>
+        <button class="btn btn-primary" @click="openCreate">+ Nouvelle Fonction</button>
+      </div>
+      <div v-if="!funcs.length" class="empty">Aucune Fonction définie</div>
+      <table v-else>
+        <thead><tr><th>ID</th><th>Label</th><th>Type</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="f in funcs" :key="f.id">
+            <td><code style="font-size:0.8rem">{{ f.id }}</code></td>
+            <td>{{ f.label }}</td>
+            <td><span :class="'badge badge-'+(f.side==='interne'?'blue':'green')">{{ f.side }}</span></td>
+            <td>
+              <button class="btn btn-ghost btn-sm" @click="openEdit(f)">Modifier</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444" @click="del(f.id)">Suppr.</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="showModal" class="modal-backdrop">
+      <div class="modal" style="max-width:400px">
+        <div class="modal-title">{{ editing ? 'Modifier' : 'Nouvelle' }} Fonction</div>
+        <div class="form-group"><label>Label *</label><input v-model="form.label" /></div>
+        <div class="form-group"><label>Type</label>
+          <select v-model="form.side"><option>interne</option><option>externe</option></select>
+        </div>
+        <div class="form-group"><label>Description</label><input v-model="form.description" /></div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showModal=false">Annuler</button>
+          <button class="btn btn-primary" @click="save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIEW: Schéma — Templates
+// ═══════════════════════════════════════════════════════════════════════════════
+const ViewSchemaTemplates = {
+  setup() {
+    const templates = ref([]);
+    const showModal = ref(false);
+    const editing   = ref(null);
+    const blank = () => ({ label:'', class_id:'', description:'', extra_sheets:[], field_defaults:{}, std_tables:[], mxl_defaults:{}, source_file:'' });
+    const form  = reactive(blank());
+
+    const load = async () => { templates.value = await GET('/api/schema/templates').catch(() => []); };
+    onMounted(load);
+
+    const openCreate = () => { Object.assign(form, blank()); editing.value = null; showModal.value = true; };
+    const openEdit   = (t)  => { Object.assign(form, JSON.parse(JSON.stringify(t))); editing.value = t.id; showModal.value = true; };
+
+    const save = async () => {
+      try {
+        if (editing.value) { await PUT(`/api/schema/templates/${editing.value}`, form); toast('Template mis à jour'); }
+        else { await POST('/api/schema/templates', form); toast('Template créé'); }
+        showModal.value = false; await load();
+      } catch(e) { toastErr(e); }
+    };
+
+    const del = async (id) => {
+      if (!confirm('Supprimer ce template ?')) return;
+      try { await DEL(`/api/schema/templates/${id}`); await load(); toast('Template supprimé'); }
+      catch(e) { toastErr(e); }
+    };
+
+    return { templates, showModal, editing, form, openCreate, openEdit, save, del };
+  },
+  template: `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Templates <span class="topbar-badge">{{ templates.length }}</span></span>
+        <button class="btn btn-primary" @click="openCreate">+ Nouveau Template</button>
+      </div>
+      <div v-if="!templates.length" class="empty">Aucun Template défini</div>
+      <table v-else>
+        <thead><tr><th>ID</th><th>Label</th><th>Classe</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="t in templates" :key="t.id">
+            <td><code style="font-size:0.8rem">{{ t.id }}</code></td>
+            <td>{{ t.label }}</td>
+            <td><span class="badge badge-purple">{{ t.class_id }}</span></td>
+            <td>
+              <button class="btn btn-ghost btn-sm" @click="openEdit(t)">Modifier</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444" @click="del(t.id)">Suppr.</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="showModal" class="modal-backdrop">
+      <div class="modal" style="max-width:440px">
+        <div class="modal-title">{{ editing ? 'Modifier' : 'Nouveau' }} Template</div>
+        <div class="form-group"><label>Label *</label><input v-model="form.label" /></div>
+        <div class="form-group"><label>Classe *</label><input v-model="form.class_id" placeholder="ma_classe" /></div>
+        <div class="form-group"><label>Description</label><input v-model="form.description" /></div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showModal=false">Annuler</button>
+          <button class="btn btn-primary" @click="save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 const VIEW_MAP = {
@@ -2558,6 +2777,9 @@ const VIEW_MAP = {
   'excel-import': ViewExcelImport,
   ecosystem:      ViewEcosystem,
   'schema-classes':    ViewSchemaClasses,
+  'schema-relations':  ViewSchemaRelations,
+  'schema-functions':  ViewSchemaFunctions,
+  'schema-templates':  ViewSchemaTemplates,
 };
 
 const App = {
