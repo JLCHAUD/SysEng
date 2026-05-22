@@ -152,6 +152,13 @@ class CollectNode:
 
 
 @dataclass
+class IdentNode:
+    name: str       # "nom"
+    label: str      # "Nom de l'UO"
+    value: str = "" # valeur col B, saisie par l'utilisateur dans Excel
+
+
+@dataclass
 class ParseError:
     line_num: int
     raw: str
@@ -171,6 +178,7 @@ class ManifestAST:
     notifies: List[NotifyNode] = field(default_factory=list)
     lists: List[ListNode] = field(default_factory=list)
     collects: List[CollectNode] = field(default_factory=list)
+    idents:   List[IdentNode]   = field(default_factory=list)
     errors: List[ParseError] = field(default_factory=list)
 
     # Index rapide : nom de variable → DefNode
@@ -263,7 +271,7 @@ def _parse_header_line(line: str, ast: ManifestAST) -> bool:
     elif key == "DOC":
         ast.header.doc = val
     elif key not in {"DEF", "COL", "BIND", "PUSH", "PULL",
-                     "VALIDATE", "EXTENDS", "NOTIFY", "LIST", "COLLECT"}:
+                     "VALIDATE", "EXTENDS", "NOTIFY", "LIST", "COLLECT", "IDENT"}:
         # Champ de métadonnée libre (owner, projet, has_risques…)
         ast.header.manifest_metadata[key.lower()] = val
     else:
@@ -594,6 +602,20 @@ def _parse_collect(line: str) -> Optional[CollectNode]:
     )
 
 
+def _parse_ident(line: str, anchor: str) -> Optional[IdentNode]:
+    """
+    IDENT nom : LABEL="Nom de l'UO"
+    La valeur du champ vient de la colonne B (anchor).
+    """
+    m = re.match(r'^IDENT\s+([\w_]+)\s*:\s*(.*)$', line.strip())
+    if not m:
+        return None
+    name  = m.group(1)
+    attrs = _parse_kv_attrs(m.group(2))
+    label = attrs.get("LABEL", name)
+    return IdentNode(name=name, label=label, value=anchor.strip())
+
+
 # ─── Parser principal ─────────────────────────────────────────────────────────
 
 def parse_lines(lines: List[Tuple[str, str]]) -> ManifestAST:
@@ -691,6 +713,13 @@ def parse_lines(lines: List[Tuple[str, str]]) -> ManifestAST:
                 ast.collects.append(node)
             else:
                 ast.errors.append(ParseError(line_num, instr, "Syntaxe COLLECT invalide"))
+
+        elif keyword == "IDENT":
+            node = _parse_ident(instr, anchor or "")
+            if node:
+                ast.idents.append(node)
+            else:
+                ast.errors.append(ParseError(line_num, instr, "Syntaxe IDENT invalide"))
 
         else:
             ast.errors.append(ParseError(line_num, instr,
@@ -957,6 +986,7 @@ def ast_summary(ast: ManifestAST) -> str:
         f"PULL      : {len(ast.pulls)} import(s)",
         f"LIST      : {len(ast.lists)} liste(s)",
         f"COLLECT   : {len(ast.collects)} agrégation(s)",
+        f"IDENT     : {len(ast.idents)} champ(s) identitaire(s)",
         f"Metadata  : {ast.header.manifest_metadata or '—'}",
         f"Erreurs   : {len(ast.errors)}",
     ]
