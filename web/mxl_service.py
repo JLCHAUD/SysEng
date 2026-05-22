@@ -74,16 +74,26 @@ def build_class_mxl_lines(
         lines.append(f"STYLE:     {style}")
     lines.append("DOC:       ")
 
-    # min_fields identitaires / paramètres → métadonnées libres dans l'en-tête
-    # Le parser les stocke dans manifest_metadata pour les filtres LIST DYNAMIC.
-    identitaires = [
+    # Champs identitaires (is_key=True) → section IDENT (autodéclaration)
+    ident_fields = [f for f in ft.get("min_fields", []) if f.get("is_key")]
+    if ident_fields:
+        lines.append("# -- IDENTIFICATION -------------------------------------------")
+        for f in ident_fields:
+            label = f.get("label", f["name"])
+            lines.append(f'IDENT {f["name"]} : LABEL="{label}"')
+        lines.append("")
+
+    # Champs metadata non-clés (is_key=False, user_input) → en-tête classique
+    # Stockés dans manifest_metadata, utilisables dans LIST DYNAMIC WHERE.
+    meta_fields = [
         f for f in ft.get("min_fields", [])
-        if f.get("source") in ("user_input", "reference", "parametre")
+        if not f.get("is_key") and f.get("source") in ("user_input", "reference", "parametre")
     ]
-    for f in identitaires:
+    for f in meta_fields:
         label = f.get("label", f["name"])
         lines.append(f"{f['name']}:   # {label}")
-    lines.append("")
+    if meta_fields:
+        lines.append("")
 
     # ── Bloc 2 : Imports PULL (suggestions commentées) ────────────────────────
     allowed_ns = ft.get("allowed_namespaces", [])
