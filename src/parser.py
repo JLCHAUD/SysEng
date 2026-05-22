@@ -826,6 +826,7 @@ def merge_asts(child: ManifestAST, template: ManifestAST) -> ManifestAST:
     merged.pushes    = template.pushes    + child.pushes
     merged.lists     = template.lists     + child.lists
     merged.collects  = template.collects  + child.collects
+    merged.idents    = template.idents    + child.idents
 
     # ── COL index ────────────────────────────────────────────────────────────
     for col in merged.cols:
