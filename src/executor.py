@@ -28,7 +28,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_to_tuple
 
-from src.parser import ManifestAST
+from src.parser import ManifestAST, parse_sheet, MANIFESTE_SHEET
 
 
 # ─── Résultat d'exécution ────────────────────────────────────────────────────
@@ -282,6 +282,7 @@ def resolve_lists(
     ast,
     wb,
     ecosystem=None,
+    parent_dir: Path = None,
 ) -> Dict[str, ResolvedList]:
     """
     Phase 0 — Résout toutes les déclarations LIST du Manifeste.
@@ -307,7 +308,7 @@ def resolve_lists(
                 context = {k: v for k, v in row.items() if k != "FILE_ID"}
                 entries.append(ListEntry(
                     file_id=fid,
-                    filepath=_resolve_child_path(fid, wb),
+                    filepath=_resolve_child_path(fid, wb, parent_dir=parent_dir),
                     context=context,
                 ))
             resolved[list_node.name] = ResolvedList(name=list_node.name, entries=entries)
@@ -332,15 +333,24 @@ def resolve_lists(
     return resolved
 
 
-def _resolve_child_path(file_id: str, parent_wb) -> Path:
+def _resolve_child_path(file_id: str, parent_wb, parent_dir: Path = None) -> Path:
     """
     Tente de retrouver le chemin d'un fichier fils depuis son FILE_ID.
-    Stratégie simple : cherche un .xlsx contenant file_id dans le même répertoire.
+    Stratégie : cherche un .xlsx contenant file_id dans le même répertoire que le père.
+
+    parent_dir est préféré quand disponible (chemin filesystem réel).
+    Fallback : parent_wb.path (chemin interne openpyxl, peut être un chemin XML).
     """
+    # Priorité 1 : répertoire filesystem explicite (passé par execute_ast)
+    if parent_dir and parent_dir.exists():
+        for p in parent_dir.rglob("*.xlsx"):
+            if file_id.lower() in p.stem.lower():
+                return p
+    # Priorité 2 : chemin depuis l'attribut wb.path (best-effort, peut échouer)
     try:
-        parent_path = Path(parent_wb.path) if hasattr(parent_wb, "path") else None
-        if parent_path and parent_path.parent.exists():
-            for p in parent_path.parent.rglob("*.xlsx"):
+        wb_path = Path(parent_wb.path) if hasattr(parent_wb, "path") else None
+        if wb_path and wb_path.parent.exists():
+            for p in wb_path.parent.rglob("*.xlsx"):
                 if file_id.lower() in p.stem.lower():
                     return p
     except Exception:
@@ -550,17 +560,30 @@ def execute_collects(
                 if cols:
                     rows = [{k: r.get(k) for k in cols} for r in rows]
 
-                # Colonnes contextuelles : WITH (liste DYNAMIC) ou tout (liste TABLE)
+                # Colonnes identitaires : lire les IDENT depuis le _Manifeste du child
+                # (wb_child est déjà ouvert — pas de surcoût I/O)
+                ident_prefix: Dict[str, Any] = {}
+                if MANIFESTE_SHEET in wb_child.sheetnames:
+                    child_ast = parse_sheet(wb_child[MANIFESTE_SHEET])
+                    if child_ast.idents:
+                        # Manifeste IDENT → source de vérité autonome
+                        ident_prefix = {i.name: i.value for i in child_ast.idents}
+                    else:
+                        # Ancien manifeste sans IDENT → fallback sur entry.context
+                        ident_prefix = dict(entry.context)
+                else:
+                    ident_prefix = dict(entry.context)
+
+                # Filtre WITH si spécifié dans le COLLECT
                 with_fields = getattr(collect, "with_fields", []) or []
                 if with_fields:
-                    context = {k: entry.context.get(k) for k in with_fields}
-                else:
-                    context = dict(entry.context)
+                    ident_prefix = {k: v for k, v in ident_prefix.items()
+                                    if k in with_fields}
 
-                # Enrichissement : _source_file_id en premier, puis contexte, puis données fils
+                # Enrichissement : _source_file_id en premier, puis idents, puis données fils
                 for row in rows:
                     enriched: Dict[str, Any] = {"_source_file_id": entry.file_id}
-                    enriched.update(context)
+                    enriched.update(ident_prefix)
                     enriched.update(row)
                     all_rows.append(enriched)
 
@@ -1385,7 +1408,7 @@ def execute_ast(
 
     try:
         # Phase 0 — Résolution des LIST (avant tout : COLLECT dépend des listes)
-        resolved_lists = resolve_lists(ast, wb, ecosystem)
+        resolved_lists = resolve_lists(ast, wb, ecosystem, parent_dir=filepath.parent)
 
         # Phase 1 — PULL
         execute_pulls(ast, wb, store, result)
