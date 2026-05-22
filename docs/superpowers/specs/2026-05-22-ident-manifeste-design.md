@@ -13,7 +13,7 @@
 ## Contexte
 
 Actuellement, quand un fichier parent exécute un `COLLECT`, le moteur doit connaître
-les colonnes identitaires (namespace) du child pour les injecter en tête de chaque
+les colonnes identitaires du child pour les injecter en tête de chaque
 ligne collectée. Cette information vient de `file_types.yaml` → `min_fields[is_key=True]`
 — une source de vérité **externe** au fichier Excel.
 
@@ -54,7 +54,7 @@ A10: DEF $activites = GET_TABLE(Activites, TabActivites)
 - **Colonne A** = déclaration figée (générée, ne pas modifier)
 - **Colonne B** = valeur saisie par l'utilisateur dans Excel
 - Plusieurs `IDENT` autorisés sur un même Post
-- `IDENT` = sémantique `is_key=True` : ces champs sont les colonnes namespace injectées en tête lors des `COLLECT`
+- `IDENT` = sémantique `is_key=True` : ces champs sont les colonnes identitaires injectées en tête de chaque ligne lors des `COLLECT`, pour identifier la source (quel child a produit cette ligne)
 - Les champs metadata non-clés (`is_key=False`) qui servent aux filtres `LIST DYNAMIC WHERE` restent en lignes d'en-tête classiques (`nom: valeur`)
 - `LABEL=` est optionnel ; si absent, `name` est utilisé comme label
 
