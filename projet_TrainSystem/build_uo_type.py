@@ -195,32 +195,34 @@ ws.add_data_validation(dv); dv.add("G2:G40")
 # ── OIL — Open Items List ─────────────────────────────────────────────────────
 ws = wb.create_sheet("OIL")
 add_table(ws, "tbl_oil",
-    ["id", "titre", "description", "en_action", "domaine", "statut",
-     "date_ouverture", "date_besoin", "journal"],
+    ["id", "titre", "description", "en_action", "domaine", "criticite",
+     "statut", "date_ouverture", "date_besoin", "journal"],
     [
         {"id": "PO-001", "titre": "Relecture spec SAA par fournisseur",
          "description": "Spec SAA v0.3 envoyee au fournisseur pour relecture avant IDR.",
-         "en_action": "FOURNISSEUR", "domaine": "", "statut": "OUVERT",
+         "en_action": "FOURNISSEUR", "domaine": "", "criticite": "MOYENNE", "statut": "OUVERT",
          "date_ouverture": "2026-06-02", "date_besoin": "2026-06-20",
          "journal": "02/06 : envoi v0.3 au fournisseur"},
         {"id": "PO-002", "titre": "Exigence feu-fumee EN 45545 a clarifier",
          "description": "Classification HL2 vs HL3 a confirmer pour le compartiment clim.",
-         "en_action": "EXPERT", "domaine": "feu-fumee", "statut": "OUVERT",
+         "en_action": "EXPERT", "domaine": "feu-fumee", "criticite": "HAUTE", "statut": "OUVERT",
          "date_ouverture": "2026-06-05", "date_besoin": "2026-06-30",
          "journal": "05/06 : question posee a l'expert FS"},
         {"id": "PO-003", "titre": "Acces DOORS module .CUS",
          "description": "Droits d'acces au module client demandes.",
-         "en_action": "SE", "domaine": "", "statut": "CLOS",
+         "en_action": "SE", "domaine": "", "criticite": "BASSE", "statut": "CLOS",
          "date_ouverture": "2026-05-28", "date_besoin": "",
          "journal": "28/05 : demande IT — 30/05 : acces obtenu, point clos"},
     ],
-    widths={"A": 8, "B": 34, "C": 44, "D": 13, "E": 12, "F": 9, "G": 13, "H": 12, "I": 50})
+    widths={"A": 8, "B": 34, "C": 44, "D": 13, "E": 12, "F": 11, "G": 9, "H": 13, "I": 12, "J": 50})
 dv = DataValidation(type="list", formula1='"SE,FOURNISSEUR,EXPERT,AT,CLIENT,AUTRE"', allow_blank=True)
 ws.add_data_validation(dv); dv.add("D2:D60")
-dv = DataValidation(type="list", formula1='"OUVERT,CLOS"', allow_blank=True)
+dv = DataValidation(type="list", formula1='"BASSE,MOYENNE,HAUTE"', allow_blank=True)
 ws.add_data_validation(dv); dv.add("F2:F60")
+dv = DataValidation(type="list", formula1='"OUVERT,CLOS"', allow_blank=True)
+ws.add_data_validation(dv); dv.add("G2:G60")
 for r in range(2, 5):
-    ws.cell(row=r, column=9).alignment = Alignment(wrap_text=True, vertical="top")
+    ws.cell(row=r, column=10).alignment = Alignment(wrap_text=True, vertical="top")
 
 # ── KPI — sortie du moteur ────────────────────────────────────────────────────
 ws = wb.create_sheet("KPI")
@@ -233,6 +235,8 @@ kpis = [
     ("Avancement UO (%)",            "kpi_avancement",     "Moyenne des avancements pondérée par les poids (activités applicables)"),
     ("Heures consommées",            "kpi_h_conso",        "Somme des heures consommées (activités applicables)"),
     ("Points ouverts",               "kpi_po_ouverts",     "Nombre de points OIL au statut OUVERT"),
+    ("Points fermés",                "kpi_po_fermes",      "Nombre de points OIL au statut CLOS"),
+    ("Points critiques ouverts",     "kpi_po_critiques",   "Points OUVERTS avec criticite = HAUTE"),
     ("Dont balle chez fournisseur",  "kpi_po_fournisseur", "Points OUVERTS avec en_action = FOURNISSEUR"),
     ("Dont balle chez expert",       "kpi_po_expert",      "Points OUVERTS avec en_action = EXPERT"),
 ]
@@ -242,14 +246,26 @@ for label, name, desc in kpis:
     named(wb, name, "KPI", f"B{r}")
     ws.cell(row=r, column=3, value=desc).font = Font(name=FONT, size=9, italic=True)
     r += 1
-# Lignes calculees en Excel local (pas moteur)
-ws.cell(row=r, column=1, value="Heures vendues").font = Font(name=FONT, bold=True)
-ws.cell(row=r, column=2, value="=heures_vendues")
-ws.cell(row=r, column=3, value="Lu depuis General (formule Excel)").font = Font(name=FONT, size=9, italic=True)
-r += 1
-ws.cell(row=r, column=1, value="Reste à faire total (h)").font = Font(name=FONT, bold=True)
-ws.cell(row=r, column=2, value="=SUM(Activites!I2:I40)")
-ws.cell(row=r, column=3, value="Somme colonne reste_a_faire (formule Excel)").font = Font(name=FONT, size=9, italic=True)
+# Lignes calculees en Excel local (formules — le moteur ne les lit pas en v1)
+excel_kpis = [
+    ("Heures vendues",            "kpi_h_vendues", "=heures_vendues",
+     "Lu depuis General (formule Excel)"),
+    ("Reste à faire total (h)",   "kpi_raf",       "=SUM(Activites!I2:I40)",
+     "Somme colonne reste_a_faire (formule Excel)"),
+    ("Heures estimées à terminaison (EAC)", "kpi_eac", "=kpi_h_conso+kpi_raf",
+     "EAC = consommé + reste à faire (formule Excel)"),
+    ("Dérive à terminaison (h)",  "kpi_derive",    "=kpi_eac-kpi_h_vendues",
+     "EAC − heures vendues : >0 = dépassement prévu (formule Excel)"),
+    ("Santé",                     "kpi_sante",
+     '=IF(kpi_po_critiques>0,"ROUGE",IF(kpi_po_ouverts>0,"ORANGE","VERT"))',
+     "ROUGE si point critique ouvert · ORANGE si point ouvert · VERT sinon (formule Excel)"),
+]
+for label, name, formula, desc in excel_kpis:
+    ws.cell(row=r, column=1, value=label).font = Font(name=FONT, bold=True)
+    ws.cell(row=r, column=2, value=formula)
+    named(wb, name, "KPI", f"B{r}")
+    ws.cell(row=r, column=3, value=desc).font = Font(name=FONT, size=9, italic=True)
+    r += 1
 
 # ── Dashboard — presentation libre ────────────────────────────────────────────
 ws = wb.create_sheet("Dashboard")
@@ -263,14 +279,18 @@ cards = [
     ("C4", "HEURES",          "C6", '=kpi_h_conso&" / "&heures_vendues&" h"'),
     ("E4", "POINTS OUVERTS",  "E6", "=kpi_po_ouverts"),
     ("G4", "ATTENTE FOURN.",  "G6", "=kpi_po_fournisseur"),
+    ("A8", "SANTÉ",           "A10", "=kpi_sante"),
+    ("C8", "EAC (h)",         "C10", "=kpi_eac"),
+    ("E8", "DÉRIVE (h)",      "E10", "=kpi_derive"),
+    ("G8", "PTS CRITIQUES",   "G10", "=kpi_po_critiques"),
 ]
 for lc, label, vc, formula in cards:
     ws[lc] = label
     ws[lc].font = Font(name=FONT, bold=True, size=10, color=NAVY)
     ws[vc] = formula
     ws[vc].font = Font(name=FONT, bold=True, size=18)
-ws["A9"] = "Cette feuille est libre : l'ingénieur la customise (elle ne fait que LIRE l'onglet KPI)."
-ws["A9"].font = Font(name=FONT, italic=True, size=9)
+ws["A13"] = "Cette feuille est libre : l'ingénieur la customise (elle ne fait que LIRE l'onglet KPI)."
+ws["A13"].font = Font(name=FONT, italic=True, size=9)
 
 # ── Planning / Orga (reserves) ────────────────────────────────────────────────
 ws = wb.create_sheet("Planning")
@@ -304,6 +324,8 @@ manifeste = [
     "DEF $avancement = COMPUTE(MEAN_WEIGHTED($actifs.avancement, $actifs.poids))",
     "DEF $h_conso = COMPUTE(SUM($actifs.heures_consommees))",
     'DEF $po_ouverts = COMPUTE(COUNT_IF($oil.statut, "OUVERT"))',
+    'DEF $po_fermes = COMPUTE(COUNT_IF($oil.statut, "CLOS"))',
+    'DEF $po_critiques = COMPUTE(COUNT_IF($po_ouv.criticite, "HAUTE"))',
     'DEF $po_fournisseur = COMPUTE(COUNT_IF($po_ouv.en_action, "FOURNISSEUR"))',
     'DEF $po_expert = COMPUTE(COUNT_IF($po_ouv.en_action, "EXPERT"))',
     "",
@@ -316,6 +338,8 @@ manifeste = [
     "BIND $avancement -> KPI.kpi_avancement",
     "BIND $h_conso -> KPI.kpi_h_conso",
     "BIND $po_ouverts -> KPI.kpi_po_ouverts",
+    "BIND $po_fermes -> KPI.kpi_po_fermes",
+    "BIND $po_critiques -> KPI.kpi_po_critiques",
     "BIND $po_fournisseur -> KPI.kpi_po_fournisseur",
     "BIND $po_expert -> KPI.kpi_po_expert",
     "",
@@ -323,6 +347,8 @@ manifeste = [
     f"PUSH $avancement -> uo.{UO}.avancement",
     f"PUSH $h_conso -> uo.{UO}.heures_consommees",
     f"PUSH $po_ouverts -> uo.{UO}.po_ouverts",
+    f"PUSH $po_fermes -> uo.{UO}.po_fermes",
+    f"PUSH $po_critiques -> uo.{UO}.po_critiques",
     f"PUSH $actifs -> uo.{UO}.activites",
     f"PUSH $oil -> uo.{UO}.points_ouverts",
     f"PUSH $liv -> uo.{UO}.livrables",
