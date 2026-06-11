@@ -39,3 +39,7 @@ CONTEXT_NEW_SESSION.md
 config/file_types.yaml
 config/tables.json
 config/hierarchy.json
+
+# Contenu client confidentiel (Alstom) — ne jamais versionner
+projet_TrainSystem/catalogue_uo.json
+projet_TrainSystem/*.xlsx
