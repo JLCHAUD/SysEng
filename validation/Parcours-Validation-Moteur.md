@@ -192,6 +192,12 @@ Puis **ouvre `m2_recepteur.xlsx`, onglet `Donnees`**.
 
 **Critère de validation** : les données de A sont **physiquement visibles** dans le fichier B.
 
+> 🔍 **Dépannage — « PULL = 0 » sans erreur ?** Cela veut dire que la clé demandée
+> n'existe pas (encore) dans le store. Le moteur ne plante pas volontairement
+> (dégradation gracieuse : un fichier absent ne casse pas les autres). Causes probables :
+> tu as lancé B **avant** A, tu as vidé le store entre les deux, ou la clé du `PULL`
+> ne correspond pas exactement à celle du `PUSH`. Vérifie avec `python -m src status`.
+
 **Ce que tu viens de prouver** : deux fichiers Excel indépendants échangent des données
 via le store, sans connexion directe entre eux. **C'est l'exostructure en action.**
 
