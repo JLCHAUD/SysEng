@@ -168,8 +168,8 @@ for r in range(2, 2 + n):
     )
     # reste_a_faire : defaut arithmetique, surchargeable par l'ingenieur
     ws.cell(row=r, column=9).value = f"=(1-G{r}/100)*E{r}"
-    ws.cell(row=r, column=5).number_format = "0.0"
-    ws.cell(row=r, column=9).number_format = "0.0"
+    ws.cell(row=r, column=5).number_format = "0.00"
+    ws.cell(row=r, column=9).number_format = "0.00"
 dv = DataValidation(type="list", formula1='"OUI,NON"', allow_blank=True)
 ws.add_data_validation(dv); dv.add(f"C2:C40")
 dv = DataValidation(type="list", formula1='"A_FAIRE,EN_COURS,TERMINEE,STAND_BY"', allow_blank=True)
@@ -232,37 +232,39 @@ ws.column_dimensions["C"].width = 64
 ws["A1"] = "KPI — calculés par ExoSync à chaque synchronisation (ne pas saisir)"
 ws["A1"].font = Font(name=FONT, bold=True, size=12)
 kpis = [
-    ("Avancement UO (%)",            "kpi_avancement",     "Moyenne des avancements pondérée par les poids (activités applicables)"),
-    ("Heures consommées",            "kpi_h_conso",        "Somme des heures consommées (activités applicables)"),
-    ("Points ouverts",               "kpi_po_ouverts",     "Nombre de points OIL au statut OUVERT"),
-    ("Points fermés",                "kpi_po_fermes",      "Nombre de points OIL au statut CLOS"),
-    ("Points critiques ouverts",     "kpi_po_critiques",   "Points OUVERTS avec criticite = HAUTE"),
-    ("Dont balle chez fournisseur",  "kpi_po_fournisseur", "Points OUVERTS avec en_action = FOURNISSEUR"),
-    ("Dont balle chez expert",       "kpi_po_expert",      "Points OUVERTS avec en_action = EXPERT"),
+    ("Avancement UO (%)",            "kpi_avancement",     "0.00", "Moyenne des avancements pondérée par les poids (activités applicables)"),
+    ("Heures consommées",            "kpi_h_conso",        "0.00", "Somme des heures consommées (activités applicables)"),
+    ("Points ouverts",               "kpi_po_ouverts",     "0",    "Nombre de points OIL au statut OUVERT"),
+    ("Points fermés",                "kpi_po_fermes",      "0",    "Nombre de points OIL au statut CLOS"),
+    ("Points critiques ouverts",     "kpi_po_critiques",   "0",    "Points OUVERTS avec criticite = HAUTE"),
+    ("Dont balle chez fournisseur",  "kpi_po_fournisseur", "0",    "Points OUVERTS avec en_action = FOURNISSEUR"),
+    ("Dont balle chez expert",       "kpi_po_expert",      "0",    "Points OUVERTS avec en_action = EXPERT"),
 ]
 r = 3
-for label, name, desc in kpis:
+for label, name, fmt, desc in kpis:
     ws.cell(row=r, column=1, value=label).font = Font(name=FONT, bold=True)
     named(wb, name, "KPI", f"B{r}")
+    ws.cell(row=r, column=2).number_format = fmt
     ws.cell(row=r, column=3, value=desc).font = Font(name=FONT, size=9, italic=True)
     r += 1
 # Lignes calculees en Excel local (formules — le moteur ne les lit pas en v1)
 excel_kpis = [
-    ("Heures vendues",            "kpi_h_vendues", "=heures_vendues",
+    ("Heures vendues",            "kpi_h_vendues", "=heures_vendues", "0",
      "Lu depuis General (formule Excel)"),
-    ("Reste à faire total (h)",   "kpi_raf",       "=SUM(Activites!I2:I40)",
+    ("Reste à faire total (h)",   "kpi_raf",       "=SUM(Activites!I2:I40)", "0.00",
      "Somme colonne reste_a_faire (formule Excel)"),
-    ("Heures estimées à terminaison (EAC)", "kpi_eac", "=kpi_h_conso+kpi_raf",
+    ("Heures estimées à terminaison (EAC)", "kpi_eac", "=kpi_h_conso+kpi_raf", "0.00",
      "EAC = consommé + reste à faire (formule Excel)"),
-    ("Dérive à terminaison (h)",  "kpi_derive",    "=kpi_eac-kpi_h_vendues",
+    ("Dérive à terminaison (h)",  "kpi_derive",    "=kpi_eac-kpi_h_vendues", "0.00",
      "EAC − heures vendues : >0 = dépassement prévu (formule Excel)"),
     ("Santé",                     "kpi_sante",
-     '=IF(kpi_po_critiques>0,"ROUGE",IF(kpi_po_ouverts>0,"ORANGE","VERT"))',
+     '=IF(kpi_po_critiques>0,"ROUGE",IF(kpi_po_ouverts>0,"ORANGE","VERT"))', "General",
      "ROUGE si point critique ouvert · ORANGE si point ouvert · VERT sinon (formule Excel)"),
 ]
-for label, name, formula, desc in excel_kpis:
+for label, name, formula, fmt, desc in excel_kpis:
     ws.cell(row=r, column=1, value=label).font = Font(name=FONT, bold=True)
     ws.cell(row=r, column=2, value=formula)
+    ws.cell(row=r, column=2).number_format = fmt
     named(wb, name, "KPI", f"B{r}")
     ws.cell(row=r, column=3, value=desc).font = Font(name=FONT, size=9, italic=True)
     r += 1
@@ -275,13 +277,13 @@ ws.column_dimensions["A"].width = 26
 for col in "BCDEFG":
     ws.column_dimensions[col].width = 16
 cards = [
-    ("A4", "AVANCEMENT UO",   "A6", "=kpi_avancement&\" %\""),
-    ("C4", "HEURES",          "C6", '=kpi_h_conso&" / "&heures_vendues&" h"'),
+    ("A4", "AVANCEMENT UO",   "A6", '=ROUND(kpi_avancement,2)&" %"'),
+    ("C4", "HEURES",          "C6", '=ROUND(kpi_h_conso,2)&" / "&heures_vendues&" h"'),
     ("E4", "POINTS OUVERTS",  "E6", "=kpi_po_ouverts"),
     ("G4", "ATTENTE FOURN.",  "G6", "=kpi_po_fournisseur"),
     ("A8", "SANTÉ",           "A10", "=kpi_sante"),
-    ("C8", "EAC (h)",         "C10", "=kpi_eac"),
-    ("E8", "DÉRIVE (h)",      "E10", "=kpi_derive"),
+    ("C8", "EAC (h)",         "C10", "=ROUND(kpi_eac,2)"),
+    ("E8", "DÉRIVE (h)",      "E10", "=ROUND(kpi_derive,2)"),
     ("G8", "PTS CRITIQUES",   "G10", "=kpi_po_critiques"),
 ]
 for lc, label, vc, formula in cards:
