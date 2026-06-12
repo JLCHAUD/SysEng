@@ -1,7 +1,7 @@
 """
-parse_catalogue.py — Parse 'UO TS.docx' (extrait avec styles) en catalogue.
+parse_catalogue.py — Parse 'UO TS.docx' en catalogue structure.
 ============================================================================
-Lit uo_ts_extract2.txt (format [style|B|N] texte, B=gras, N=puce) et produit
+Lit directement le Word (ou un extrait texte [style|B|N]) et produit
 catalogue_uo.json :
 {
   "L09U1": {
@@ -18,17 +18,40 @@ Structure du Word : titres en GRAS — sections reconnues : Activités,
 Données d'entrée, Principaux livrables, Critères d'acceptation,
 Niveaux de complexité. Tout autre titre gras = une activité.
 
-Usage : python projet_TrainSystem/parse_catalogue.py [extrait2.txt]
+Usage : python projet_TrainSystem/parse_catalogue.py ["chemin\\UO TS.docx"]
 """
 import json
 import re
 import sys
 import unicodedata
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 SRC = Path(sys.argv[1] if len(sys.argv) > 1
-           else r"C:\Users\fabie\Documents\JLC\uo_ts_extract2.txt")
+           else r"C:\Users\fabie\Documents\JLC\UO TS.docx")
 OUT = Path(__file__).parent / "catalogue_uo.json"
+
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def extract_docx_lines(path: Path) -> list[str]:
+    """Extrait les paragraphes du .docx au format '[style|B|N] texte'."""
+    doc = ET.fromstring(zipfile.ZipFile(path).read("word/document.xml"))
+    lines = []
+    for p in doc.iter(_W + "p"):
+        style_el = p.find(f".//{_W}pStyle")
+        style = style_el.get(_W + "val") if style_el is not None else ""
+        text = "".join(t.text or "" for t in p.iter(_W + "t")).strip()
+        if not text:
+            continue
+        bold = any(
+            r.find(f"{_W}rPr/{_W}b") is not None
+            and "".join(t.text or "" for t in r.iter(_W + "t")).strip()
+            for r in p.iter(_W + "r"))
+        num = p.find(f".//{_W}numPr") is not None
+        lines.append(f"[{style}|{'B' if bold else '.'}|{'N' if num else '.'}] {text}")
+    return lines
 
 RE_LINE = re.compile(r"^\[([^|\]]*)\|([B.])\|([N.])\]\s?(.*)$")
 RE_LOT = re.compile(r"LOT\s*(\d+)\s*[-:]?\s*(.+)", re.IGNORECASE)
@@ -62,7 +85,12 @@ mode = None        # section courante
 current = None     # activite courante
 act_seq = 0
 
-for raw in SRC.read_text(encoding="utf-8").splitlines():
+if SRC.suffix.lower() == ".docx":
+    lines = extract_docx_lines(SRC)
+else:
+    lines = SRC.read_text(encoding="utf-8").splitlines()
+
+for raw in lines:
     m = RE_LINE.match(raw)
     if not m:
         continue
