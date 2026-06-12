@@ -129,7 +129,7 @@ def activites_sheet(wb, banner=None):
     top = 1
     if banner:
         banner(ws, "Saisie — Activités", 7)
-        top = 4
+        top = 5
 
     headers = ["id", "designation", "statut", "avancement", "load (h)",
                "consommé (h)", "reste (h)"]
@@ -176,7 +176,7 @@ def oil_sheet(wb, banner=None):
     top = 1
     if banner:
         banner(ws, "Points ouverts — OIL", 5)
-        top = 4
+        top = 5
     headers = ["id", "titre", "en_action", "criticite", "statut"]
     hr = top + 1
     for ci, h in enumerate(headers, 1):
@@ -301,14 +301,30 @@ def build_design_A():
 # ══════════════════════════════════════════════════════════════════════════════
 
 def banner_B(ws, subtitle, ncols):
-    """Bandeau marine lignes 1-3 + pastilles de navigation."""
-    for rr in range(1, 4):
+    """Bandeau marine lignes 1-4 : titre UO, chips SYSTEME + PROJET en
+    evidence, navigation. Identique sur toutes les feuilles."""
+    for rr in range(1, 5):
         for cc in range(1, ncols + 6):
             ws.cell(row=rr, column=cc).fill = fill(NAVY_D)
     t = ws.cell(row=1, column=2, value="UO L09U1 — Préparation et passage des IDR")
     t.font = Font(name=F, size=14, bold=True, color=WHITE)
-    s = ws.cell(row=2, column=2, value=subtitle + "   ·   Projet Demo · Climatisation · J. Dujardin")
+    s = ws.cell(row=1, column=11, value=subtitle + " · J. Dujardin")
     s.font = Font(name=F, size=9, color="B5D4F4")
+    s.alignment = Alignment(horizontal="right", vertical="center")
+    ws.merge_cells(start_row=1, start_column=11, end_row=1, end_column=12)
+
+    # Chips SYSTEME et PROJET — aussi visibles que le nom de l'UO
+    sysc = ws.cell(row=2, column=2, value="⚙  SYSTÈME : CLIMATISATION")
+    sysc.font = Font(name=F, size=12, bold=True, color=WHITE)
+    sysc.fill = fill(NAVY)
+    sysc.alignment = Alignment(horizontal="center", vertical="center")
+    ws.merge_cells(start_row=2, start_column=2, end_row=2, end_column=6)
+    prj = ws.cell(row=2, column=8, value="▣  PROJET : PROJET DEMO")
+    prj.font = Font(name=F, size=12, bold=True, color=WHITE)
+    prj.fill = fill(NAVY)
+    prj.alignment = Alignment(horizontal="center", vertical="center")
+    ws.merge_cells(start_row=2, start_column=8, end_row=2, end_column=12)
+
     nav = [("⌂ Dashboard", "Dashboard"), ("✎ Activités", "Activites"),
            ("⚑ OIL", "OIL")]
     for i, (label, target) in enumerate(nav):
@@ -318,12 +334,33 @@ def banner_B(ws, subtitle, ncols):
         ws.merge_cells(start_row=3, start_column=2 + i * 2,
                        end_row=3, end_column=3 + i * 2)
     ws.row_dimensions[1].height = 24
-    ws.row_dimensions[2].height = 16
+    ws.row_dimensions[2].height = 22
     ws.row_dimensions[3].height = 18
+    ws.row_dimensions[4].height = 6
+
+
+def make_donut(wb, ws_dash, ws_data, data_row, anchor, label, pct, color):
+    """Petit camembert-jauge : pct colore, reste pale. Donnees en feuille cachee."""
+    ws_data.cell(row=data_row, column=1, value="fait")
+    ws_data.cell(row=data_row, column=2, value=pct)
+    ws_data.cell(row=data_row + 1, column=1, value="reste")
+    ws_data.cell(row=data_row + 1, column=2, value=100 - pct)
+    chart = DoughnutChart()
+    chart.title = f"{label} — {pct} %"
+    data = Reference(ws_data, min_col=2, min_row=data_row, max_row=data_row + 1)
+    chart.add_data(data, titles_from_data=False)
+    chart.holeSize = 60
+    serie = chart.series[0]
+    p1 = DataPoint(idx=0); p1.graphicalProperties.solidFill = color
+    p2 = DataPoint(idx=1); p2.graphicalProperties.solidFill = "EFEDE7"
+    serie.data_points = [p1, p2]
+    chart.legend = None
+    chart.width = 4.6; chart.height = 4.6
+    ws_dash.add_chart(chart, anchor)
 
 
 def kpi_card_B(ws, col, label, value, sub, border_color, value_color):
-    r = 5
+    r = 6
     card_border(ws, r, col, r + 3, col + 2, color=border_color)
     for rr in range(r, r + 4):
         for cc in range(col, col + 3):
@@ -356,75 +393,94 @@ def build_design_B():
     banner_B(ws, "Cockpit de pilotage", 12)
 
     # Badge sante dans le bandeau (droite)
-    b = ws.cell(row=1, column=13, value="SANTÉ ROUGE")
+    ws.merge_cells(start_row=2, start_column=14, end_row=3, end_column=16)
+    b = ws.cell(row=2, column=14, value="SANTÉ ROUGE")
     b.font = Font(name=F, size=11, bold=True, color=WHITE)
     b.fill = fill(RED)
     b.alignment = Alignment(horizontal="center", vertical="center")
-    ws.merge_cells(start_row=1, start_column=13, end_row=2, end_column=15)
 
-    # 4 cartes KPI bordees
-    for rr in range(5, 9):
+    # 4 cartes KPI bordees (lignes 6-9)
+    for rr in range(6, 10):
         ws.row_dimensions[rr].height = 18
     kpi_card_B(ws, 2, "AVANCEMENT UO", "45,0 %", "pondéré par poids", "B5D4F4", NAVY_D)
     kpi_card_B(ws, 5, "CONSOMMÉ", "29,5 %", "59 h / 200 h", GREY_B, "2C2C2A")
     kpi_card_B(ws, 8, "POINTS OUVERTS", "2  ▲1", "dont 1 critique", "FAC775", AMBER_D)
     kpi_card_B(ws, 11, "EAC", "169 h", "dérive −31 h", GREY_B, GREEN_D)
 
-    # Jauge anneau (graphique natif) : avancement 45 %
+    # Rangee de camemberts-jauges (4 anneaux, ligne 11)
     ws_data = wb.create_sheet("_chart_data")
     ws_data.sheet_state = "hidden"
-    ws_data["A1"] = "fait"; ws_data["B1"] = 45
-    ws_data["A2"] = "reste"; ws_data["B2"] = 55
-    chart = DoughnutChart()
-    chart.title = "Avancement"
-    data = Reference(ws_data, min_col=2, min_row=1, max_row=2)
-    cats = Reference(ws_data, min_col=1, min_row=1, max_row=2)
-    chart.add_data(data, titles_from_data=False)
-    chart.set_categories(cats)
-    chart.holeSize = 62
-    serie = chart.series[0]
-    pt_done = DataPoint(idx=0); pt_done.graphicalProperties.solidFill = BLUE
-    pt_rest = DataPoint(idx=1); pt_rest.graphicalProperties.solidFill = BLUE_L
-    serie.data_points = [pt_done, pt_rest]
-    chart.legend = None
-    chart.width = 6.6; chart.height = 6.2
-    ws.add_chart(chart, "B10")
+    make_donut(wb, ws, ws_data, 1, "B11", "Avancement", 45, BLUE)
+    make_donut(wb, ws, ws_data, 4, "E11", "Heures", 30, "888780")
+    make_donut(wb, ws, ws_data, 7, "H11", "Livrables", 33, GREEN)
+    make_donut(wb, ws, ws_data, 10, "K11", "Données d'entrée", 67, "EF9F27")
 
-    # Prochains livrables (a droite de la jauge)
-    ws.cell(row=10, column=6, value="Prochains livrables").font = \
+    # Prochains livrables (sous les camemberts)
+    ws.cell(row=21, column=2, value="Prochains livrables").font = \
         fnt(11, bold=True, color=NAVY_D)
     livs = [("SAA.RS — Requirement Spec", "M3", "EN_COURS"),
             ("RSS.RS — Subsystem Spec", "M3", "A_FAIRE"),
             ("DR.RS — Design Review file", "—", "A_FAIRE")]
-    hr = 11
+    hr = 22
     for ri, (des, mat, st) in enumerate(livs, hr):
-        ws.cell(row=ri, column=6, value=des).font = fnt(10)
-        ws.merge_cells(start_row=ri, start_column=6, end_row=ri, end_column=10)
-        m = ws.cell(row=ri, column=11, value=mat)
+        ws.cell(row=ri, column=2, value=des).font = fnt(10)
+        ws.merge_cells(start_row=ri, start_column=2, end_row=ri, end_column=8)
+        m = ws.cell(row=ri, column=9, value=mat)
         m.font = fnt(10, bold=True, color=NAVY_D)
         m.alignment = Alignment(horizontal="center")
-        sc = ws.cell(row=ri, column=12, value=st)
+        sc = ws.cell(row=ri, column=10, value=st)
         sc.font = fnt(9); sc.alignment = Alignment(horizontal="center")
-        ws.merge_cells(start_row=ri, start_column=12, end_row=ri, end_column=13)
-        for cc in range(6, 14):
+        ws.merge_cells(start_row=ri, start_column=10, end_row=ri, end_column=11)
+        for cc in range(2, 12):
             ws.cell(row=ri, column=cc).border = \
                 Border(bottom=Side(style="thin", color=GREY_B))
         ws.row_dimensions[ri].height = 19
-    statut_cf(ws, f"L{hr}:L{hr+2}")
+    statut_cf(ws, f"J{hr}:J{hr+2}")
 
     # Balle dans quel camp
-    ws.cell(row=15, column=6, value="La balle est chez…").font = \
+    ws.cell(row=26, column=2, value="La balle est chez…").font = \
         fnt(11, bold=True, color=NAVY_D)
     camps = [("FOURNISSEUR", 1, AMBER_L, AMBER_D), ("EXPERT", 1, RED_L, RED_D),
              ("NOUS (SE)", 0, GREEN_L, GREEN_D)]
     for i, (who, n, bg, fg) in enumerate(camps):
-        cc = 6 + i * 3
-        c = ws.cell(row=16, column=cc, value=f"{who} : {n}")
+        cc = 2 + i * 3
+        c = ws.cell(row=27, column=cc, value=f"{who} : {n}")
         c.font = Font(name=F, size=10, bold=True, color=fg)
         c.fill = fill(bg)
         c.alignment = Alignment(horizontal="center", vertical="center")
-        ws.merge_cells(start_row=16, start_column=cc, end_row=16, end_column=cc + 1)
-    ws.row_dimensions[16].height = 22
+        ws.merge_cells(start_row=27, start_column=cc, end_row=27, end_column=cc + 1)
+    ws.row_dimensions[27].height = 22
+
+    # Avancement des activites EN COURS (les terminees sont masquees)
+    ws.cell(row=29, column=2, value="Avancement des activités en cours").font = \
+        fnt(11, bold=True, color=NAVY_D)
+    note = ws.cell(row=29, column=9, value="(les activités terminées ne sont pas affichées)")
+    note.font = fnt(8.5, color=GREY_D, italic=True)
+    hr = 30
+    for ci, h in [(2, "activité"), (9, "statut"), (11, "avancement"), (14, "heures")]:
+        c = ws.cell(row=hr, column=ci, value=h)
+        c.font = fnt(9, bold=True, color=GREY_D)
+    for cc in range(2, 15):
+        ws.cell(row=hr, column=cc).border = Border(bottom=Side(style="thin", color=GREY_B))
+    en_cours = [a for a in ACTIVITES if a[2] != "TERMINEE"]
+    for ri, (aid, des, st, av, load, conso) in enumerate(en_cours, hr + 1):
+        ws.cell(row=ri, column=2, value=f"{aid} — {des}").font = fnt(10)
+        ws.merge_cells(start_row=ri, start_column=2, end_row=ri, end_column=8)
+        sc = ws.cell(row=ri, column=9, value=st)
+        sc.font = fnt(10); sc.alignment = Alignment(horizontal="center")
+        ws.merge_cells(start_row=ri, start_column=9, end_row=ri, end_column=10)
+        avc = ws.cell(row=ri, column=11, value=av)
+        avc.alignment = Alignment(horizontal="center"); avc.font = fnt(10)
+        ws.merge_cells(start_row=ri, start_column=11, end_row=ri, end_column=13)
+        hc = ws.cell(row=ri, column=14, value=conso)
+        hc.number_format = "0.0"; hc.font = fnt(10)
+        hc.alignment = Alignment(horizontal="right")
+        ws.row_dimensions[ri].height = 19
+    last = hr + len(en_cours)
+    ws.conditional_formatting.add(f"K{hr+1}:K{last}", DataBarRule(
+        start_type="num", start_value=0, end_type="num", end_value=100,
+        color=BLUE, showValue=True))
+    statut_cf(ws, f"I{hr+1}:I{last}")
 
     activites_sheet(wb, banner=banner_B)
     oil_sheet(wb, banner=banner_B)
