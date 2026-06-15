@@ -1,47 +1,35 @@
 """
-design_demo.py — Demos de design Excel : option A (Studio clair) et B (Cockpit bandeau).
+design_demo.py — Démos de design Excel : option A (Studio clair) et B (Cockpit bandeau).
 =========================================================================================
-Genere deux classeurs de demonstration poussant les capacites natives d'Excel
+Génère deux classeurs de démonstration poussant les capacités natives d'Excel
 (sans VBA), pour choisir la direction visuelle des fichiers UO :
 
   Design_A_Studio.xlsx   minimalisme clair, filets d'accent, data bars vivantes
   Design_B_Cockpit.xlsx  bandeau marine, navigation hyperliens, jauge anneau
 
-Techniques utilisees : quadrillage masque, onglets colores, cellules fusionnees
-(cartes KPI), bordures d'accent, mise en forme conditionnelle (data bars, jeux
-d'icones feux tricolores, badges colores par valeur), liens HYPERLINK internes,
-volets figes, graphique anneau (jauge), formats numeriques personnalises.
-
 Usage : python projet_TrainSystem/design_demo.py
 """
+import sys
 from pathlib import Path
 
+HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE))
+
 from openpyxl import Workbook
-from openpyxl.chart import DoughnutChart, Reference
-from openpyxl.chart.series import DataPoint
-from openpyxl.formatting.rule import CellIsRule, DataBarRule, IconSetRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.worksheet.datavalidation import DataValidation
 
-HERE = Path(__file__).parent
-
-# ── Palette (3 couleurs + etats) ──────────────────────────────────────────────
-NAVY_D = "0C447C"   # marine fonce — titres, bandeaux
-NAVY = "185FA5"     # marine — accents
-BLUE = "378ADD"     # bleu — data bars
-BLUE_L = "E6F1FB"   # bleu pale — fonds doux
-GREY_D = "5F5E5A"   # gris fonce — texte secondaire
-GREY_L = "F5F4F0"   # gris chaud pale — fonds de carte
-GREY_B = "D3D1C7"   # gris — bordures
-GREEN = "639922"; GREEN_L = "EAF3DE"; GREEN_D = "27500A"
-AMBER = "EF9F27"; AMBER_L = "FAEEDA"; AMBER_D = "854F0B"
-RED = "E24B4A"; RED_L = "FCEBEB"; RED_D = "791F1F"
-WHITE = "FFFFFF"
-
-F = "Segoe UI"
-THIN_G = Side(style="thin", color=GREY_B)
-HAIR = Border(left=THIN_G, right=THIN_G, top=THIN_G, bottom=THIN_G)
+from design_b import (
+    NAVY_D, NAVY, BLUE, BLUE_L, GREY_D, GREY_L, GREY_B,
+    GREEN, GREEN_L, GREEN_D, AMBER, AMBER_L, AMBER_D,
+    RED, RED_L, RED_D, WHITE,
+    TEAL, TEAL_CHIP, TEAL_TINT, AMB_B, AMB_CHIP, AMB_TINT,
+    F, THIN_G, HAIR,
+    fnt, fill, card_border, add_table, statut_cf, criticite_cf,
+    banner_B, banner_teal, banner_amber,
+    section_box, kpi_card_B, make_donut,
+)
 
 ACTIVITES = [
     ("ACT-01", "Analyse fonctionnelle du besoin", "TERMINEE", 100, 24, 22.0),
@@ -56,65 +44,6 @@ OIL = [
     ("PO-002", "Attente retour relecture fournisseur", "FOURNISSEUR", "MOYENNE", "OUVERT"),
     ("PO-003", "Acces outil documentaire obtenu", "SE", "BASSE", "CLOS"),
 ]
-
-
-def fnt(size=11, bold=False, color="2C2C2A", italic=False):
-    return Font(name=F, size=size, bold=bold, color=color, italic=italic)
-
-
-def fill(color):
-    return PatternFill("solid", fgColor=color)
-
-
-def card_border(ws, r1, c1, r2, c2, side=None, color=GREY_B):
-    """Encadre une zone (carte) d'une bordure fine, option accent gauche."""
-    thin = Side(style="thin", color=color)
-    for r in range(r1, r2 + 1):
-        for c in range(c1, c2 + 1):
-            cell = ws.cell(row=r, column=c)
-            b = {}
-            if r == r1: b["top"] = thin
-            if r == r2: b["bottom"] = thin
-            if c == c1: b["left"] = side or thin
-            if c == c2: b["right"] = thin
-            old = cell.border
-            cell.border = Border(
-                left=b.get("left", old.left), right=b.get("right", old.right),
-                top=b.get("top", old.top), bottom=b.get("bottom", old.bottom))
-
-
-def add_table(ws, name, ref):
-    t = Table(displayName=name, ref=ref)
-    t.tableStyleInfo = TableStyleInfo(name="TableStyleLight15", showRowStripes=True)
-    ws.add_table(t)
-
-
-def statut_cf(ws, rng):
-    """Badges colores par valeur de statut."""
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"TERMINEE"'], fill=fill(GREEN_L),
-        font=Font(name=F, size=10, bold=True, color=GREEN_D)))
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"EN_COURS"'], fill=fill(BLUE_L),
-        font=Font(name=F, size=10, bold=True, color=NAVY_D)))
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"STAND_BY"'], fill=fill(AMBER_L),
-        font=Font(name=F, size=10, bold=True, color=AMBER_D)))
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"A_FAIRE"'], fill=fill(GREY_L),
-        font=Font(name=F, size=10, color=GREY_D)))
-
-
-def criticite_cf(ws, rng):
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"HAUTE"'], fill=fill(RED_L),
-        font=Font(name=F, size=10, bold=True, color=RED_D)))
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"MOYENNE"'], fill=fill(AMBER_L),
-        font=Font(name=F, size=10, bold=True, color=AMBER_D)))
-    ws.conditional_formatting.add(rng, CellIsRule(
-        operator="equal", formula=['"BASSE"'], fill=fill(GREY_L),
-        font=Font(name=F, size=10, color=GREY_D)))
 
 
 def activites_sheet(wb, banner=None, header_color=NAVY_D):
@@ -158,6 +87,7 @@ def activites_sheet(wb, banner=None, header_color=NAVY_D):
 
     last = hr + len(ACTIVITES)
     rng_av = f"D{hr+1}:D{last}"
+    from openpyxl.formatting.rule import DataBarRule
     ws.conditional_formatting.add(rng_av, DataBarRule(
         start_type="num", start_value=0, end_type="num", end_value=100,
         color=BLUE, showValue=True))
@@ -195,6 +125,7 @@ def oil_sheet(wb, banner=None, header_color=NAVY_D):
         ws.row_dimensions[ri].height = 20
     last = hr + len(OIL)
     criticite_cf(ws, f"D{hr+1}:D{last}")
+    from openpyxl.formatting.rule import CellIsRule
     ws.conditional_formatting.add(f"E{hr+1}:E{last}", CellIsRule(
         operator="equal", formula=['"OUVERT"'], fill=fill(RED_L),
         font=Font(name=F, size=10, bold=True, color=RED_D)))
@@ -262,7 +193,6 @@ def build_design_A():
     hr = 10
     ws.cell(row=9, column=2, value="Avancement par activité").font = \
         fnt(11, bold=True, color=NAVY_D)
-    heads = ["", "activité", "", "", "statut", "avancement", "", "heures"]
     for ci, h in [(2, "activité"), (5, "statut"), (6, "avancement"), (8, "heures")]:
         c = ws.cell(row=hr, column=ci, value=h)
         c.font = fnt(9, bold=True, color=GREY_D)
@@ -281,6 +211,7 @@ def build_design_A():
         hc.alignment = Alignment(horizontal="right")
         ws.row_dimensions[ri].height = 19
     last = hr + len(ACTIVITES)
+    from openpyxl.formatting.rule import DataBarRule, IconSetRule
     ws.conditional_formatting.add(f"F{hr+1}:F{last}", DataBarRule(
         start_type="num", start_value=0, end_type="num", end_value=100,
         color=BLUE, showValue=True))
@@ -299,114 +230,6 @@ def build_design_A():
 # ══════════════════════════════════════════════════════════════════════════════
 # DESIGN B — COCKPIT BANDEAU
 # ══════════════════════════════════════════════════════════════════════════════
-
-# Couleurs de bandeau par onglet (bandeau = couleur d'onglet, tres visuel)
-TEAL = "0F6E56"; TEAL_CHIP = "085041"; TEAL_TINT = "9FE1CB"
-AMB_B = "BA7517"; AMB_CHIP = "854F0B"; AMB_TINT = "FAC775"
-
-
-def banner_B(ws, subtitle, ncols, bg=NAVY_D, chip=NAVY, tint="B5D4F4"):
-    """Bandeau colore lignes 1-4, largeur EXACTE ncols (ne deborde pas).
-    Titre UO puis, en dessous, systeme — projet en texte simple (meme fond).
-    La couleur du bandeau = la couleur de l'onglet (coherence)."""
-    ws.sheet_properties.tabColor = bg
-    for rr in range(1, 5):
-        for cc in range(1, ncols + 1):
-            ws.cell(row=rr, column=cc).fill = fill(bg)
-    t = ws.cell(row=1, column=2, value="UO L09U1 — Préparation et passage des IDR")
-    t.font = Font(name=F, size=14, bold=True, color=WHITE)
-    t.alignment = Alignment(vertical="center")
-    ws.merge_cells(start_row=1, start_column=2, end_row=1,
-                   end_column=max(ncols - 1, 3))
-
-    # Systeme — Projet : texte simple, meme fond que le bandeau
-    sp = ws.cell(row=2, column=2, value="CLIMATISATION  —  PROJET DEMO")
-    sp.font = Font(name=F, size=12, bold=True, color=WHITE)
-    sp.alignment = Alignment(vertical="center")
-    ws.merge_cells(start_row=2, start_column=2, end_row=2,
-                   end_column=min(13, max(ncols - 1, 3)))
-
-    nav = [("⌂ Dashboard", "Dashboard"), ("✎ Activités", "Activites"),
-           ("⚑ OIL", "OIL")]
-    for i, (label, target) in enumerate(nav):
-        # navigation adaptative : sur feuille etroite, 1 cellule par pastille
-        col = 2 + i * 2 if ncols >= 8 else 2 + i
-        c = ws.cell(row=3, column=col)
-        c.value = f'=HYPERLINK("#{target}!A1","{label}")'
-        c.font = Font(name=F, size=9, bold=True, color=tint)
-        if ncols >= 8:
-            ws.merge_cells(start_row=3, start_column=col,
-                           end_row=3, end_column=col + 1)
-    if ncols >= 12:
-        s = ws.cell(row=3, column=ncols - 2, value=subtitle + " · J. Dujardin")
-        s.font = Font(name=F, size=9, color=tint)
-        s.alignment = Alignment(horizontal="right", vertical="center")
-        ws.merge_cells(start_row=3, start_column=ncols - 2, end_row=3,
-                       end_column=ncols)
-    ws.row_dimensions[1].height = 24
-    ws.row_dimensions[2].height = 22
-    ws.row_dimensions[3].height = 18
-    ws.row_dimensions[4].height = 6
-
-
-def banner_teal(ws, subtitle, ncols):
-    banner_B(ws, subtitle, ncols, bg=TEAL, chip=TEAL_CHIP, tint=TEAL_TINT)
-
-
-def banner_amber(ws, subtitle, ncols):
-    banner_B(ws, subtitle, ncols, bg=AMB_B, chip=AMB_CHIP, tint=AMB_TINT)
-
-
-def section_box(ws, title, r1, c1, r2, c2):
-    """Delimite une zone : bande de titre remplie + cadre fin autour."""
-    for cc in range(c1, c2 + 1):
-        ws.cell(row=r1, column=cc).fill = fill(BLUE_L)
-    tc = ws.cell(row=r1, column=c1, value=title)
-    tc.font = fnt(11, bold=True, color=NAVY_D)
-    tc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[r1].height = 20
-    card_border(ws, r1, c1, r2, c2, color=GREY_B)
-
-
-def make_donut(wb, ws_dash, ws_data, data_row, anchor, label, pct, color):
-    """Petit camembert-jauge : pct colore, reste pale. Donnees en feuille cachee."""
-    ws_data.cell(row=data_row, column=1, value="fait")
-    ws_data.cell(row=data_row, column=2, value=pct)
-    ws_data.cell(row=data_row + 1, column=1, value="reste")
-    ws_data.cell(row=data_row + 1, column=2, value=100 - pct)
-    chart = DoughnutChart()
-    data = Reference(ws_data, min_col=2, min_row=data_row, max_row=data_row + 1)
-    chart.add_data(data, titles_from_data=False)
-    chart.holeSize = 60
-    serie = chart.series[0]
-    p1 = DataPoint(idx=0); p1.graphicalProperties.solidFill = color
-    p2 = DataPoint(idx=1); p2.graphicalProperties.solidFill = "EFEDE7"
-    serie.data_points = [p1, p2]
-    chart.legend = None
-    chart.width = 4.6; chart.height = 4.6
-    ws_dash.add_chart(chart, anchor)
-
-
-def kpi_card_B(ws, col, label, value, sub, border_color, value_color):
-    r = 6
-    card_border(ws, r, col, r + 3, col + 2, color=border_color)
-    for rr in range(r, r + 4):
-        for cc in range(col, col + 3):
-            ws.cell(row=rr, column=cc).fill = fill(WHITE)
-    card_border(ws, r, col, r + 3, col + 2, color=border_color)
-    lab = ws.cell(row=r + 1, column=col, value=label)
-    lab.font = fnt(9, bold=True, color=GREY_D)
-    lab.alignment = Alignment(horizontal="center", vertical="center")
-    ws.merge_cells(start_row=r + 1, start_column=col, end_row=r + 1, end_column=col + 2)
-    val = ws.cell(row=r + 2, column=col, value=value)
-    val.font = Font(name=F, size=20, bold=True, color=value_color)
-    val.alignment = Alignment(horizontal="center", vertical="center")
-    ws.merge_cells(start_row=r + 2, start_column=col, end_row=r + 2, end_column=col + 2)
-    s = ws.cell(row=r + 3, column=col, value=sub)
-    s.font = fnt(8.5, color=GREY_D)
-    s.alignment = Alignment(horizontal="center", vertical="top")
-    ws.merge_cells(start_row=r + 3, start_column=col, end_row=r + 3, end_column=col + 2)
-
 
 def build_design_B():
     wb = Workbook()
@@ -516,6 +339,7 @@ def build_design_B():
         hc.alignment = Alignment(horizontal="right")
         ws.row_dimensions[ri].height = 19
     last = hr + len(en_cours)
+    from openpyxl.formatting.rule import DataBarRule
     ws.conditional_formatting.add(f"L{hr+1}:L{last}", DataBarRule(
         start_type="num", start_value=0, end_type="num", end_value=100,
         color=BLUE, showValue=True))
