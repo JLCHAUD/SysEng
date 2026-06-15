@@ -2,13 +2,49 @@
 
 > **Objet** : valider la chaîne complète d'instanciation et de synchronisation
 > des UO : génération du catalogue depuis le Word, création d'une UO en une
-> commande, saisie ingénieur, synchronisation, KPI.
-> **Durée estimée** : 45-60 minutes.
+> commande, saisie ingénieur, synchronisation, KPI — puis robustesse du moteur
+> face à des modifications du fichier (colonnes ajoutées, Manifeste modifié,
+> tableau renommé).
+> **Durée estimée** : 60-90 minutes.
 > **Tous les résultats attendus de cette procédure ont été vérifiés le 2026-06-12.**
 >
 > Note ce que tu obtiens à chaque étape dans le classeur de suivi
 > `Validation-UO-TrainSystem.xlsx` (statut OK/KO + remarques). En cas de KO,
 > continue si possible — le bilan global compte plus qu'un blocage isolé.
+
+---
+
+## Règles de bonne conduite
+
+Ces règles évitent les faux KO et les situations de debug inutiles.
+
+**Avant chaque sync :**
+- **Ferme toujours le fichier Excel** avant de lancer une commande — sinon le
+  moteur obtient un fichier verrouillé et la sync échoue avec une erreur trompeuse.
+- **Rouvre le fichier après** pour constater le résultat — les valeurs BIND ne
+  s'actualisent qu'à l'ouverture.
+
+**Sur les tableaux Excel :**
+- **Ne jamais renommer un tableau** (ex. `tbl_act`, `tbl_oil`) — les noms sont
+  référencés mot pour mot dans le `_Manifeste`. Un tableau renommé disparaît
+  silencieusement du store sans message d'erreur (le moteur retourne `[]`).
+- **Tu peux ajouter des colonnes** librement — le moteur les intègre
+  automatiquement. Les receveurs qui ne les demandent pas les ignorent.
+- **Tu peux ajouter des feuilles** — elles sont ignorées si le Manifeste n'y
+  fait pas référence.
+
+**Sur le `_Manifeste` :**
+- **Toute modification prend effet immédiatement** à la prochaine sync — pas
+  besoin de recréer l'UO.
+- **Ne change pas le FILE_ID** en cours de test — ça crée une nouvelle clé dans
+  le store, l'ancienne reste orpheline, et les valeurs semblent doubler.
+- **Une faute de syntaxe MXL** dans le Manifeste bloque la sync entière avec une
+  erreur de parsing explicite — corrige et relance.
+
+**Sur le store :**
+- Utilise `python -m src store clear` pour repartir proprement entre deux scénarios
+  distincts. Inutile entre deux syncs du même fichier.
+- `python -m src status` à tout moment pour voir ce qui est réellement dans le store.
 
 ---
 
@@ -171,7 +207,138 @@ ingénieur et le dashboard métier.
 
 ---
 
-## Étape 9 — Bilan libre (le plus important)
+## Étape 9 — Modifier le Manifeste : ajouter une instruction PUSH
+
+**Objectif** : vérifier que modifier le `_Manifeste` suffit pour enrichir ce
+que l'UO publie dans le store — sans recréer le fichier.
+
+Ouvre `L09U1-TEST01-CLIM.xlsx`, feuille `_Manifeste`. À la fin des instructions
+existantes, ajoute cette ligne :
+
+```
+PUSH $livrables -> uo.L09U1-TEST01-CLIM.livrables
+```
+
+*(La variable `$livrables` est déjà définie plus haut dans le Manifeste généré.)*
+
+Enregistre et ferme. Relance la sync :
+
+```bash
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.L09U1-TEST01-CLIM
+```
+
+**Attendu :**
+- La console affiche maintenant `PUSH = 9` (une de plus qu'avant).
+- `python -m src status` liste une nouvelle clé `uo.L09U1-TEST01-CLIM.livrables`
+  avec ses lignes.
+- Zéro erreur.
+
+**Ce que ça prouve** : le Manifeste est la seule source de vérité — le modifier
+reconfigure le comportement immédiatement. Pas besoin de toucher au moteur.
+
+---
+
+## Étape 10 — Ajouter une colonne à un tableau existant
+
+**Objectif** : vérifier que le moteur absorbe sans erreur une colonne ajoutée
+par l'ingénieur, et qu'elle remonte dans le store.
+
+Ouvre le fichier, feuille `Activites`. Ajoute une colonne `commentaire` à droite
+du tableau `tbl_act` (clique sur la cellule à droite du dernier en-tête, tape
+`commentaire` — Excel étend automatiquement le tableau). Renseigne un texte libre
+sur 2 ou 3 lignes. Enregistre et ferme.
+
+```bash
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.L09U1-TEST01-CLIM.activites
+```
+
+**Attendu :**
+- Zéro erreur.
+- Le store montre la table `activites` avec la colonne `commentaire` incluse.
+- Les KPI sont inchangés (le moteur calcule sur `avancement`, pas sur `commentaire`).
+
+**Ce que ça prouve** : les colonnes libres sont tolérées — un ingénieur peut
+enrichir son fichier sans casser la sync.
+
+---
+
+## Étape 11 — Ajouter une feuille libre
+
+**Objectif** : vérifier qu'une feuille non référencée dans le Manifeste est
+simplement ignorée.
+
+Ouvre le fichier, crée une feuille nommée `Notes_perso` et tape quelques lignes
+de texte. Enregistre et ferme.
+
+```bash
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+```
+
+**Attendu :** zéro erreur, comportement identique à avant. La feuille `Notes_perso`
+n'apparaît nulle part dans le store.
+
+---
+
+## Étape 12 — Piège : renommer un tableau (comportement silencieux à connaître)
+
+**Objectif** : comprendre ce qui se passe quand un tableau est renommé — pour
+ne pas être surpris si ça arrive en vrai.
+
+Ouvre le fichier, feuille `OIL`. Dans le ruban **Création de tableau**, renomme
+le tableau `tbl_oil` en `tbl_oil_v2`. Enregistre et ferme.
+
+```bash
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.L09U1-TEST01-CLIM.oil
+```
+
+**Attendu :**
+- La console affiche **zéro erreur** — le moteur ne plante pas.
+- Mais `PUSH` passe à **8** (au lieu de 9) : la clé `uo.L09U1-TEST01-CLIM.oil`
+  disparaît du store (ou reste vide).
+- Les KPI liés aux points ouverts tombent à **0** dans le Dashboard.
+
+C'est la **dégradation gracieuse** : un tableau introuvable est traité comme
+vide, pas comme une erreur fatale. Utile pour la robustesse, trompeur pour
+le debug.
+
+**Remise en ordre** : rouvre le fichier, renomme le tableau en `tbl_oil`
+(nom d'origine), enregistre, ferme, relance la sync. Les KPI reviennent.
+
+---
+
+## Étape 13 — Modifier le FILE_ID (piège à éviter)
+
+**Objectif** : comprendre pourquoi il ne faut pas changer le FILE_ID en cours
+de vie d'un fichier.
+
+Ouvre le `_Manifeste`, change `FILE_ID: L09U1-TEST01-CLIM` en
+`FILE_ID: L09U1-TEST01-CLIM-V2`. Enregistre et ferme.
+
+```bash
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.
+```
+
+**Attendu :**
+- Le store contient maintenant **deux jeux de clés** :
+  - `uo.L09U1-TEST01-CLIM.*` — l'ancienne identité (données périmées)
+  - `uo.L09U1-TEST01-CLIM-V2.*` — la nouvelle identité (données fraîches)
+- Zéro erreur, mais un cockpit qui consommerait les deux voit des doublons.
+
+**Remise en ordre** : remets `FILE_ID: L09U1-TEST01-CLIM`, vide le store,
+relance.
+
+```bash
+python -m src store clear
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+```
+
+---
+
+## Étape 14 — Bilan libre (le plus important)
 
 Mets-toi 10 minutes dans la peau d'un ingénieur qui reçoit ce fichier :
 crée une 2ᵉ UO d'un autre type (ex. `L11U1-TEST02-FREIN`), remplis-la comme
@@ -187,10 +354,11 @@ elles feront la v2.
 ```bash
 git pull
 pip install -r requirements.txt
-python projet_TrainSystem/parse_catalogue.py "CHEMIN\UO TS.docx"   # 1. catalogue (json)
-python projet_TrainSystem/build_catalogue.py                       # 1. catalogue (xlsx)
-python projet_TrainSystem/creer_uo.py CODE --se "Nom" --heures N   # 3. créer une UO
-python -m src store clear                                          # remise à zéro
-python scripts/valider_un.py projet_TrainSystem/CODE.xlsx          # synchroniser
-python -m src status --prefix uo.                                  # inspecter le store
+python projet_TrainSystem/parse_catalogue.py "CHEMIN\UO TS.docx"   # étape 1 : catalogue json
+python projet_TrainSystem/build_catalogue.py                       # étape 1 : catalogue xlsx
+python projet_TrainSystem/creer_uo.py CODE --se "Nom" --heures N   # étape 3 : créer une UO
+python -m src store clear                                          # remise à zéro du store
+python scripts/valider_un.py projet_TrainSystem/CODE.xlsx          # synchroniser un fichier
+python -m src status                                               # tout le store
+python -m src status --prefix uo.                                  # clés d'une UO seulement
 ```
