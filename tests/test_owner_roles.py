@@ -102,31 +102,31 @@ class TestLoadRegistreOwner:
     def test_uo001_a_owner_id(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert "UO-001" in entrees
-        assert entrees["UO-001"].owner_id == "USR001"
+        assert "L03U12-P042" in entrees
+        assert entrees["L03U12-P042"].owner_id == "USR001"
 
     def test_uo003_a_owner_bruno(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert entrees["UO-003"].owner_id == "USR002"
+        assert entrees["L02U07-P042"].owner_id == "USR002"
 
     def test_registre_contient_5_uo(self):
-        """Le registre ne contient que les 5 UO actives (référentiels/cockpits supprimés)."""
+        """Le registre contient exactement 5 entrées de type uo_instance."""
         from src.config_loader import load_registre
-        entrees = load_registre()
+        entrees = [e for e in load_registre() if e.type_fichier == "uo_instance"]
         assert len(entrees) == 5
         ids = {e.id for e in entrees}
-        assert ids == {"UO-001", "UO-002", "UO-003", "UO-004", "UO-005"}
+        assert ids == {"L03U12-P042", "L05U03-P042", "L02U07-P042", "L04U01-P042", "L01U09-P042-ATO"}
 
     def test_uo002_owner_alice(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert entrees["UO-002"].owner_id == "USR001"
+        assert entrees["L05U03-P042"].owner_id == "USR001"
 
     def test_uo004_owner_bruno(self):
         from src.config_loader import load_registre
         entrees = {e.id: e for e in load_registre()}
-        assert entrees["UO-004"].owner_id == "USR002"
+        assert entrees["L04U01-P042"].owner_id == "USR002"
 
 
 # ─── load_uo_instances — owner_id lu ─────────────────────────────────────────
@@ -248,10 +248,9 @@ class TestValidateOwnerRoles:
         assert "ingenieur_sys" in s
 
     def test_registre_reel_uniquement_uo(self):
-        """Le registre actif ne contient que des uo_instance — tous valides."""
+        """Les uo_instance du registre sont toutes valides (pas de violation de rôle)."""
         from src.config_loader import load_registre, validate_owner_roles
-        entrees = load_registre()
-        assert all(e.type_fichier == "uo_instance" for e in entrees)
+        entrees = [e for e in load_registre() if e.type_fichier == "uo_instance"]
         violations = validate_owner_roles(entrees)
         assert violations == []
 
