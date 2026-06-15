@@ -1,7 +1,16 @@
 """Tests for SchemaConfigService and router factory pattern."""
+import json
 import pytest
+import yaml
 from dataclasses import fields
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from web.schema_config import SchemaConfigService
+from web.schema_app.api import classes as classes_mod
+from web.schema_app.api import relations as relations_mod
+from web.registry_app.api import registry as registry_mod
+from web.registry_app.services import config_service as reg_cfg
 
 
 def test_schema_config_service_has_required_fields():
@@ -19,15 +28,6 @@ def test_schema_config_service_has_required_fields():
     assert "save_functions" in f_names
     assert "load_templates" in f_names
     assert "save_templates" in f_names
-
-
-import json, yaml
-from pathlib import Path
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
-from web.schema_config import SchemaConfigService
-from web.schema_app.api import classes as classes_mod
-from web.schema_app.api import relations as relations_mod
 
 
 def _make_cfg(tmp_path: Path) -> SchemaConfigService:
@@ -311,10 +311,6 @@ def test_file_instance_schema_fields_optional():
     f = FileInstance(id="F-002", type_fichier=None, chemin="/path/f.xlsx")
     assert f.schema_version is None
     assert f.schema_outdated is None
-
-
-from web.registry_app.api import registry as registry_mod
-from web.registry_app.services import config_service as reg_cfg
 
 
 def _make_registry_app(tmp_path):

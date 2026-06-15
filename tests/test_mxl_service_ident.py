@@ -11,7 +11,7 @@ def test_is_key_true_generates_ident_line():
         ]
     }
     lines = build_class_mxl_lines("uo", "UO-001", ft, [])
-    ident_lines = [l for l in lines if l.startswith("IDENT")]
+    ident_lines = [ln for ln in lines if ln.startswith("IDENT")]
     assert len(ident_lines) == 1
     assert ident_lines[0] == 'IDENT nom : LABEL="Nom de l\'UO"'
 
@@ -25,7 +25,7 @@ def test_is_key_false_remains_header_metadata():
         ]
     }
     lines = build_class_mxl_lines("uo", "UO-001", ft, [])
-    header_lines = [l for l in lines if l.startswith("statut:")]
+    header_lines = [ln for ln in lines if ln.startswith("statut:")]
     assert len(header_lines) == 1
     assert "# Statut" in header_lines[0]
 
@@ -34,7 +34,7 @@ def test_no_min_fields_no_ident():
     """Classe sans min_fields → aucune ligne IDENT."""
     ft = {}
     lines = build_class_mxl_lines("uo", "UO-001", ft, [])
-    assert not any(l.startswith("IDENT") for l in lines)
+    assert not any(ln.startswith("IDENT") for ln in lines)
 
 
 def test_multiple_is_key_fields():
@@ -46,7 +46,7 @@ def test_multiple_is_key_fields():
         ]
     }
     lines = build_class_mxl_lines("uo", "UO-001", ft, [])
-    ident_lines = [l for l in lines if l.startswith("IDENT")]
+    ident_lines = [ln for ln in lines if ln.startswith("IDENT")]
     assert len(ident_lines) == 2
     assert ident_lines[0] == 'IDENT nom : LABEL="Nom"'
     assert ident_lines[1] == 'IDENT site : LABEL="Site"'

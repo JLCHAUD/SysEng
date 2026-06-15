@@ -50,12 +50,12 @@ DEF $nb_cloturees       = COUNT($cloturees.id)
 DEF $taux_cloture       = DIV($nb_cloturees, $nb_total)
 
 # ─── STATUTS VISUELS ──────────────────────────────────────
-# Feu tricolore standard (rouge < 30%, orange < 70%, vert >= 70%)
-DEF $statut_global = SWITCH_RANGE($avancement_global,
-  [0,  29] : "ROUGE",
-  [30, 69] : "ORANGE",
-  [70, 100]: "VERT"
-)
+# TODO(brique-B): SWITCH_RANGE pas encore implémenté dans le parser MXL.
+# DEF $statut_global = SWITCH_RANGE($avancement_global,
+#   [0,  29] : "ROUGE",
+#   [30, 69] : "ORANGE",
+#   [70, 100]: "VERT"
+# )
 
 # ─── VALIDATION QUALITE ───────────────────────────────────
 VALIDATE $activites.avancement : RANGE(0, 100)
@@ -81,7 +81,7 @@ BIND $heures_actives    -> Dashboard.heures_actives
 BIND $nb_total          -> Dashboard.nb_activites
 BIND $nb_cloturees      -> Dashboard.nb_cloturees
 BIND $taux_cloture      -> Dashboard.taux_cloture
-BIND $statut_global     -> Dashboard.statut_global
+# BIND $statut_global     -> Dashboard.statut_global  # TODO(brique-B): SWITCH_RANGE
 
 # ─── EXPORTS VERS L'ÉCOSYSTÈME ────────────────────────────
 # {{FILE_ID}} est substitué par l'ID réel de l'UO (ex: UO-001)
@@ -92,4 +92,4 @@ PUSH $heures_actives    -> uo.{{FILE_ID}}.heures_actives
 PUSH $nb_total          -> uo.{{FILE_ID}}.nb_activites
 PUSH $nb_cloturees      -> uo.{{FILE_ID}}.nb_cloturees
 PUSH $taux_cloture      -> uo.{{FILE_ID}}.taux_cloture
-PUSH $statut_global     -> uo.{{FILE_ID}}.statut             ONLY_IF $total_heures > 0
+# PUSH $statut_global     -> uo.{{FILE_ID}}.statut             # TODO(brique-B): SWITCH_RANGE
