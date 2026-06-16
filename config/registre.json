@@ -2,54 +2,164 @@
   "version": "1",
   "fichiers": [
     {
-      "id": "UO-001",
-      "type_fichier": "uo_instance",
-      "chemin": "output/UOs/UO-001_spec_fonctionnelle_climatisation.xlsx",
-      "synchro_periodicite": "quotidien",
-      "derniere_synchro": "2026-05-01T16:36:51",
-      "statut_dernier_synchro": "ok",
-      "genere_par_script": true,
-      "owner_id": "USR001"
+      "id": "REF-UO-01",
+      "type_fichier": "referentiel_uo",
+      "chemin": "config/referentiel/REF-UO-01_referentiel_types_uo.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "owner_id": "USR006",
+      "genere_par_script": false,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
     },
     {
-      "id": "UO-002",
-      "type_fichier": "uo_instance",
-      "chemin": "output/UOs/UO-002_spec_systeme_frein.xlsx",
-      "synchro_periodicite": "quotidien",
-      "derniere_synchro": "2026-05-01T16:36:52",
-      "statut_dernier_synchro": "ok",
-      "genere_par_script": true,
-      "owner_id": "USR001"
+      "id": "REF-ACT-01",
+      "type_fichier": "referentiel_acteurs",
+      "chemin": "config/referentiel/REF-ACT-01_referentiel_acteurs.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "owner_id": "USR006",
+      "genere_par_script": false,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
     },
     {
-      "id": "UO-003",
-      "type_fichier": "uo_instance",
-      "chemin": "output/UOs/UO-003_spec_technique_portes.xlsx",
+      "id": "COCKPIT-POLE-01",
+      "type_fichier": "cockpit_pole",
+      "chemin": "output/cockpits/COCKPIT-POLE-01_pole_syseng.xlsx",
       "synchro_periodicite": "quotidien",
-      "derniere_synchro": "2026-05-01T16:36:52",
-      "statut_dernier_synchro": "ok",
+      "owner_id": "USR006",
       "genere_par_script": true,
-      "owner_id": "USR002"
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
     },
     {
-      "id": "UO-004",
-      "type_fichier": "uo_instance",
-      "chemin": "output/UOs/UO-004_dossier_justification_eclairage.xlsx",
+      "id": "COCKPIT-MET-01",
+      "type_fichier": "cockpit_metier",
+      "chemin": "output/cockpits/COCKPIT-MET-01_metier_jlbernard.xlsx",
       "synchro_periodicite": "quotidien",
-      "derniere_synchro": "2026-05-01T16:36:52",
-      "statut_dernier_synchro": "ok",
+      "owner_id": "USR004",
       "genere_par_script": true,
-      "owner_id": "USR002"
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
     },
     {
-      "id": "UO-005",
-      "type_fichier": "uo_instance",
-      "chemin": "output/UOs/UO-005_spec_fonctionnelle_traction.xlsx",
+      "id": "COCKPIT-MET-02",
+      "type_fichier": "cockpit_metier",
+      "chemin": "output/cockpits/COCKPIT-MET-02_metier_drenard.xlsx",
       "synchro_periodicite": "quotidien",
-      "derniere_synchro": "2026-05-01T16:36:52",
-      "statut_dernier_synchro": "ok",
+      "owner_id": "USR005",
       "genere_par_script": true,
-      "owner_id": "USR003"
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "COCKPIT-ING-01",
+      "type_fichier": "cockpit_ingenieur",
+      "chemin": "output/cockpits/COCKPIT-ING-01_ing_adubois.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR001",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "COCKPIT-ING-02",
+      "type_fichier": "cockpit_ingenieur",
+      "chemin": "output/cockpits/COCKPIT-ING-02_ing_blecomte.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR002",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "COCKPIT-ING-03",
+      "type_fichier": "cockpit_ingenieur",
+      "chemin": "output/cockpits/COCKPIT-ING-03_ing_cvidal.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR003",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "PROJ-MI20-01",
+      "type_fichier": "projet_v",
+      "chemin": "output/projets/PROJ-MI20-01_projet_mi20_ratp.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "owner_id": "USR004",
+      "genere_par_script": false,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "PROJ-EXEN-01",
+      "type_fichier": "projet_v",
+      "chemin": "output/projets/PROJ-EXEN-01_projet_exen_sncf.xlsx",
+      "synchro_periodicite": "hebdomadaire",
+      "owner_id": "USR005",
+      "genere_par_script": false,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "L03U12-P042",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/L03U12-P042_climatisation_mi20.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR001",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "L05U03-P042",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/L05U03-P042_frein_mi20.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR001",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "L02U07-P042",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/L02U07-P042_portes_mi20.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR002",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "L04U01-P042",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/L04U01-P042_eclairage_mi20.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR002",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "L01U09-P042-ATO",
+      "type_fichier": "uo_instance",
+      "chemin": "output/UOs/L01U09-P042-ATO_traction_ato_mi20.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR003",
+      "genere_par_script": true,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
+    },
+    {
+      "id": "UO-basic",
+      "type_fichier": "referentiel_uo",
+      "chemin": "Template UO Sheet.xlsx",
+      "synchro_periodicite": "quotidien",
+      "owner_id": "USR006",
+      "genere_par_script": false,
+      "derniere_synchro": "2026-05-19T14:48:14",
+      "statut_dernier_synchro": "erreur"
     }
   ]
 }
