@@ -105,19 +105,22 @@ def criticite_cf(ws, rng):
 
 # ── Bandeaux ──────────────────────────────────────────────────────────────────
 
-def banner_B(ws, subtitle, ncols, bg=NAVY_D, chip=NAVY, tint="B5D4F4"):
+def banner_B(ws, subtitle, ncols, bg=NAVY_D, chip=NAVY, tint="B5D4F4",
+             title="UO L09U1 — Préparation et passage des IDR",
+             project_line="CLIMATISATION  —  PROJET DEMO",
+             se="J. Dujardin"):
     """Bandeau coloré lignes 1-4, largeur exacte ncols.
     Couleur de bandeau = couleur d'onglet (cohérence visuelle)."""
     ws.sheet_properties.tabColor = bg
     for rr in range(1, 5):
         for cc in range(1, ncols + 1):
             ws.cell(row=rr, column=cc).fill = fill(bg)
-    t = ws.cell(row=1, column=2, value="UO L09U1 — Préparation et passage des IDR")
+    t = ws.cell(row=1, column=2, value=title)
     t.font = Font(name=F, size=14, bold=True, color=WHITE)
     t.alignment = Alignment(vertical="center")
     ws.merge_cells(start_row=1, start_column=2, end_row=1,
                    end_column=max(ncols - 1, 3))
-    sp = ws.cell(row=2, column=2, value="CLIMATISATION  —  PROJET DEMO")
+    sp = ws.cell(row=2, column=2, value=project_line)
     sp.font = Font(name=F, size=12, bold=True, color=WHITE)
     sp.alignment = Alignment(vertical="center")
     ws.merge_cells(start_row=2, start_column=2, end_row=2,
@@ -133,7 +136,8 @@ def banner_B(ws, subtitle, ncols, bg=NAVY_D, chip=NAVY, tint="B5D4F4"):
             ws.merge_cells(start_row=3, start_column=col,
                            end_row=3, end_column=col + 1)
     if ncols >= 12:
-        s = ws.cell(row=3, column=ncols - 2, value=subtitle + " · J. Dujardin")
+        s = ws.cell(row=3, column=ncols - 2,
+                    value=subtitle + (f" · {se}" if se else ""))
         s.font = Font(name=F, size=9, color=tint)
         s.alignment = Alignment(horizontal="right", vertical="center")
         ws.merge_cells(start_row=3, start_column=ncols - 2, end_row=3,
@@ -144,12 +148,12 @@ def banner_B(ws, subtitle, ncols, bg=NAVY_D, chip=NAVY, tint="B5D4F4"):
     ws.row_dimensions[4].height = 6
 
 
-def banner_teal(ws, subtitle, ncols):
-    banner_B(ws, subtitle, ncols, bg=TEAL, chip=TEAL_CHIP, tint=TEAL_TINT)
+def banner_teal(ws, subtitle, ncols, **kwargs):
+    banner_B(ws, subtitle, ncols, bg=TEAL, chip=TEAL_CHIP, tint=TEAL_TINT, **kwargs)
 
 
-def banner_amber(ws, subtitle, ncols):
-    banner_B(ws, subtitle, ncols, bg=AMB_B, chip=AMB_CHIP, tint=AMB_TINT)
+def banner_amber(ws, subtitle, ncols, **kwargs):
+    banner_B(ws, subtitle, ncols, bg=AMB_B, chip=AMB_CHIP, tint=AMB_TINT, **kwargs)
 
 
 # ── Composants de mise en page ────────────────────────────────────────────────
@@ -165,9 +169,9 @@ def section_box(ws, title, r1, c1, r2, c2):
     card_border(ws, r1, c1, r2, c2, color=GREY_B)
 
 
-def kpi_card_B(ws, col, label, value, sub, border_color, value_color):
+def kpi_card_B(ws, col, label, value, sub, border_color, value_color, row=6):
     """Carte KPI 4 colonnes : label + grande valeur + sous-titre + bordure colorée."""
-    r = 6
+    r = row
     card_border(ws, r, col, r + 3, col + 2, color=border_color)
     for rr in range(r, r + 4):
         for cc in range(col, col + 3):
