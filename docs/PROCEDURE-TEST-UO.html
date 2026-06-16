@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html><head><meta charset='utf-8'>
+<style>
+body { font-family: Segoe UI, Arial, sans-serif; font-size: 11pt; line-height: 1.5;
+       max-width: 900px; margin: 2cm auto; color: #222; }
+h1 { color: #0C447C; border-bottom: 2px solid #0C447C; }
+h2 { color: #185FA5; border-bottom: 1px solid #D3D1C7; margin-top: 1.5em; }
+h3 { color: #378ADD; }
+code, pre { background: #F5F4F0; font-family: Consolas, monospace; font-size: 9.5pt; }
+pre { padding: 0.5em; border-left: 3px solid #D3D1C7; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th { background: #0C447C; color: #fff; padding: 6px 10px; }
+td { padding: 5px 10px; border: 1px solid #D3D1C7; }
+tr:nth-child(even) { background: #F5F4F0; }
+blockquote { border-left: 4px solid #D3D1C7; margin: 0; padding-left: 1em; color: #5F5E5A; }
+</style>
+</head><body>
+<h1>Procédure de test — Chaîne Catalogue → UO (projet Train System)</h1>
+<blockquote>
+<p><strong>Objet</strong> : valider la chaîne complète d'instanciation et de synchronisation
+des UO : génération du catalogue depuis le Word, création d'une UO en une
+commande, saisie ingénieur, synchronisation, KPI — puis robustesse du moteur
+face à des modifications du fichier (colonnes ajoutées, Manifeste modifié,
+tableau renommé).
+<strong>Durée estimée</strong> : 60-90 minutes.
+<strong>Tous les résultats attendus de cette procédure ont été vérifiés le 2026-06-12.</strong></p>
+<p>Note ce que tu obtiens à chaque étape dans le classeur de suivi
+<code>Validation-UO-TrainSystem.xlsx</code> (statut OK/KO + remarques). En cas de KO,
+continue si possible — le bilan global compte plus qu'un blocage isolé.</p>
+</blockquote>
+<hr />
+<h2>Règles de bonne conduite</h2>
+<p>Ces règles évitent les faux KO et les situations de debug inutiles.</p>
+<p><strong>Avant chaque sync :</strong>
+- <strong>Ferme toujours le fichier Excel</strong> avant de lancer une commande — sinon le
+  moteur obtient un fichier verrouillé et la sync échoue avec une erreur trompeuse.
+- <strong>Rouvre le fichier après</strong> pour constater le résultat — les valeurs BIND ne
+  s'actualisent qu'à l'ouverture.</p>
+<p><strong>Sur les tableaux Excel :</strong>
+- <strong>Ne jamais renommer un tableau</strong> (ex. <code>tbl_act</code>, <code>tbl_oil</code>) — les noms sont
+  référencés mot pour mot dans le <code>_Manifeste</code>. Un tableau renommé disparaît
+  silencieusement du store sans message d'erreur (le moteur retourne <code>[]</code>).
+- <strong>Tu peux ajouter des colonnes</strong> librement — le moteur les intègre
+  automatiquement. Les receveurs qui ne les demandent pas les ignorent.
+- <strong>Tu peux ajouter des feuilles</strong> — elles sont ignorées si le Manifeste n'y
+  fait pas référence.</p>
+<p><strong>Sur le <code>_Manifeste</code> :</strong>
+- <strong>Toute modification prend effet immédiatement</strong> à la prochaine sync — pas
+  besoin de recréer l'UO.
+- <strong>Ne change pas le FILE_ID</strong> en cours de test — ça crée une nouvelle clé dans
+  le store, l'ancienne reste orpheline, et les valeurs semblent doubler.
+- <strong>Une faute de syntaxe MXL</strong> dans le Manifeste bloque la sync entière avec une
+  erreur de parsing explicite — corrige et relance.</p>
+<p><strong>Sur le store :</strong>
+- Utilise <code>python -m src store clear</code> pour repartir proprement entre deux scénarios
+  distincts. Inutile entre deux syncs du même fichier.
+- <code>python -m src status</code> à tout moment pour voir ce qui est réellement dans le store.</p>
+<hr />
+<h2>Prérequis</h2>
+<ol>
+<li>Dépôt à jour : <code>git pull</code> dans le dossier <code>SysEng</code>.</li>
+<li>Dépendances : <code>pip install -r requirements.txt</code> (une fois).</li>
+<li><strong>Le fichier Word <code>UO TS.docx</code></strong> — il est <strong>confidentiel</strong> et n'est PAS sur
+   GitHub : il doit t'être transmis par canal interne (mail/Teams). Note le
+   chemin où tu l'enregistres.</li>
+<li>Toutes les commandes se lancent <strong>depuis la racine du dossier <code>SysEng</code></strong>.</li>
+<li>Règle d'or : <strong>toujours fermer le fichier Excel avant de lancer une
+   commande</strong>, et le rouvrir après pour constater le résultat.</li>
+</ol>
+<hr />
+<h2>Étape 1 — Générer le catalogue depuis le Word</h2>
+<pre><code class="language-bash">python projet_TrainSystem/parse_catalogue.py &quot;CHEMIN\VERS\UO TS.docx&quot;
+python projet_TrainSystem/build_catalogue.py
+</code></pre>
+<p><strong>Attendu :</strong>
+- La 1ʳᵉ commande affiche un tableau de <strong>10 lignes</strong> (<code>L09U1</code> → <code>L13U2</code>) avec
+  les comptes d'activités par UO.
+- La 2ᵉ affiche : <code>[OK] Catalogue_UO_TrainSystem.xlsx — 10 UO types,
+  54 activites, 97 livrables, 88 donnees d'entree</code>.
+- Ouvre <code>projet_TrainSystem\Catalogue_UO_TrainSystem.xlsx</code> : 4 onglets
+  (<code>Index</code>, <code>Catalogue_Activites</code>, <code>Catalogue_Livrables</code>,
+  <code>Catalogue_DonneesEntree</code>). Dans <code>Catalogue_Activites</code>, filtre la colonne
+  <code>uo_type</code> sur <code>L09U1</code> : <strong>13 lignes</strong>.</p>
+<hr />
+<h2>Étape 2 — Tests négatifs (codes invalides)</h2>
+<pre><code class="language-bash">python projet_TrainSystem/creer_uo.py CODE-INVALIDE
+python projet_TrainSystem/creer_uo.py L99U9-TEST
+</code></pre>
+<p><strong>Attendu :</strong> deux messages d'erreur clairs (pas de plantage Python) :
+- <code>[ERR] Code invalide 'CODE-INVALIDE' — attendu : L09U1-PROJET-SYSTEME</code>
+- <code>[ERR] UO type 'L99U9' absent du catalogue. Disponibles : L09U1, L09U2, …</code></p>
+<hr />
+<h2>Étape 3 — Créer l'UO de test</h2>
+<pre><code class="language-bash">python projet_TrainSystem/creer_uo.py L09U1-TEST01-CLIM --se &quot;Ton Nom&quot; --heures 240 --projet &quot;Projet Test&quot; --systeme &quot;Climatisation&quot;
+</code></pre>
+<p><strong>Attendu :</strong> <code>[OK] …L09U1-TEST01-CLIM.xlsx</code> créé. Ouvre-le et vérifie :
+- <strong>11 feuilles</strong> : General, Description_Besoin, Donnees_Entree, Activites,
+  Livrables, OIL, KPI, Dashboard, Planning, Orga, _Manifeste ;
+- <code>General</code> : projet, système, ton nom, <strong>240</strong> en Heures vendues ;
+- <code>Activites</code> : <strong>13 lignes</strong> pré-remplies (applicable=OUI, avancement=0,
+  heures_allouees calculées ≈ 18,46 h chacune) ;
+- <code>Description_Besoin</code> : le cahier des charges complet du type L09U1 ;
+- <code>Livrables</code> : 21 lignes · <code>Donnees_Entree</code> : 21 lignes ;
+- <code>OIL</code> : 1 ligne d'exemple <code>PO-000</code> ;
+- Les listes déroulantes fonctionnent (colonne <code>statut</code> d'Activites, etc.).</p>
+<p>Ferme le fichier.</p>
+<hr />
+<h2>Étape 4 — Synchronisation à blanc (UO vierge)</h2>
+<pre><code class="language-bash">python -m src store clear
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<p><strong>Attendu (console) :</strong> <code>PUSH = 8</code>, <code>BIND = 7</code>, <code>[OK] Execution terminee sans
+erreur.</code> — et 8 clés <code>uo.L09U1-TEST01-CLIM.*</code> listées dans le store.
+Rouvre le fichier : onglet <code>KPI</code> → Avancement <strong>0</strong> ; Points ouverts <strong>0</strong> ;
+Points fermés <strong>1</strong> (la ligne d'exemple) ; Santé <strong>VERT</strong>. Referme.</p>
+<hr />
+<h2>Étape 5 — Saisie ingénieur (scénario imposé)</h2>
+<p>Ouvre le fichier et saisis <strong>exactement</strong> ceci :</p>
+<p><strong>Feuille <code>Activites</code></strong> (les lignes du tableau, ligne 2 = première activité) :
+| Ligne | applicable | statut | avancement | heures_consommees |
+|---|---|---|---|---|
+| 2 | OUI | EN_COURS | <strong>50</strong> | <strong>10</strong> |
+| 3 | OUI | TERMINEE | <strong>100</strong> | <strong>20</strong> |
+| 5 | <strong>NON</strong> | — | — | — |
+| toutes les autres | OUI (inchangé) | inchangé | 0 | 0 |</p>
+<p><strong>Feuille <code>OIL</code></strong> — remplace la ligne d'exemple et ajoute 2 lignes
+(étire le tableau si besoin en tirant la poignée en bas à droite) :
+| id | titre | en_action | criticite | statut |
+|---|---|---|---|---|
+| PO-001 | Question expert normes | EXPERT | HAUTE | OUVERT |
+| PO-002 | Attente retour fournisseur | FOURNISSEUR | MOYENNE | OUVERT |
+| PO-003 | Accès outil obtenu | SE | BASSE | CLOS |</p>
+<p>Renseigne aussi une date d'ouverture et une ligne de <code>journal</code> sur chaque point
+(texte libre). <strong>Enregistre et ferme.</strong></p>
+<hr />
+<h2>Étape 6 — Synchronisation et vérification des KPI</h2>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<p><strong>Attendu (console) :</strong> zéro erreur. Rouvre le fichier, onglet <code>KPI</code> :</p>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>Valeur attendue</th>
+<th>Pourquoi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Avancement UO (%)</td>
+<td><strong>12,5</strong></td>
+<td>(50+100+0×10) ÷ 12 activités applicables</td>
+</tr>
+<tr>
+<td>Heures consommées</td>
+<td><strong>30</strong></td>
+<td>10 + 20</td>
+</tr>
+<tr>
+<td>Points ouverts</td>
+<td><strong>2</strong></td>
+<td>PO-001, PO-002</td>
+</tr>
+<tr>
+<td>Points fermés</td>
+<td><strong>1</strong></td>
+<td>PO-003</td>
+</tr>
+<tr>
+<td>Points critiques ouverts</td>
+<td><strong>1</strong></td>
+<td>PO-001 (HAUTE)</td>
+</tr>
+<tr>
+<td>Dont balle chez fournisseur</td>
+<td><strong>1</strong></td>
+<td>PO-002</td>
+</tr>
+<tr>
+<td>Dont balle chez expert</td>
+<td><strong>1</strong></td>
+<td>PO-001</td>
+</tr>
+<tr>
+<td>Reste à faire total (h)</td>
+<td><strong>210</strong></td>
+<td>formule Excel (recalculée à l'ouverture)</td>
+</tr>
+<tr>
+<td>EAC</td>
+<td><strong>240</strong></td>
+<td>30 consommées + 210 RAF</td>
+</tr>
+<tr>
+<td>Dérive à terminaison</td>
+<td><strong>0</strong></td>
+<td>EAC = heures vendues</td>
+</tr>
+<tr>
+<td>Santé</td>
+<td><strong>ROUGE</strong></td>
+<td>un point critique est ouvert</td>
+</tr>
+</tbody>
+</table>
+<p>L'onglet <code>Dashboard</code> doit refléter les mêmes valeurs (cartes).</p>
+<blockquote>
+<p>ℹ️ Les lignes « Reste à faire », « EAC », « Dérive », « Santé » sont des
+formules Excel : elles s'actualisent à l'ouverture du fichier, pas à la sync.</p>
+</blockquote>
+<hr />
+<h2>Étape 7 — Règles de qualité (VALIDATE)</h2>
+<ol>
+<li>Ouvre le fichier, mets l'avancement de la <strong>ligne 2</strong> à <strong>150</strong>. Enregistre, ferme.</li>
+<li>Relance la sync.</li>
+</ol>
+<p><strong>Attendu :</strong> la sync se termine <strong>en erreur</strong>, avec un message explicite :
+<code>[ERR] VALIDATE $actifs.avancement : RANGE(0.0,100.0) : 1 valeur(s) hors plage ([150])</code></p>
+<ol>
+<li>Remets <strong>50</strong>, enregistre, ferme, relance : <strong>zéro erreur</strong>, KPI inchangés
+   (mêmes valeurs qu'à l'étape 6 — la sync est répétable).</li>
+</ol>
+<hr />
+<h2>Étape 8 — Le store (ce que verront les cockpits)</h2>
+<pre><code class="language-bash">python -m src status --prefix uo.
+</code></pre>
+<p><strong>Attendu :</strong> les 8 clés de l'UO avec leurs valeurs (<code>avancement = 12.5</code>,
+<code>activites = [table: 12 lignes]</code>…). C'est ce qui alimentera le cockpit
+ingénieur et le dashboard métier.</p>
+<hr />
+<h2>Étape 9 — Modifier le Manifeste : ajouter une instruction PUSH</h2>
+<p><strong>Objectif</strong> : vérifier que modifier le <code>_Manifeste</code> suffit pour enrichir ce
+que l'UO publie dans le store — sans recréer le fichier.</p>
+<p>Ouvre <code>L09U1-TEST01-CLIM.xlsx</code>, feuille <code>_Manifeste</code>. À la fin des instructions
+existantes, ajoute cette ligne :</p>
+<pre><code>PUSH $liv -&gt; uo.L09U1-TEST01-CLIM.livrables_v2
+</code></pre>
+<p><em>(La variable <code>$liv</code> est déjà définie plus haut dans le Manifeste généré — c'est elle qui contient les livrables. On pousse vers une nouvelle clé <code>livrables_v2</code> pour éviter tout conflit avec une éventuelle clé existante.)</em></p>
+<p>Enregistre et ferme. Relance la sync :</p>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.L09U1-TEST01-CLIM
+</code></pre>
+<p><strong>Attendu :</strong>
+- La console affiche maintenant <code>PUSH = 9</code> (une de plus qu'avant).
+- <code>python -m src status</code> liste une nouvelle clé <code>uo.L09U1-TEST01-CLIM.livrables_v2</code>
+  avec ses lignes.
+- Zéro erreur.</p>
+<p><strong>Ce que ça prouve</strong> : le Manifeste est la seule source de vérité — le modifier
+reconfigure le comportement immédiatement. Pas besoin de toucher au moteur.</p>
+<hr />
+<h2>Étape 10 — Ajouter une colonne à un tableau existant</h2>
+<p><strong>Objectif</strong> : vérifier que le moteur absorbe sans erreur une colonne ajoutée
+par l'ingénieur, et qu'elle remonte dans le store.</p>
+<p>Ouvre le fichier, feuille <code>Activites</code>. Ajoute une colonne <code>commentaire</code> à droite
+du tableau <code>tbl_act</code> (clique sur la cellule à droite du dernier en-tête, tape
+<code>commentaire</code> — Excel étend automatiquement le tableau). Renseigne un texte libre
+sur 2 ou 3 lignes. Enregistre et ferme.</p>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<p>Puis vérifie les colonnes présentes dans le store avec ce snippet Python :</p>
+<pre><code class="language-python">python -c &quot;
+import json, pathlib
+store_path = pathlib.Path('output/store.json')
+data = json.loads(store_path.read_text(encoding='utf-8'))
+rows = data.get('uo.L09U1-TEST01-CLIM.activites', [])
+if rows:
+    print('Colonnes :', list(rows[0].keys()))
+    print('Nb lignes :', len(rows))
+else:
+    print('Cle absente ou vide')
+&quot;
+</code></pre>
+<p><strong>Attendu :</strong>
+- Zéro erreur.
+- La liste des colonnes inclut <code>commentaire</code> en plus des colonnes d'origine.
+- Les KPI sont inchangés (le moteur calcule sur <code>avancement</code>, pas sur <code>commentaire</code>).</p>
+<p><strong>Ce que ça prouve</strong> : les colonnes libres sont tolérées — un ingénieur peut
+enrichir son fichier sans casser la sync.</p>
+<hr />
+<h2>Étape 11 — Ajouter une feuille libre</h2>
+<p><strong>Objectif</strong> : vérifier qu'une feuille non référencée dans le Manifeste est
+simplement ignorée.</p>
+<p>Ouvre le fichier, crée une feuille nommée <code>Notes_perso</code> et tape quelques lignes
+de texte. Enregistre et ferme.</p>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<p><strong>Attendu :</strong> zéro erreur, comportement identique à avant. La feuille <code>Notes_perso</code>
+n'apparaît nulle part dans le store.</p>
+<hr />
+<h2>Étape 12 — Piège : renommer un tableau (comportement silencieux à connaître)</h2>
+<p><strong>Objectif</strong> : comprendre ce qui se passe quand un tableau est renommé — pour
+ne pas être surpris si ça arrive en vrai.</p>
+<p>Ouvre le fichier, feuille <code>OIL</code>. Dans le ruban <strong>Création de tableau</strong>, renomme
+le tableau <code>tbl_oil</code> en <code>tbl_oil_v2</code>. Enregistre et ferme.</p>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+python -m src status --prefix uo.L09U1-TEST01-CLIM.oil
+</code></pre>
+<p><strong>Attendu :</strong>
+- La console affiche <strong>zéro erreur</strong> — le moteur ne plante pas.
+- <code>PUSH</code> <strong>reste à 9</strong> : le PUSH s'exécute quand même, mais pousse une liste
+  vide (le tableau <code>tbl_oil</code> est introuvable → GET_TABLE renvoie <code>[]</code>).
+- La clé <code>uo.L09U1-TEST01-CLIM.oil</code> reste dans le store mais contient
+  <strong>0 ligne</strong> (<code>[]</code>).
+- Les KPI liés aux points ouverts tombent à <strong>0</strong> dans le Dashboard.</p>
+<p>C'est la <strong>dégradation gracieuse</strong> : un tableau introuvable est traité comme
+vide, pas comme une erreur fatale. Utile pour la robustesse, trompeur pour
+le debug.</p>
+<p><strong>Remise en ordre</strong> : rouvre le fichier, renomme le tableau en <code>tbl_oil</code>
+(nom d'origine), enregistre, ferme, relance la sync. Les KPI reviennent.</p>
+<hr />
+<h2>Étape 13 — Modifier le FILE_ID (piège à éviter)</h2>
+<p><strong>Objectif</strong> : comprendre pourquoi il ne faut pas changer le FILE_ID en cours
+de vie d'un fichier.</p>
+<p>Ouvre le <code>_Manifeste</code>, change <code>FILE_ID: L09U1-TEST01-CLIM</code> en
+<code>FILE_ID: L09U1-TEST01-CLIM-V2</code>. Enregistre et ferme.</p>
+<pre><code class="language-bash">python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<p>Puis vérifie le contenu du store :</p>
+<pre><code class="language-bash">python -m src status --prefix uo.
+</code></pre>
+<p><strong>Attendu :</strong>
+- Zéro erreur.
+- Le store contient maintenant <strong>deux jeux de clés</strong> :
+  - <code>uo.L09U1-TEST01-CLIM.*</code> — l'ancienne identité (données périmées, non mises à jour)
+  - <code>uo.L09U1-TEST01-CLIM-V2.*</code> — la nouvelle identité (données fraîches de cette sync)
+- Un cockpit qui consommerait les deux voit des doublons.</p>
+<p><strong>Remise en ordre</strong> : remets <code>FILE_ID: L09U1-TEST01-CLIM</code>, vide le store,
+relance.</p>
+<pre><code class="language-bash">python -m src store clear
+python scripts/valider_un.py projet_TrainSystem/L09U1-TEST01-CLIM.xlsx
+</code></pre>
+<hr />
+<h2>Étape 14 — Bilan libre (le plus important)</h2>
+<p>Mets-toi 10 minutes dans la peau d'un ingénieur qui reçoit ce fichier :
+crée une 2ᵉ UO d'un autre type (ex. <code>L11U1-TEST02-FREIN</code>), remplis-la comme
+tu le ferais en vrai, et note <strong>tout ce qui te gêne</strong> :
+colonnes manquantes ou inutiles, libellés pas clairs, saisies pénibles,
+KPI faux ou absents, idées. Ces remarques valent plus que les OK/KO —
+elles feront la v2.</p>
+<hr />
+<h2>Récapitulatif des commandes</h2>
+<pre><code class="language-bash">git pull
+pip install -r requirements.txt
+python projet_TrainSystem/parse_catalogue.py &quot;CHEMIN\UO TS.docx&quot;   # étape 1 : catalogue json
+python projet_TrainSystem/build_catalogue.py                       # étape 1 : catalogue xlsx
+python projet_TrainSystem/creer_uo.py CODE --se &quot;Nom&quot; --heures N   # étape 3 : créer une UO
+python -m src store clear                                          # remise à zéro du store
+python scripts/valider_un.py projet_TrainSystem/CODE.xlsx          # synchroniser un fichier
+python -m src status                                               # tout le store
+python -m src status --prefix uo.                                  # clés d'une UO seulement
+</code></pre>
+</body></html>
