@@ -1,11 +1,7 @@
 """
-design_demo.py — Démos de design Excel : option A (Studio clair) et B (Cockpit bandeau).
-=========================================================================================
-Génère deux classeurs de démonstration poussant les capacités natives d'Excel
-(sans VBA), pour choisir la direction visuelle des fichiers UO :
-
-  Design_A_Studio.xlsx   minimalisme clair, filets d'accent, data bars vivantes
-  Design_B_Cockpit.xlsx  bandeau marine, navigation hyperliens, jauge anneau
+design_demo.py — Démo de design Excel Design B « Cockpit bandeau ».
+====================================================================
+Génère Design_B_Cockpit.xlsx — direction visuelle retenue pour les fichiers UO.
 
 Usage : python projet_TrainSystem/design_demo.py
 """
@@ -135,102 +131,6 @@ def oil_sheet(wb, banner=None, header_color=NAVY_D):
     return ws
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# DESIGN A — STUDIO CLAIR
-# ══════════════════════════════════════════════════════════════════════════════
-
-def kpi_card_A(ws, col, label, value, sub, accent, value_color, bar_pct=None):
-    """Carte KPI : filet d'accent a gauche, grande valeur, sous-texte."""
-    c1 = col
-    r = 4
-    for rr in range(r, r + 4):
-        for cc in range(c1, c1 + 3):
-            ws.cell(row=rr, column=cc).fill = fill(GREY_L)
-    accent_side = Side(style="thick", color=accent)
-    card_border(ws, r, c1, r + 3, c1 + 2, side=accent_side)
-    lab = ws.cell(row=r, column=c1, value=label)
-    lab.font = fnt(9, bold=True, color=GREY_D)
-    lab.alignment = Alignment(horizontal="left", vertical="bottom", indent=1)
-    ws.merge_cells(start_row=r, start_column=c1, end_row=r, end_column=c1 + 2)
-    val = ws.cell(row=r + 1, column=c1, value=value)
-    val.font = Font(name=F, size=22, bold=True, color=value_color)
-    val.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.merge_cells(start_row=r + 1, start_column=c1, end_row=r + 2, end_column=c1 + 2)
-    s = ws.cell(row=r + 3, column=c1, value=sub)
-    s.font = fnt(9, color=GREY_D)
-    s.alignment = Alignment(horizontal="left", vertical="top", indent=1)
-    ws.merge_cells(start_row=r + 3, start_column=c1, end_row=r + 3, end_column=c1 + 2)
-
-
-def build_design_A():
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Dashboard"
-    ws.sheet_view.showGridLines = False
-    ws.sheet_properties.tabColor = NAVY_D
-    for i in range(1, 16):
-        ws.column_dimensions[get_column_letter(i)].width = 8.5
-    ws.column_dimensions["A"].width = 2
-
-    # Titre
-    t = ws.cell(row=2, column=2, value="L09U1 — Préparation et passage des IDR")
-    t.font = Font(name=F, size=16, bold=True, color=NAVY_D)
-    sub = ws.cell(row=3, column=2,
-                  value="Projet Demo · Climatisation · Jean Dujardin · sync 12/06 08:12")
-    sub.font = fnt(9, color=GREY_D, italic=True)
-    ws.row_dimensions[2].height = 26
-
-    # 4 cartes KPI (lignes 4-7)
-    for rr in range(4, 8):
-        ws.row_dimensions[rr].height = 18
-    kpi_card_A(ws, 2, "AVANCEMENT UO", "45,0 %", "moyenne pondérée par poids",
-               NAVY, NAVY_D)
-    kpi_card_A(ws, 5, "HEURES", "59 / 200", "consommées / vendues", GREY_D, "2C2C2A")
-    kpi_card_A(ws, 8, "EAC — DÉRIVE", "169 h", "▼ −31 h vs vendu", AMBER, AMBER_D)
-    kpi_card_A(ws, 11, "SANTÉ", "● ROUGE", "1 point critique ouvert", RED, RED_D)
-
-    # Mini-table avancement par activite avec data bars + feux
-    hr = 10
-    ws.cell(row=9, column=2, value="Avancement par activité").font = \
-        fnt(11, bold=True, color=NAVY_D)
-    for ci, h in [(2, "activité"), (5, "statut"), (6, "avancement"), (8, "heures")]:
-        c = ws.cell(row=hr, column=ci, value=h)
-        c.font = fnt(9, bold=True, color=GREY_D)
-    for ci in range(2, 9):
-        ws.cell(row=hr, column=ci).border = Border(bottom=Side(style="thin", color=GREY_B))
-    for ri, (aid, des, st, av, load, conso) in enumerate(ACTIVITES, hr + 1):
-        ws.cell(row=ri, column=2, value=f"{aid} — {des}").font = fnt(10)
-        ws.merge_cells(start_row=ri, start_column=2, end_row=ri, end_column=4)
-        sc = ws.cell(row=ri, column=5, value=st)
-        sc.font = fnt(10); sc.alignment = Alignment(horizontal="center")
-        avc = ws.cell(row=ri, column=6, value=av)
-        avc.alignment = Alignment(horizontal="center"); avc.font = fnt(10)
-        ws.merge_cells(start_row=ri, start_column=6, end_row=ri, end_column=7)
-        hc = ws.cell(row=ri, column=8, value=conso)
-        hc.number_format = "0.0"; hc.font = fnt(10)
-        hc.alignment = Alignment(horizontal="right")
-        ws.row_dimensions[ri].height = 19
-    last = hr + len(ACTIVITES)
-    from openpyxl.formatting.rule import DataBarRule, IconSetRule
-    ws.conditional_formatting.add(f"F{hr+1}:F{last}", DataBarRule(
-        start_type="num", start_value=0, end_type="num", end_value=100,
-        color=BLUE, showValue=True))
-    ws.conditional_formatting.add(f"H{hr+1}:H{last}", IconSetRule(
-        icon_style="3TrafficLights1", type="percent", values=[0, 33, 67],
-        showValue=True))
-    statut_cf(ws, f"E{hr+1}:E{last}")
-
-    activites_sheet(wb)
-    oil_sheet(wb)
-    out = HERE / "Design_A_Studio.xlsx"
-    wb.save(out)
-    print(f"[OK] {out.name}")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# DESIGN B — COCKPIT BANDEAU
-# ══════════════════════════════════════════════════════════════════════════════
-
 def build_design_B():
     wb = Workbook()
     ws = wb.active
@@ -353,8 +253,4 @@ def build_design_B():
 
 
 if __name__ == "__main__":
-    build_design_A()
     build_design_B()
-    print("\nOuvre les deux fichiers dans Excel pour comparer :")
-    print("  projet_TrainSystem/Design_A_Studio.xlsx")
-    print("  projet_TrainSystem/Design_B_Cockpit.xlsx")
