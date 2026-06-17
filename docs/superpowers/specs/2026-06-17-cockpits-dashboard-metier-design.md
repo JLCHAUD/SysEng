@@ -74,15 +74,17 @@ Vue synthèse de toutes les UOs de l'ingénieur :
 
 ### Onglet `_Manifeste`
 
-Règles ExoSync de push/pull :
+Règles ExoSync de push/pull. La feuille contient une **3ème colonne `COMMENTAIRE`** (après `DIRECTION` et `NOM_GLOBAL`) qui décrit en langage naturel ce que fait la ligne MXL — obligatoire pour chaque règle générée.
 
-| Direction | Clé store | Feuille | Cellule/Tableau | Type |
-|-----------|-----------|---------|-----------------|------|
-| PUSH | `uo.<id>.avancement` | Mes UOs | col % Avancement | CELL_PCT |
-| PUSH | `uo.<id>.heures_realisees` | Mes UOs | col H réalisées | CELL_NUM |
-| PUSH | `uo.<id>.points_ouverts` | Agenda | col Points ouverts | CELL_NUM |
-| PULL | `uo.<id>.charge_allouee` | Mes UOs | col Charge allouée | CELL_NUM |
-| PULL | `uo.<id>.date_fin` | Mes UOs | col Date fin | CELL_DATE |
+| Direction | Clé store | Commentaire (col 3) | Feuille | Cellule/Tableau | Type |
+|-----------|-----------|---------------------|---------|-----------------|------|
+| PUSH | `uo.<id>.avancement` | Remonte le % d'avancement saisi par l'ingénieur vers le store central | Mes UOs | col % Avancement | CELL_PCT |
+| PUSH | `uo.<id>.heures_realisees` | Remonte les heures réalisées saisies par l'ingénieur | Mes UOs | col H réalisées | CELL_NUM |
+| PUSH | `uo.<id>.points_ouverts` | Remonte le nombre de points ouverts non résolus | Agenda | col Points ouverts | CELL_NUM |
+| PULL | `uo.<id>.charge_allouee` | Injecte la charge allouée depuis le store (lecture seule) | Mes UOs | col Charge allouée | CELL_NUM |
+| PULL | `uo.<id>.date_fin` | Injecte la date de fin planifiée depuis le store (lecture seule) | Mes UOs | col Date fin | CELL_DATE |
+
+**Règle de génération :** le générateur Python doit remplir la colonne `COMMENTAIRE` pour chaque règle. Le commentaire doit être explicite en français, sans jargon technique MXL.
 
 ---
 
@@ -129,13 +131,13 @@ Seuils :
 
 ### Onglet `_Manifeste`
 
-Règles de pull depuis store.json pour chaque UO de l'équipe :
+Règles de pull depuis store.json pour chaque UO de l'équipe. Même convention : **3ème colonne `COMMENTAIRE`** obligatoire.
 
-| Direction | Clé store | Feuille | Type |
-|-----------|-----------|---------|------|
-| PULL | `uo.<id>.avancement` | Synthèse + Par Ingénieur | CELL_PCT |
-| PULL | `uo.<id>.heures_realisees` | Synthèse + Par Ingénieur | CELL_NUM |
-| PULL | `uo.<id>.points_ouverts` | Alertes | CELL_NUM |
+| Direction | Clé store | Commentaire (col 3) | Feuille | Type |
+|-----------|-----------|---------------------|---------|------|
+| PULL | `uo.<id>.avancement` | Récupère l'avancement poussé par le cockpit ingénieur | Synthèse + Par Ingénieur | CELL_PCT |
+| PULL | `uo.<id>.heures_realisees` | Récupère les heures réalisées poussées par le cockpit ingénieur | Synthèse + Par Ingénieur | CELL_NUM |
+| PULL | `uo.<id>.points_ouverts` | Récupère le nb de points ouverts pour alimentation des alertes | Alertes | CELL_NUM |
 
 ---
 
