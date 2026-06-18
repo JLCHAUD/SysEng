@@ -130,6 +130,7 @@ def load_uo_instances() -> List[UOInstance]:
             degrade=item.get("degrade", False),
             degrade_note=item.get("degrade_note", ""),
             owner_id=item.get("owner_id"),
+            pilotes=item.get("pilotes", {}),
             uo_type=resolved_type,
             system=system,
             project=project,

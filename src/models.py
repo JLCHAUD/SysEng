@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
@@ -172,6 +172,7 @@ class UOInstance:
     degrade: bool = False           # marqueur UO★ (périmètre réduit / non standard)
     degrade_note: str = ""
     owner_id: Optional[str] = None  # ID acteur propriétaire (référence acteurs.json)
+    pilotes: Dict[str, str] = field(default_factory=dict)
 
     # Références résolues (remplies par config_loader)
     uo_type: Optional[UOType] = None
