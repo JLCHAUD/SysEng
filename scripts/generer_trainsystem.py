@@ -1,18 +1,26 @@
 """
-Génère cockpits ingénieurs + dashboard pilote dans projet_TrainSystem/.
+Génère le cycle complet UOs → cockpits → dashboards dans projet_TrainSystem/.
 
-Tout est produit dans le même répertoire que les fichiers UO pour
-pouvoir tester le cycle complet sans changer de dossier.
+Tout est produit dans le même répertoire pour tester le cycle de bout en bout :
+  1. Fichiers UO individuels (7 onglets + _Manifeste)
+  2. Cockpits ingénieurs (Mes UOs + Agenda + _Manifeste)
+  3. Simulation de saisies ingénieur (données dans store.json)
+  4. Dashboards pilotes métier (Synthèse + Alertes)
 
 Usage :
     python scripts/generer_trainsystem.py
 
-Sortie :
-    projet_TrainSystem/Cockpit_Alice_Dubois.xlsx
-    projet_TrainSystem/Cockpit_Bruno_Lecomte.xlsx
-    projet_TrainSystem/Cockpit_Camille_Vidal.xlsx
-    projet_TrainSystem/Dashboard_Jean-Luc_Bernard.xlsx
-    projet_TrainSystem/store.json
+Sortie dans projet_TrainSystem/ :
+    UO-001_spec_fonctionnelle_climatisation.xlsx  ← fichier de travail Alice
+    UO-002_spec_systeme_frein.xlsx                ← fichier de travail Alice
+    UO-003_spec_technique_portes.xlsx             ← fichier de travail Bruno
+    UO-004_dossier_justification_eclairage.xlsx   ← fichier de travail Bruno
+    UO-005_spec_fonctionnelle_traction.xlsx       ← fichier de travail Camille
+    Cockpit_Alice_Dubois.xlsx                     ← vue agenda + suivi Alice
+    Cockpit_Bruno_Lecomte.xlsx
+    Cockpit_Camille_Vidal.xlsx
+    Dashboard_Jean-Luc_Bernard.xlsx               ← vue consolidée pilote
+    store.json                                    ← store de données partagé
 """
 
 import io
@@ -25,6 +33,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.config_loader import load_uo_instances, load_acteurs
+from src.generators.uo_generator import generate_uo_file
 from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
 from src.generators.dashboard_metier_generator import generate_dashboard_metier
 from src.store import JsonStore
@@ -67,8 +76,14 @@ def main():
     print(f"  Pilotes métier : {', '.join(a.nom for a in pilotes_metier)}")
     print(f"  Dossier sortie : {PROJET_DIR}")
 
-    # Étape 1 : Cockpits ingénieurs
-    banner("Étape 1 — Génération des cockpits ingénieurs")
+    # Étape 1 : Fichiers UO individuels
+    banner("Étape 1 — Génération des fichiers UO")
+    for uo in all_uos:
+        path = generate_uo_file(uo, output_dir=PROJET_DIR)
+        print(f"  ✅  {path.name}")
+
+    # Étape 2 : Cockpits ingénieurs
+    banner("Étape 2 — Génération des cockpits ingénieurs")
     for eng in engineers:
         path = generate_cockpit_ingenieur(
             eng, all_uos,
@@ -78,14 +93,14 @@ def main():
         nb_uos = len([u for u in all_uos if u.engineer_name == eng])
         print(f"  ✅  {path.name}  ({nb_uos} UOs)")
 
-    # Étape 2 : Injection des données simulées
-    banner("Étape 2 — Injection des données dans le store")
+    # Étape 3 : Injection des données simulées
+    banner("Étape 3 — Injection des données dans le store (saisies simulées)")
     store = JsonStore(STORE_PATH)
     store.set_many(SAISIES_SIMULEES)
     print(f"  {len(SAISIES_SIMULEES)} valeurs → {STORE_PATH.relative_to(ROOT)}")
 
-    # Étape 3 : Dashboards pilotes métier
-    banner("Étape 3 — Génération des dashboards pilotes métier")
+    # Étape 4 : Dashboards pilotes métier
+    banner("Étape 4 — Génération des dashboards pilotes métier")
     for pilote in pilotes_metier:
         path = generate_dashboard_metier(pilote, all_uos, store, output_dir=PROJET_DIR)
         uo_filtrees = len([u for u in all_uos
@@ -94,6 +109,7 @@ def main():
 
     # Résumé
     banner("Résumé — Fichiers dans projet_TrainSystem/")
+    print(f"  {'Fichier':<52} Taille")
     generated = []
     for f in sorted(PROJET_DIR.glob("*.xlsx")):
         size_kb = f.stat().st_size // 1024

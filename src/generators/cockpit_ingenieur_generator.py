@@ -93,7 +93,9 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         id_cell.font = body_font(color="0563C1")
         id_cell.alignment = left()
         id_cell.border = THIN_BORDER
-        uo_path = uo_dir / f"{uo.id}.xlsx"
+        uo_type_file = uo.uo_type.id if uo.uo_type else uo.uo_type_id
+        uo_sys_file = uo.system.id if uo.system else uo.system_id
+        uo_path = uo_dir / f"{uo.id}_{uo_type_file}_{uo_sys_file}.xlsx"
         id_cell.hyperlink = str(uo_path)
 
         ws.cell(row=row, column=2, value=type_name)
