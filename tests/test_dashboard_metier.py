@@ -163,28 +163,85 @@ class TestDashboardManifeste:
         ws = wb["_Manifeste"]
         assert str(ws["A1"].value).startswith("MANIFESTE_V=")
 
-    def test_colonne_commentaire_presente(self, tmp_path):
+    def test_ligne2_vide(self, tmp_path):
         from src.generators.dashboard_metier_generator import generate_dashboard_metier
         acteur = _make_pilote_metier()
         store = JsonStore(tmp_path / "store.json")
         path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["_Manifeste"]
-        headers = [ws.cell(row=2, column=c).value for c in range(1, 15)]
-        assert "COMMENTAIRE" in headers
+        assert ws["A2"].value is None
 
-    def test_regles_pull_avancement_presentes(self, tmp_path):
+    def test_file_type_en_a3(self, tmp_path):
         from src.generators.dashboard_metier_generator import generate_dashboard_metier
         acteur = _make_pilote_metier()
         store = JsonStore(tmp_path / "store.json")
         path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["_Manifeste"]
-        nom_globals = [ws.cell(row=r, column=3).value for r in range(3, 30)
-                       if ws.cell(row=r, column=3).value]
-        assert "uo.UO-001.avancement" in nom_globals
-        assert "uo.UO-003.avancement" in nom_globals
-        assert "uo.UO-004.avancement" not in nom_globals
+        assert ws["A3"].value == "FILE_TYPE: dashboard_pilote"
+
+    def test_pilote_id_en_a5(self, tmp_path):
+        """A5 doit contenir pilote_id: <id_acteur>."""
+        from src.generators.dashboard_metier_generator import generate_dashboard_metier
+        acteur = _make_pilote_metier()
+        store = JsonStore(tmp_path / "store.json")
+        path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        assert ws["A5"].value == f"pilote_id: {acteur.id}"
+
+    def test_list_dynamic_presente(self, tmp_path):
+        """Une instruction LIST mes_uos TYPE=uo_instance WHERE pilote_id=... doit exister."""
+        from src.generators.dashboard_metier_generator import generate_dashboard_metier
+        acteur = _make_pilote_metier()
+        store = JsonStore(tmp_path / "store.json")
+        path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
+        assert any(
+            str(v).startswith("LIST mes_uos TYPE=uo_instance") for v in instrs if v
+        )
+
+    def test_collect_presente(self, tmp_path):
+        """Une instruction COLLECT ... FROM mes_uos doit exister."""
+        from src.generators.dashboard_metier_generator import generate_dashboard_metier
+        acteur = _make_pilote_metier()
+        store = JsonStore(tmp_path / "store.json")
+        path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
+        assert any(
+            str(v).startswith("COLLECT") and "FROM mes_uos" in str(v)
+            for v in instrs if v
+        )
+
+    def test_commentaires_en_colonne_c(self, tmp_path):
+        from src.generators.dashboard_metier_generator import generate_dashboard_metier
+        acteur = _make_pilote_metier()
+        store = JsonStore(tmp_path / "store.json")
+        path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        for r in range(3, 12):
+            instr = ws.cell(row=r, column=1).value
+            if instr and str(instr).strip():
+                comment = ws.cell(row=r, column=3).value
+                assert comment and len(str(comment)) > 5, \
+                    f"Commentaire manquant ligne {r}: '{comment}'"
+
+    def test_mxl_parseable_zero_erreurs(self, tmp_path):
+        from src.generators.dashboard_metier_generator import generate_dashboard_metier
+        from src.parser import parse_file
+        acteur = _make_pilote_metier()
+        store = JsonStore(tmp_path / "store.json")
+        path = generate_dashboard_metier(acteur, ALL_UOS, store, output_dir=tmp_path)
+        ast = parse_file(path)
+        assert ast is not None
+        errors = [f"L{e.line_num}: {e.message}" for e in ast.errors]
+        assert not ast.errors, f"Erreurs de parse MXL : {errors}"
 
 
 class TestPushPullCycle:

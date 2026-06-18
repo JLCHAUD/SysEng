@@ -47,7 +47,7 @@ def generate_dashboard_metier(
     _sheet_synthese(wb, acteur, uo_list, store)
     _sheet_par_ingenieur(wb, acteur, uo_list, store)
     _sheet_alertes(wb, uo_list, store)
-    _sheet_manifeste_dashboard(wb, uo_list)
+    _sheet_manifeste_dashboard(wb, acteur, uo_list)
 
     safe = acteur.nom.replace(" ", "_")
     filepath = output_dir / f"Dashboard_{safe}.xlsx"
@@ -322,51 +322,39 @@ def _sheet_alertes(wb: Workbook, uo_list: List[UOInstance], store: JsonStore):
     ws.freeze_panes = "A3"
 
 
-_MANIFESTE_HEADERS = [
-    "TYPE", "SCOPE", "NOM_GLOBAL", "NOM_LOCAL",
-    "FEUILLE", "TABLEAU", "CLE", "COLONNES",
-    "CELLULE", "DIRECTION", "FORMULE", "COMMENTAIRE",
-]
-
-
-def _sheet_manifeste_dashboard(wb: Workbook, uo_list: List[UOInstance]):
-    """_Manifeste du dashboard : règles PULL pour chaque UO du périmètre."""
+def _sheet_manifeste_dashboard(wb: Workbook, acteur, uo_list: List[UOInstance]):
+    """Génère l'onglet _Manifeste dashboard au format MXL mono-colonne.
+    Col A = instruction MXL, col B = ancre, col C = commentaire français.
+    Le pilote_id en métadonnée permet à LIST DYNAMIC de découvrir ce dashboard.
+    """
     ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
 
+    def _mxl_row(row: int, instr: str, ancre: str = "", comment: str = ""):
+        cell_a = ws.cell(row=row, column=1, value=instr)
+        cell_a.font = body_font(size=9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ", "LIST ", "COLLECT ")))
+        cell_a.alignment = left()
+        if ancre:
+            ws.cell(row=row, column=2, value=ancre).font = body_font(size=9, color="888888")
+        if comment:
+            c = ws.cell(row=row, column=3, value=comment)
+            c.font = body_font(size=9, color="666666")
+            c.fill = solid_fill("F9F9F9")
+
+    # Ligne 1 : version
     ws["A1"] = "MANIFESTE_V=1"
     ws["A1"].font = body_font(bold=True, color="1F3864")
+    # Ligne 2 intentionnellement vide
 
-    for col, h in enumerate(_MANIFESTE_HEADERS, 1):
-        ws.cell(row=2, column=col, value=h)
-    style_header_row(ws, 2, 1, len(_MANIFESTE_HEADERS), color=BLUE_MID)
+    # Métadonnées
+    _mxl_row(3, "FILE_TYPE: dashboard_pilote",       comment="Type de fichier ExoSync")
+    _mxl_row(4, f"FILE_ID: Dashboard_{acteur.id}",   comment="Identifiant unique du dashboard")
+    _mxl_row(5, f"pilote_id: {acteur.id}",            comment="Identifiant du pilote propriétaire")
 
-    row = 3
-    for i, uo in enumerate(uo_list):
-        synth_row = 6 + i
+    # Découverte automatique des UOs
+    _mxl_row(7, f"LIST mes_uos TYPE=uo_instance WHERE pilote_id={acteur.id}",
+             comment="Découverte automatique des UOs dont ce pilote est responsable")
+    _mxl_row(8, "COLLECT Activites FROM mes_uos INTO vue_synthese",
+             comment="Agrégation de toutes les activités des UOs de l'équipe")
 
-        rules = [
-            ("CELL_PCT",  "GLOBAL", f"uo.{uo.id}.avancement",      "", "Synthèse", "", "", "", f"G{synth_row}", "PULL", "",
-             f"Récupère l'avancement de {uo.id} poussé par le cockpit de {uo.engineer_name}"),
-            ("CELL_NUM",  "GLOBAL", f"uo.{uo.id}.heures_realisees", "", "Synthèse", "", "", "", f"H{synth_row}", "PULL", "",
-             f"Récupère les heures réalisées de {uo.id} poussées par le cockpit de {uo.engineer_name}"),
-            ("CELL_NUM",  "GLOBAL", f"uo.{uo.id}.points_ouverts",  "", "Alertes",  "", "", "", "",             "PULL", "",
-             f"Récupère le nb de points ouverts de {uo.id} pour alimentation des alertes"),
-        ]
-
-        for rule in rules:
-            for col, val in enumerate(rule, 1):
-                c = ws.cell(row=row, column=col, value=val)
-                c.font = body_font(size=10)
-                c.border = THIN_BORDER
-                c.alignment = left()
-            ws.cell(row=row, column=12).font = body_font(size=10, color="666666")
-            ws.cell(row=row, column=12).fill = solid_fill("F7F7F7")
-            row += 1
-
-        row += 1
-
-    set_column_widths(ws, {
-        "A": 12, "B": 8, "C": 35, "D": 14, "E": 12, "F": 10,
-        "G": 8, "H": 10, "I": 10, "J": 10, "K": 10, "L": 60,
-    })
+    set_column_widths(ws, {"A": 65, "B": 18, "C": 55})
