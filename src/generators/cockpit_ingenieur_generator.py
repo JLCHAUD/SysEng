@@ -19,12 +19,6 @@ from src.styles import (
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output" / "cockpits"
 UO_DIR = Path(__file__).parent.parent.parent / "output" / "UOs"
 
-MANIFESTE_HEADERS = [
-    "TYPE", "SCOPE", "NOM_GLOBAL", "NOM_LOCAL",
-    "FEUILLE", "TABLEAU", "CLE", "COLONNES",
-    "CELLULE", "DIRECTION", "FORMULE", "COMMENTAIRE",
-]
-
 
 def generate_cockpit_ingenieur(
     engineer_name: str,
@@ -40,7 +34,7 @@ def generate_cockpit_ingenieur(
 
     _sheet_mes_uos(wb, engineer_name, uo_list)
     _sheet_agenda(wb, engineer_name, uo_list)
-    _sheet_manifeste(wb, uo_list)
+    _sheet_manifeste(wb, engineer_name, uo_list)
 
     safe = engineer_name.replace(" ", "_")
     filepath = output_dir / f"Cockpit_{safe}.xlsx"
@@ -298,45 +292,46 @@ def _agenda_points_ouverts(ws, start_row: int, uo_list: List[UOInstance]) -> int
     return start_row
 
 
-def _sheet_manifeste(wb: Workbook, uo_list: List[UOInstance]):
+def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
+    """Génère l'onglet _Manifeste au format MXL mono-colonne.
+    Col A = instruction MXL, col B = ancre, col C = commentaire français.
+    """
     ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
 
+    safe_name = engineer_name.replace(" ", "_")
+
+    def _mxl_row(row: int, instr: str, ancre: str = "", comment: str = ""):
+        cell_a = ws.cell(row=row, column=1, value=instr)
+        cell_a.font = body_font(size=9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ")))
+        cell_a.alignment = left()
+        if ancre:
+            ws.cell(row=row, column=2, value=ancre).font = body_font(size=9, color="888888")
+        if comment:
+            c = ws.cell(row=row, column=3, value=comment)
+            c.font = body_font(size=9, color="666666")
+            c.fill = solid_fill("F9F9F9")
+
+    # Ligne 1 : version
     ws["A1"] = "MANIFESTE_V=1"
     ws["A1"].font = body_font(bold=True, color="1F3864")
+    # Ligne 2 intentionnellement vide (skippée par parser.py)
 
-    for col, h in enumerate(MANIFESTE_HEADERS, 1):
-        ws.cell(row=2, column=col, value=h)
-    style_header_row(ws, 2, 1, len(MANIFESTE_HEADERS), color=BLUE_MID)
+    # Métadonnées
+    _mxl_row(3, "FILE_TYPE: cockpit_ingenieur",     comment="Type de fichier ExoSync")
+    _mxl_row(4, f"FILE_ID: Cockpit_{safe_name}",    comment="Identifiant unique du cockpit")
+    _mxl_row(5, f"ingenieur: {engineer_name}",      comment="Nom de l'ingénieur propriétaire")
 
-    row = 3
-    for i, uo in enumerate(uo_list):
-        mes_uos_data_row = 6 + i
+    # Définition de la table
+    _mxl_row(7, "DEF $mes_uos = GET_TABLE(Mes UOs, tbl_mes_uos)",
+             comment="Référence à la table des UOs de l'ingénieur")
+    _mxl_row(8, "COL $mes_uos.avancement : WRITE=engineer",
+             comment="% avancement saisi par l'ingénieur (zone jaune)")
+    _mxl_row(9, "COL $mes_uos.heures_realisees : WRITE=engineer",
+             comment="Heures réalisées saisies par l'ingénieur (zone jaune)")
 
-        rules = [
-            ("CELL_PCT",  "GLOBAL", f"uo.{uo.id}.avancement",       "", "Mes UOs", "", "", "", f"F{mes_uos_data_row}", "PUSH", "",
-             "Remonte le % d'avancement saisi par l'ingénieur vers le store central"),
-            ("CELL_NUM",  "GLOBAL", f"uo.{uo.id}.heures_realisees",  "", "Mes UOs", "", "", "", f"G{mes_uos_data_row}", "PUSH", "",
-             "Remonte les heures réalisées saisies par l'ingénieur vers le store central"),
-            ("CELL_NUM",  "GLOBAL", f"uo.{uo.id}.charge_allouee",    "", "Mes UOs", "", "", "", f"E{mes_uos_data_row}", "PULL", "",
-             "Injecte la charge allouée depuis le store (valeur de référence, lecture seule)"),
-            ("CELL_DATE", "GLOBAL", f"uo.{uo.id}.date_fin",          "", "Mes UOs", "", "", "", f"H{mes_uos_data_row}", "PULL", "",
-             "Injecte la date de fin planifiée depuis le store (lecture seule)"),
-        ]
+    # Export vers store
+    _mxl_row(11, f"PUSH $mes_uos -> cockpit.{safe_name}.mes_uos",
+             comment="Remonte les saisies ingénieur vers le store central ExoSync")
 
-        for rule in rules:
-            for col, val in enumerate(rule, 1):
-                c = ws.cell(row=row, column=col, value=val)
-                c.font = body_font(size=10)
-                c.border = THIN_BORDER
-                c.alignment = left()
-            ws.cell(row=row, column=12).font = body_font(size=10, color="666666")
-            ws.cell(row=row, column=12).fill = solid_fill("F7F7F7")
-            row += 1
-
-        row += 1
-
-    set_column_widths(ws, {
-        "A": 12, "B": 8, "C": 35, "D": 14, "E": 12, "F": 10,
-        "G": 8, "H": 10, "I": 10, "J": 10, "K": 10, "L": 55,
-    })
+    set_column_widths(ws, {"A": 60, "B": 18, "C": 55})

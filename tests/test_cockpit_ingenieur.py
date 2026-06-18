@@ -133,32 +133,77 @@ class TestCockpitManifeste:
         ws = wb["_Manifeste"]
         assert str(ws["A1"].value).startswith("MANIFESTE_V=")
 
-    def test_colonne_commentaire_presente(self, tmp_path):
+    def test_ligne2_vide(self, tmp_path):
+        """Ligne 2 doit être vide — le parser MXL la skippe."""
         from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["_Manifeste"]
-        headers = [ws.cell(row=2, column=c).value for c in range(1, 15)]
-        assert "COMMENTAIRE" in headers
+        assert ws["A2"].value is None
 
-    def test_regles_push_avancement_presentes(self, tmp_path):
+    def test_file_type_en_a3(self, tmp_path):
+        """A3 doit contenir FILE_TYPE: cockpit_ingenieur."""
         from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["_Manifeste"]
-        nom_globals = [ws.cell(row=r, column=3).value for r in range(3, 20) if ws.cell(row=r, column=3).value]
-        assert "uo.UO-001.avancement" in nom_globals
-        assert "uo.UO-002.avancement" in nom_globals
+        assert ws["A3"].value == "FILE_TYPE: cockpit_ingenieur"
 
-    def test_commentaires_non_vides(self, tmp_path):
+    def test_commentaires_en_colonne_c(self, tmp_path):
+        """Chaque instruction MXL doit avoir un commentaire non vide en colonne C."""
         from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["_Manifeste"]
-        headers = {ws.cell(row=2, column=c).value: c for c in range(1, 15)}
-        col_c = headers.get("COMMENTAIRE")
-        assert col_c is not None
-        for r in range(3, 20):
-            if ws.cell(row=r, column=1).value:
-                comment = ws.cell(row=r, column=col_c).value
-                assert comment and len(str(comment)) > 10, f"Commentaire manquant ligne {r}"
+        # Lignes avec une instruction en col A doivent avoir un commentaire en col C
+        for r in range(3, 15):
+            instr = ws.cell(row=r, column=1).value
+            if instr and str(instr).strip():
+                comment = ws.cell(row=r, column=3).value
+                assert comment and len(str(comment)) > 5, \
+                    f"Commentaire manquant ou trop court en ligne {r}: '{comment}'"
+
+    def test_push_instruction_presente(self, tmp_path):
+        """Une instruction PUSH $mes_uos -> ... doit être présente."""
+        from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
+        path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
+        assert any(
+            str(v).startswith("PUSH $mes_uos") for v in instrs if v
+        )
+
+    def test_def_get_table_presente(self, tmp_path):
+        """Une instruction DEF $mes_uos = GET_TABLE(...) doit être présente."""
+        from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
+        path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
+        assert any(
+            str(v).startswith("DEF $mes_uos = GET_TABLE") for v in instrs if v
+        )
+
+    def test_colonne_b_non_polluee(self, tmp_path):
+        """Col B = ancres uniquement. Les commentaires ne doivent PAS être en col B."""
+        from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
+        path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["_Manifeste"]
+        for r in range(3, 15):
+            b_val = ws.cell(row=r, column=2).value
+            # Col B est vide ou contient une ancre (pas un commentaire long)
+            if b_val:
+                assert len(str(b_val)) < 60, \
+                    f"Col B ligne {r} semble contenir un commentaire : '{b_val}'"
+
+    def test_mxl_parseable_zero_erreurs(self, tmp_path):
+        """Le _Manifeste généré doit être parseable par parser.py sans erreur."""
+        from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
+        from src.parser import parse_file
+        path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
+        ast = parse_file(path)
+        assert ast is not None, "parse_file() a retourné None — pas de feuille _Manifeste"
+        errors = [f"L{e.line_num}: {e.message}" for e in ast.errors]
+        assert not ast.errors, f"Erreurs de parse MXL : {errors}"
