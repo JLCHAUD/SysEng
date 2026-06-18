@@ -24,6 +24,7 @@ def generate_cockpit_ingenieur(
     engineer_name: str,
     all_uo_instances: List[UOInstance],
     output_dir: Path = OUTPUT_DIR,
+    uo_dir: Path = UO_DIR,
 ) -> Path:
     """Génère le cockpit agenda pour un ingénieur système."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -32,7 +33,7 @@ def generate_cockpit_ingenieur(
     wb = Workbook()
     wb.remove(wb.active)
 
-    _sheet_mes_uos(wb, engineer_name, uo_list)
+    _sheet_mes_uos(wb, engineer_name, uo_list, uo_dir)
     _sheet_agenda(wb, engineer_name, uo_list)
     _sheet_manifeste(wb, engineer_name, uo_list)
 
@@ -42,7 +43,7 @@ def generate_cockpit_ingenieur(
     return filepath
 
 
-def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
+def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], uo_dir: Path = UO_DIR):
     ws = wb.create_sheet("Mes UOs")
     ws.sheet_view.showGridLines = False
 
@@ -92,7 +93,7 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
         id_cell.font = body_font(color="0563C1")
         id_cell.alignment = left()
         id_cell.border = THIN_BORDER
-        uo_path = UO_DIR / f"{uo.id}.xlsx"
+        uo_path = uo_dir / f"{uo.id}.xlsx"
         id_cell.hyperlink = str(uo_path)
 
         ws.cell(row=row, column=2, value=type_name)
