@@ -89,6 +89,14 @@ class TestCockpitMesUOs:
         assert alerte_cell is not None
         assert str(alerte_cell).startswith("=IF(")
 
+    def test_table_nommee_tbl_mes_uos_presente(self, tmp_path):
+        from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
+        path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
+        wb = load_workbook(path)
+        ws = wb["Mes UOs"]
+        table_names = list(ws.tables.keys())
+        assert "tbl_mes_uos" in table_names
+
 
 class TestCockpitAgenda:
     def test_en_tetes_onglet_agenda(self, tmp_path):

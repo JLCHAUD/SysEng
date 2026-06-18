@@ -6,6 +6,7 @@ from typing import List
 
 from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from src.models import UOInstance
 from src.styles import (
@@ -148,6 +149,16 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
             CellIsRule(operator="equal", formula=['"✅ OK"'],
                        fill=solid_fill(GREEN_LIGHT)),
         )
+
+    # Table nommée pour GET_TABLE(Mes UOs, tbl_mes_uos)
+    if uo_list:
+        tbl_ref = f"A5:I{last_row}"
+        tbl = Table(displayName="tbl_mes_uos", ref=tbl_ref)
+        tbl.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium2", showFirstColumn=False,
+            showLastColumn=False, showRowStripes=True, showColumnStripes=False,
+        )
+        ws.add_table(tbl)
 
     set_column_widths(ws, {
         "A": 12, "B": 30, "C": 18, "D": 20, "E": 13,
