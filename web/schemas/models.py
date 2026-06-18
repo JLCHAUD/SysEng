@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 
@@ -21,9 +21,7 @@ class FileTypeCreate(FileTypeBase):
 
 class FileType(FileTypeBase):
     id: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── FileInstance (Registre) ────────────────────────────────────────────────────
@@ -46,9 +44,7 @@ class FileInstance(FileInstanceBase):
     derniere_synchro: Optional[str] = None
     statut_dernier_synchro: Optional[str] = None
     schema_outdated: Optional[bool] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Actor ─────────────────────────────────────────────────────────────────────
@@ -65,9 +61,7 @@ class ActorCreate(ActorBase):
 
 class Actor(ActorBase):
     id: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── TableDef ──────────────────────────────────────────────────────────────────
