@@ -23,11 +23,17 @@ class XD:
     # ── Palette transversale (statuts / neutres) ───────────────
     WHITE = "FFFFFF"
     INPUT = "FFF2CC"
-    GREEN_L = "EAF3DE"; GREEN_D = "27500A"
-    BLUE_L = "E6F1FB";  NAVY_D = "0C447C"
-    AMBER_L = "FAEEDA"; AMBER_D = "854F0B"
-    RED_L = "FCEBEB";   RED_D = "791F1F"
-    GREY_L = "F1EFE8";  GREY_D = "5F5E5A"; GREY_B = "D3D1C7"
+    GREEN_L = "EAF3DE"
+    GREEN_D = "27500A"
+    BLUE_L = "E6F1FB"
+    NAVY_D = "0C447C"
+    AMBER_L = "FAEEDA"
+    AMBER_D = "854F0B"
+    RED_L = "FCEBEB"
+    RED_D = "791F1F"
+    GREY_L = "F1EFE8"
+    GREY_D = "5F5E5A"
+    GREY_B = "D3D1C7"
 
     # ── Bordure fine (4 côtés) ─────────────────────────────────
     _SIDE = Side(style="thin", color="D3D1C7")
