@@ -5,19 +5,13 @@ from pathlib import Path
 from typing import List, Tuple
 
 from openpyxl import Workbook
-from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.formatting.rule import FormulaRule
 
 from src.models import ProfilActeur, TypeFiltre, UOInstance
 from src.store import JsonStore
-from src.styles import (
-    BLUE_DARK, BLUE_MID, BLUE_LIGHT, GREEN_LIGHT, ORANGE_LIGHT, RED_LIGHT,
-    YELLOW_LIGHT, WHITE, GREY_LIGHT, THIN_BORDER,
-    solid_fill, header_font, body_font, center, left,
-    style_header_row, style_data_row, set_column_widths, freeze_top_row,
-)
+from src.xl_design import XD
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output" / "cockpits"
-COCKPIT_DIR = Path(__file__).parent.parent.parent / "output" / "cockpits"
 
 
 def _filter_instances(acteur: ProfilActeur, instances: List[UOInstance]) -> List[UOInstance]:
@@ -72,59 +66,52 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
                     uo_list: List[UOInstance], store: JsonStore):
     ws = wb.create_sheet("Synthèse")
     ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 2.5
 
-    ws.merge_cells("A1:J1")
-    t = ws["A1"]
-    t.value = (f"Dashboard Métier — {acteur.nom}   |   "
-               f"{date.today().strftime('%d/%m/%Y')}")
-    t.fill = solid_fill(BLUE_DARK)
-    t.font = header_font(size=14)
-    t.alignment = center()
-    ws.row_dimensions[1].height = 32
+    XD.banner(ws, "dashboard", f"Dashboard Métier — {acteur.nom}",
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=11)
 
     total_h = int(sum(u.total_hours for u in uo_list))
     avancement_vals = [_get_store_float(store, f"uo.{u.id}.avancement") for u in uo_list]
     avg_avanc = sum(avancement_vals) / len(avancement_vals) if avancement_vals else 0
 
     kpis = [
-        ("A2:B2", len(uo_list), "Périmètre équipe"),
-        ("C2:D2", total_h, "Charge totale"),
-        ("E2:F2", avg_avanc, "Avancement moyen"),
+        ("B2:C2", len(uo_list), "Périmètre équipe"),
+        ("D2:E2", total_h, "Charge totale"),
+        ("F2:G2", avg_avanc, "Avancement moyen"),
     ]
     for cell_range, value, label in kpis:
         ws.merge_cells(cell_range)
         first_cell = cell_range.split(":")[0]
         c = ws[first_cell]
         c.value = value
-        c.fill = solid_fill(BLUE_LIGHT)
-        c.font = body_font(bold=True, color="1F3864")
-        c.alignment = center()
-        c.border = THIN_BORDER
+        c.fill = XD.fill(XD.sheet("dashboard").accent)
+        c.font = XD.fnt(11, bold=True, color="1F3864")
+        c.alignment = XD.center()
+        c.border = XD.HAIR
     # Label row under KPIs
-    ws.merge_cells("A3:B3")
-    ws["A3"].value = "Périmètre équipe"
-    ws.merge_cells("C3:D3")
-    ws["C3"].value = "Charge totale (h)"
-    ws.merge_cells("E3:F3")
-    ws["E3"].value = "Avancement moyen"
-    for col_label in ("A3", "C3", "E3"):
-        ws[col_label].font = body_font(color="555555")
-        ws[col_label].alignment = center()
+    ws.merge_cells("B3:C3")
+    ws["B3"].value = "Périmètre équipe"
+    ws.merge_cells("D3:E3")
+    ws["D3"].value = "Charge totale (h)"
+    ws.merge_cells("F3:G3")
+    ws["F3"].value = "Avancement moyen"
+    for col_label in ("B3", "D3", "F3"):
+        ws[col_label].font = XD.fnt(11, color="555555")
+        ws[col_label].alignment = XD.center()
     ws.row_dimensions[2].height = 24
     ws.row_dimensions[3].height = 18
 
-    ws.merge_cells("A4:J4")
-    sec = ws["A4"]
+    ws.merge_cells("B4:K4")
+    sec = ws["B4"]
     sec.value = "Toutes les UOs de l'équipe"
-    sec.fill = solid_fill(BLUE_MID)
-    sec.font = header_font()
-    sec.alignment = center()
+    sec.fill = XD.fill(XD.sheet("dashboard").header)
+    sec.font = XD.fnt(11, bold=True, color=XD.WHITE)
+    sec.alignment = XD.center()
 
     headers = ["UO ID", "Ingénieur", "Type UO", "Système", "Projet",
                "Charge (h)", "% Avancement", "H réalisées", "Date fin", "Alerte"]
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=5, column=col, value=h)
-    style_header_row(ws, 5, 1, 10, color=BLUE_MID)
+    XD.table_header(ws, 5, headers, "dashboard", col_start=2)
 
     for i, uo in enumerate(uo_list):
         row = 6 + i
@@ -134,19 +121,19 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
         sys_name = uo.system.name if uo.system else uo.system_id
         proj_name = uo.project.name if uo.project else uo.project_id
 
-        ws.cell(row=row, column=1, value=uo.id)
-        ws.cell(row=row, column=2, value=uo.engineer_name)
-        ws.cell(row=row, column=3, value=type_name)
-        ws.cell(row=row, column=4, value=sys_name)
-        ws.cell(row=row, column=5, value=proj_name)
-        ws.cell(row=row, column=6, value=uo.total_hours)
+        ws.cell(row=row, column=2, value=uo.id)
+        ws.cell(row=row, column=3, value=uo.engineer_name)
+        ws.cell(row=row, column=4, value=type_name)
+        ws.cell(row=row, column=5, value=sys_name)
+        ws.cell(row=row, column=6, value=proj_name)
+        ws.cell(row=row, column=7, value=uo.total_hours)
 
-        avanc_cell = ws.cell(row=row, column=7, value=avancement)
+        avanc_cell = ws.cell(row=row, column=8, value=avancement)
         avanc_cell.number_format = "0%"
 
-        ws.cell(row=row, column=8, value=h_real)
+        ws.cell(row=row, column=9, value=h_real)
 
-        date_cell = ws.cell(row=row, column=9, value=uo.end_date)
+        date_cell = ws.cell(row=row, column=10, value=uo.end_date)
         date_cell.number_format = "DD/MM/YYYY"
 
         today = date.today()
@@ -156,20 +143,45 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
             alerte = "⏰ Échéance proche"
         else:
             alerte = "✅ OK"
-        ws.cell(row=row, column=10, value=alerte)
+        ws.cell(row=row, column=11, value=alerte)
 
-        style_data_row(ws, row, 1, 10, alternate=(i % 2 == 1))
+        alternate = (i % 2 == 1)
+        bg = XD.sheet("dashboard").accent if alternate else XD.WHITE
+        for c in range(2, 12):
+            cell = ws.cell(row=row, column=c)
+            cell.fill = XD.fill(bg)
+            cell.font = XD.fnt(11)
+            cell.alignment = XD.left()
+            cell.border = XD.HAIR
+        # Restore number formats after style_data_row equivalent
+        ws.cell(row=row, column=8).number_format = "0%"
+        ws.cell(row=row, column=10).number_format = "DD/MM/YYYY"
 
-    set_column_widths(ws, {
-        "A": 12, "B": 22, "C": 28, "D": 18, "E": 22,
-        "F": 13, "G": 16, "H": 14, "I": 14, "J": 22,
-    })
-    ws.freeze_panes = "A6"
+    # Spine santé col A (hors tableau — _sheet_synthese n'a pas de named table)
+    ws.cell(row=5, column=1).fill = XD.fill(XD.sheet("dashboard").banner)
+    last_row = 5 + len(uo_list)
+    if uo_list:
+        spine_rng = f"A6:A{last_row}"
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="⚠ Dérive heures"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_ALERT)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="⏰ Échéance proche"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_WATCH)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="✅ OK"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_DONE)))
+
+    for col, w in {"A": 2.5, "B": 12, "C": 22, "D": 28, "E": 18, "F": 22,
+                   "G": 13, "H": 16, "I": 14, "J": 14, "K": 22}.items():
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "B6"
 
 
 def _sheet_vue_synthese(wb: Workbook):
     """Feuille réceptrice du COLLECT — tbl_vue_synthese remplie par ExoSync."""
     ws = wb.create_sheet("Vue Synthèse")
+    ws.sheet_properties.tabColor = XD.sheet("dashboard").header
     ws.sheet_view.showGridLines = False
 
     # En-têtes alignés sur tbl_mes_uos pour que COLLECT fusionne correctement
@@ -177,16 +189,15 @@ def _sheet_vue_synthese(wb: Workbook):
                "Projet", "Charge (h)", "% Avancement", "H réalisées", "Date fin", "Alerte"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
+    XD.table_header(ws, 1, headers, "dashboard")
     # Ligne vide d'initialisation (table doit avoir au moins 1 ligne de données)
     ws.cell(row=2, column=1, value="(vide — rempli par ExoSync)")
 
-    tbl = Table(displayName="tbl_vue_synthese", ref=f"A1:{chr(64+len(headers))}2")
-    tbl.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2", showRowStripes=True,
-    )
-    ws.add_table(tbl)
-    set_column_widths(ws, {"A": 22, "B": 22, "C": 18, "D": 28, "E": 18,
-                           "F": 20, "G": 13, "H": 16, "I": 14, "J": 14, "K": 22})
+    ref = f"A1:{chr(64+len(headers))}2"
+    XD.named_table(ws, "tbl_vue_synthese", ref, "dashboard")
+    for col, w in {"A": 22, "B": 22, "C": 18, "D": 28, "E": 18,
+                   "F": 20, "G": 13, "H": 16, "I": 14, "J": 14, "K": 22}.items():
+        ws.column_dimensions[col].width = w
 
 
 def _sheet_par_ingenieur(wb: Workbook, acteur: ProfilActeur,
@@ -194,13 +205,7 @@ def _sheet_par_ingenieur(wb: Workbook, acteur: ProfilActeur,
     ws = wb.create_sheet("Par Ingénieur")
     ws.sheet_view.showGridLines = False
 
-    ws.merge_cells("A1:H1")
-    t = ws["A1"]
-    t.value = f"Détail par Ingénieur — {acteur.nom}"
-    t.fill = solid_fill(BLUE_DARK)
-    t.font = header_font(size=13)
-    t.alignment = center()
-    ws.row_dimensions[1].height = 28
+    XD.banner(ws, "activites", f"Détail par Ingénieur — {acteur.nom}", n_cols=8)
 
     engineers = sorted(set(u.engineer_name for u in uo_list))
     current_row = 3
@@ -215,19 +220,15 @@ def _sheet_par_ingenieur(wb: Workbook, acteur: ProfilActeur,
         eng_cell = ws[f"A{current_row}"]
         eng_cell.value = (f"▶  {eng}   |   {len(eng_uo)} UO   |   "
                           f"{total_h}h   |   {avg_avanc:.0%} avancement moyen")
-        eng_cell.fill = solid_fill(BLUE_MID)
-        eng_cell.font = header_font()
-        eng_cell.alignment = left()
+        eng_cell.fill = XD.fill(XD.sheet("activites").header)
+        eng_cell.font = XD.fnt(11, bold=True, color=XD.WHITE)
+        eng_cell.alignment = XD.left()
         ws.row_dimensions[current_row].height = 22
         current_row += 1
 
         sub_headers = ["UO ID", "Type", "Système", "Projet",
                        "Charge (h)", "% Avancement", "H réalisées", "Date fin"]
-        for col, h in enumerate(sub_headers, 1):
-            ws.cell(row=current_row, column=col, value=h)
-        style_header_row(ws, current_row, 1, 8, color=BLUE_LIGHT)
-        for col in range(1, 9):
-            ws.cell(row=current_row, column=col).font = body_font(bold=True, color="1F3864")
+        XD.table_header(ws, current_row, sub_headers, "activites")
         current_row += 1
 
         for i, uo in enumerate(eng_uo):
@@ -247,23 +248,33 @@ def _sheet_par_ingenieur(wb: Workbook, acteur: ProfilActeur,
             ws.cell(row=current_row, column=7, value=h_real)
             dc = ws.cell(row=current_row, column=8, value=uo.end_date)
             dc.number_format = "DD/MM/YYYY"
-            style_data_row(ws, current_row, 1, 8, alternate=(i % 2 == 1))
+
+            alternate = (i % 2 == 1)
+            bg = XD.sheet("activites").accent if alternate else XD.WHITE
+            for c in range(1, 9):
+                cell = ws.cell(row=current_row, column=c)
+                cell.fill = XD.fill(bg)
+                cell.font = XD.fnt(11)
+                cell.alignment = XD.left()
+                cell.border = XD.HAIR
+            # Restore number formats
+            ws.cell(row=current_row, column=6).number_format = "0%"
+            ws.cell(row=current_row, column=8).number_format = "DD/MM/YYYY"
             current_row += 1
 
-        cockpit_path = COCKPIT_DIR / f"Cockpit_{eng.replace(' ', '_')}.xlsx"
+        cockpit_path = OUTPUT_DIR / f"Cockpit_{eng.replace(' ', '_')}.xlsx"
         ws.merge_cells(f"A{current_row}:H{current_row}")
         link_cell = ws[f"A{current_row}"]
         link_cell.value = f"→ Ouvrir cockpit {eng}"
         link_cell.hyperlink = str(cockpit_path)
-        link_cell.font = body_font(color="0563C1")
-        link_cell.alignment = left()
-        link_cell.fill = solid_fill(GREY_LIGHT)
-        link_cell.border = THIN_BORDER
+        link_cell.font = XD.fnt(11, color="0563C1")
+        link_cell.alignment = XD.left()
+        link_cell.fill = XD.fill(XD.GREY_L)
+        link_cell.border = XD.HAIR
         current_row += 2
 
-    set_column_widths(ws, {
-        "A": 12, "B": 28, "C": 18, "D": 22, "E": 13, "F": 16, "G": 14, "H": 14,
-    })
+    for col, w in {"A": 12, "B": 28, "C": 18, "D": 22, "E": 13, "F": 16, "G": 14, "H": 14}.items():
+        ws.column_dimensions[col].width = w
 
 
 def _compute_alerts(uo_list: List[UOInstance], store: JsonStore) -> List[Tuple]:
@@ -302,18 +313,12 @@ def _sheet_alertes(wb: Workbook, uo_list: List[UOInstance], store: JsonStore):
     ws = wb.create_sheet("Alertes")
     ws.sheet_view.showGridLines = False
 
-    ws.merge_cells("A1:E1")
-    t = ws["A1"]
-    t.value = f"Alertes & Risques — {date.today().strftime('%d/%m/%Y')}"
-    t.fill = solid_fill("C00000")
-    t.font = header_font(size=13)
-    t.alignment = center()
-    ws.row_dimensions[1].height = 28
+    XD.banner(ws, "oil", f"Alertes & Risques — {date.today().strftime('%d/%m/%Y')}", n_cols=5)
 
     headers = ["Ingénieur", "UO ID", "Type alerte", "Détail", "Criticité"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=2, column=col, value=h)
-    style_header_row(ws, 2, 1, 5, color=BLUE_MID)
+    XD.table_header(ws, 2, headers, "oil")
 
     alerts = _compute_alerts(uo_list, store)
 
@@ -321,10 +326,10 @@ def _sheet_alertes(wb: Workbook, uo_list: List[UOInstance], store: JsonStore):
         ws.merge_cells("A3:E3")
         c = ws["A3"]
         c.value = "✅ Aucune alerte active"
-        c.fill = solid_fill(GREEN_LIGHT)
-        c.font = body_font(bold=True, color="1F3864")
-        c.alignment = center()
-        c.border = THIN_BORDER
+        c.fill = XD.fill(XD.GREEN_L)
+        c.font = XD.fnt(11, bold=True, color="1F3864")
+        c.alignment = XD.center()
+        c.border = XD.HAIR
     else:
         for i, (eng, uid, type_a, detail, criticite, _) in enumerate(alerts):
             row = 3 + i
@@ -334,15 +339,16 @@ def _sheet_alertes(wb: Workbook, uo_list: List[UOInstance], store: JsonStore):
             ws.cell(row=row, column=4, value=detail)
             ws.cell(row=row, column=5, value=criticite)
 
-            fill_color = RED_LIGHT if "Critique" in criticite else ORANGE_LIGHT
+            fill_color = XD.RED_L if "Critique" in criticite else XD.AMBER_L
             for col in range(1, 6):
                 c = ws.cell(row=row, column=col)
-                c.fill = solid_fill(fill_color)
-                c.border = THIN_BORDER
-                c.alignment = left()
-                c.font = body_font()
+                c.fill = XD.fill(fill_color)
+                c.border = XD.HAIR
+                c.alignment = XD.left()
+                c.font = XD.fnt(11)
 
-    set_column_widths(ws, {"A": 22, "B": 12, "C": 20, "D": 40, "E": 15})
+    for col, w in {"A": 22, "B": 12, "C": 20, "D": 40, "E": 15}.items():
+        ws.column_dimensions[col].width = w
     ws.freeze_panes = "A3"
 
 
@@ -356,18 +362,19 @@ def _sheet_manifeste_dashboard(wb: Workbook, acteur, uo_list: List[UOInstance]):
 
     def _mxl_row(row: int, instr: str, ancre: str = "", comment: str = ""):
         cell_a = ws.cell(row=row, column=1, value=instr)
-        cell_a.font = body_font(size=9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ", "LIST ", "COLLECT ")))
-        cell_a.alignment = left()
+        cell_a.font = XD.fnt(9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ", "LIST ", "COLLECT ")))
+        cell_a.alignment = XD.left()
         if ancre:
-            ws.cell(row=row, column=2, value=ancre).font = body_font(size=9, color="888888")
+            ws.cell(row=row, column=2, value=ancre).font = XD.fnt(9, color="888888")
         if comment:
             c = ws.cell(row=row, column=3, value=comment)
-            c.font = body_font(size=9, color="666666")
-            c.fill = solid_fill("F9F9F9")
+            c.font = XD.fnt(9, color="666666")
+            c.fill = XD.fill("F9F9F9")
 
     # Ligne 1 : version
     ws["A1"] = "MANIFESTE_V=1"
-    ws["A1"].font = body_font(bold=True, color="1F3864")
+    ws["A1"].font = XD.fnt(11, bold=True, color="1F3864")
+    ws.sheet_properties.tabColor = XD.sheet("manifeste").header
     # Ligne 2 intentionnellement vide
 
     # Métadonnées
@@ -387,4 +394,5 @@ def _sheet_manifeste_dashboard(wb: Workbook, acteur, uo_list: List[UOInstance]):
     _mxl_row(11, f"PUSH $synthese -> dashboard.{acteur.id}.synthese",
               comment="Publie la vue consolidée de l'équipe dans le store central")
 
-    set_column_widths(ws, {"A": 70, "B": 18, "C": 60})
+    for col, w in {"A": 70, "B": 18, "C": 60}.items():
+        ws.column_dimensions[col].width = w

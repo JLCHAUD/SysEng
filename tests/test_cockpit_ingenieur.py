@@ -56,7 +56,7 @@ class TestCockpitMesUOs:
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["Mes UOs"]
-        ids = [ws.cell(row=r, column=1).value for r in range(6, 20) if ws.cell(row=r, column=1).value]
+        ids = [ws.cell(row=r, column=2).value for r in range(6, 20) if ws.cell(row=r, column=2).value]
         assert "UO-001" in ids
         assert "UO-002" in ids
         assert "UO-003" not in ids  # Bruno, pas Alice
@@ -66,7 +66,7 @@ class TestCockpitMesUOs:
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["Mes UOs"]
-        headers = [ws.cell(row=5, column=c).value for c in range(1, 10)]
+        headers = [ws.cell(row=5, column=c).value for c in range(2, 11)]
         assert "UO ID" in headers
         assert "% Avancement" in headers
         assert "H réalisées" in headers
@@ -77,15 +77,15 @@ class TestCockpitMesUOs:
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["Mes UOs"]
-        assert ws.cell(row=5, column=6).value == "% Avancement"
-        assert ws.cell(row=5, column=7).value == "H réalisées"
+        assert ws.cell(row=5, column=7).value == "% Avancement"
+        assert ws.cell(row=5, column=8).value == "H réalisées"
 
     def test_formule_alerte_presente(self, tmp_path):
         from src.generators.cockpit_ingenieur_generator import generate_cockpit_ingenieur
         path = generate_cockpit_ingenieur("Alice Dubois", ALL_UOS, output_dir=tmp_path)
         wb = load_workbook(path)
         ws = wb["Mes UOs"]
-        alerte_cell = ws.cell(row=6, column=9).value
+        alerte_cell = ws.cell(row=6, column=10).value
         assert alerte_cell is not None
         assert str(alerte_cell).startswith("=IF(")
 

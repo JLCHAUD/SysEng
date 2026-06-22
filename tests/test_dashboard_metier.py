@@ -267,8 +267,8 @@ class TestPushPullCycle:
         ws = wb["Synthèse"]
 
         for row in range(6, 20):
-            if ws.cell(row=row, column=1).value == "UO-001":
-                avanc = ws.cell(row=row, column=7).value
+            if ws.cell(row=row, column=2).value == "UO-001":
+                avanc = ws.cell(row=row, column=8).value
                 assert avanc == pytest.approx(0.8, abs=0.01), \
                     f"Attendu 0.8, obtenu {avanc}"
                 break
@@ -304,7 +304,7 @@ class TestPushPullCycle:
         wb = load_workbook(path, data_only=True)
         ws = wb["Synthèse"]
         for row in range(6, 20):
-            if ws.cell(row=row, column=1).value == "UO-001":
-                avanc = ws.cell(row=row, column=7).value
+            if ws.cell(row=row, column=2).value == "UO-001":
+                avanc = ws.cell(row=row, column=8).value
                 assert avanc == pytest.approx(0.0, abs=0.01)
                 break
