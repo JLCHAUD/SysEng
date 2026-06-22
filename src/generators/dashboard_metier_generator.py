@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from openpyxl import Workbook
+from openpyxl.formatting.rule import FormulaRule
 
 from src.models import ProfilActeur, TypeFiltre, UOInstance
 from src.store import JsonStore
@@ -65,18 +66,19 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
                     uo_list: List[UOInstance], store: JsonStore):
     ws = wb.create_sheet("Synthèse")
     ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 2.5
 
     XD.banner(ws, "dashboard", f"Dashboard Métier — {acteur.nom}",
-              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=10)
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=11)
 
     total_h = int(sum(u.total_hours for u in uo_list))
     avancement_vals = [_get_store_float(store, f"uo.{u.id}.avancement") for u in uo_list]
     avg_avanc = sum(avancement_vals) / len(avancement_vals) if avancement_vals else 0
 
     kpis = [
-        ("A2:B2", len(uo_list), "Périmètre équipe"),
-        ("C2:D2", total_h, "Charge totale"),
-        ("E2:F2", avg_avanc, "Avancement moyen"),
+        ("B2:C2", len(uo_list), "Périmètre équipe"),
+        ("D2:E2", total_h, "Charge totale"),
+        ("F2:G2", avg_avanc, "Avancement moyen"),
     ]
     for cell_range, value, label in kpis:
         ws.merge_cells(cell_range)
@@ -88,20 +90,20 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
         c.alignment = XD.center()
         c.border = XD.HAIR
     # Label row under KPIs
-    ws.merge_cells("A3:B3")
-    ws["A3"].value = "Périmètre équipe"
-    ws.merge_cells("C3:D3")
-    ws["C3"].value = "Charge totale (h)"
-    ws.merge_cells("E3:F3")
-    ws["E3"].value = "Avancement moyen"
-    for col_label in ("A3", "C3", "E3"):
+    ws.merge_cells("B3:C3")
+    ws["B3"].value = "Périmètre équipe"
+    ws.merge_cells("D3:E3")
+    ws["D3"].value = "Charge totale (h)"
+    ws.merge_cells("F3:G3")
+    ws["F3"].value = "Avancement moyen"
+    for col_label in ("B3", "D3", "F3"):
         ws[col_label].font = XD.fnt(11, color="555555")
         ws[col_label].alignment = XD.center()
     ws.row_dimensions[2].height = 24
     ws.row_dimensions[3].height = 18
 
-    ws.merge_cells("A4:J4")
-    sec = ws["A4"]
+    ws.merge_cells("B4:K4")
+    sec = ws["B4"]
     sec.value = "Toutes les UOs de l'équipe"
     sec.fill = XD.fill(XD.sheet("dashboard").header)
     sec.font = XD.fnt(11, bold=True, color=XD.WHITE)
@@ -109,9 +111,7 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
 
     headers = ["UO ID", "Ingénieur", "Type UO", "Système", "Projet",
                "Charge (h)", "% Avancement", "H réalisées", "Date fin", "Alerte"]
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=5, column=col, value=h)
-    XD.table_header(ws, 5, headers, "dashboard")
+    XD.table_header(ws, 5, headers, "dashboard", col_start=2)
 
     for i, uo in enumerate(uo_list):
         row = 6 + i
@@ -121,19 +121,19 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
         sys_name = uo.system.name if uo.system else uo.system_id
         proj_name = uo.project.name if uo.project else uo.project_id
 
-        ws.cell(row=row, column=1, value=uo.id)
-        ws.cell(row=row, column=2, value=uo.engineer_name)
-        ws.cell(row=row, column=3, value=type_name)
-        ws.cell(row=row, column=4, value=sys_name)
-        ws.cell(row=row, column=5, value=proj_name)
-        ws.cell(row=row, column=6, value=uo.total_hours)
+        ws.cell(row=row, column=2, value=uo.id)
+        ws.cell(row=row, column=3, value=uo.engineer_name)
+        ws.cell(row=row, column=4, value=type_name)
+        ws.cell(row=row, column=5, value=sys_name)
+        ws.cell(row=row, column=6, value=proj_name)
+        ws.cell(row=row, column=7, value=uo.total_hours)
 
-        avanc_cell = ws.cell(row=row, column=7, value=avancement)
+        avanc_cell = ws.cell(row=row, column=8, value=avancement)
         avanc_cell.number_format = "0%"
 
-        ws.cell(row=row, column=8, value=h_real)
+        ws.cell(row=row, column=9, value=h_real)
 
-        date_cell = ws.cell(row=row, column=9, value=uo.end_date)
+        date_cell = ws.cell(row=row, column=10, value=uo.end_date)
         date_cell.number_format = "DD/MM/YYYY"
 
         today = date.today()
@@ -143,24 +143,39 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
             alerte = "⏰ Échéance proche"
         else:
             alerte = "✅ OK"
-        ws.cell(row=row, column=10, value=alerte)
+        ws.cell(row=row, column=11, value=alerte)
 
         alternate = (i % 2 == 1)
         bg = XD.sheet("dashboard").accent if alternate else XD.WHITE
-        for c in range(1, 11):
+        for c in range(2, 12):
             cell = ws.cell(row=row, column=c)
             cell.fill = XD.fill(bg)
             cell.font = XD.fnt(11)
             cell.alignment = XD.left()
             cell.border = XD.HAIR
         # Restore number formats after style_data_row equivalent
-        ws.cell(row=row, column=7).number_format = "0%"
-        ws.cell(row=row, column=9).number_format = "DD/MM/YYYY"
+        ws.cell(row=row, column=8).number_format = "0%"
+        ws.cell(row=row, column=10).number_format = "DD/MM/YYYY"
 
-    for col, w in {"A": 12, "B": 22, "C": 28, "D": 18, "E": 22,
-                   "F": 13, "G": 16, "H": 14, "I": 14, "J": 22}.items():
+    # Spine santé col A (hors tableau — _sheet_synthese n'a pas de named table)
+    ws.cell(row=5, column=1).fill = XD.fill(XD.sheet("dashboard").banner)
+    last_row = 5 + len(uo_list)
+    if uo_list:
+        spine_rng = f"A6:A{last_row}"
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="⚠ Dérive heures"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_ALERT)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="⏰ Échéance proche"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_WATCH)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$K6="✅ OK"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_DONE)))
+
+    for col, w in {"A": 2.5, "B": 12, "C": 22, "D": 28, "E": 18, "F": 22,
+                   "G": 13, "H": 16, "I": 14, "J": 14, "K": 22}.items():
         ws.column_dimensions[col].width = w
-    ws.freeze_panes = "A6"
+    ws.freeze_panes = "B6"
 
 
 def _sheet_vue_synthese(wb: Workbook):
