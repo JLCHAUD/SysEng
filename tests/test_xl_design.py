@@ -1,6 +1,7 @@
 """Tests TDD pour le module de design system xl_design."""
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border
+from openpyxl.utils import get_column_letter
 
 from src.xl_design import XD
 
@@ -191,3 +192,23 @@ class TestTrafficEtCadres:
         ws = Workbook().active
         XD.section_box(ws, "Titre section", 2, 2, 5, 4, "kpi")
         assert ws.cell(row=2, column=2).value == "Titre section"
+
+
+class TestHealthSpine:
+    def test_largeur_colonne_fine(self):
+        ws = Workbook().active
+        XD.health_spine(ws, "activites", header_row=5, row_start=6,
+                        row_end=10, status_col=6, spine_col=1)
+        assert ws.column_dimensions[get_column_letter(1)].width <= 3
+
+    def test_entete_spine_au_ton_banniere(self):
+        ws = Workbook().active
+        XD.health_spine(ws, "activites", header_row=5, row_start=6,
+                        row_end=10, status_col=6, spine_col=1)
+        assert ws.cell(row=5, column=1).fill.fgColor.rgb.endswith("084434")
+
+    def test_regles_conditionnelles_posees(self):
+        ws = Workbook().active
+        XD.health_spine(ws, "activites", header_row=5, row_start=6,
+                        row_end=10, status_col=6, spine_col=1)
+        assert len(ws.conditional_formatting) >= 1

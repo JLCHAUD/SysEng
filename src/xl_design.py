@@ -5,8 +5,9 @@ Voir docs/superpowers/specs/2026-06-22-design-system-excel-design.md.
 """
 from dataclasses import dataclass
 
-from openpyxl.formatting.rule import CellIsRule
+from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 from openpyxl.utils.cell import range_boundaries
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
@@ -37,6 +38,13 @@ class XD:
     GREY_L = "F1EFE8"
     GREY_D = "5F5E5A"
     GREY_B = "D3D1C7"
+
+    # ── Couleurs santé de la spine (indépendantes des familles) ─
+    SPINE_DONE = "3B6D11"
+    SPINE_OK = "0F8A66"
+    SPINE_WATCH = "EF9F27"
+    SPINE_ALERT = "A32D2D"
+    SPINE_TODO = "6B6A64"
 
     # ── Bordure fine (4 côtés) ─────────────────────────────────
     _SIDE = Side(style="thin", color="D3D1C7")
@@ -223,3 +231,30 @@ class XD:
         tc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
         ws.row_dimensions[r1].height = 20
         cls.card_border(ws, r1, c1, r2, c2)
+
+    @classmethod
+    def health_spine(cls, ws, key, header_row, row_start, row_end,
+                     status_col, spine_col=1, pct_col=None):
+        """Colonne A fine + en-tête au ton bannière. Pose les règles de mise en
+        forme conditionnelle santé, lues sur la colonne statut (recolore live)."""
+        s = cls.sheet(key)
+        spine_L = get_column_letter(spine_col)
+        stat_L = get_column_letter(status_col)
+        ws.column_dimensions[spine_L].width = 2.5
+        ws.cell(row=header_row, column=spine_col).fill = cls.fill(s.banner)
+
+        rng = f"{spine_L}{row_start}:{spine_L}{row_end}"
+
+        def rule(formula, color):
+            ws.conditional_formatting.add(rng, FormulaRule(
+                formula=[formula], stopIfTrue=True, fill=cls.fill(color)))
+
+        # ordre = priorité (premier vrai gagne)
+        rule(f'OR(${stat_L}{row_start}="TERMINEE",${stat_L}{row_start}="VALIDE")',
+             cls.SPINE_DONE)
+        rule(f'OR(${stat_L}{row_start}="OUVERT",${stat_L}{row_start}="HAUTE")',
+             cls.SPINE_ALERT)
+        rule(f'${stat_L}{row_start}="STAND_BY"', cls.SPINE_WATCH)
+        rule(f'${stat_L}{row_start}="EN_COURS"', cls.SPINE_OK)
+        rule(f'OR(${stat_L}{row_start}="A_FAIRE",${stat_L}{row_start}="EN_ATTENTE")',
+             cls.SPINE_TODO)
