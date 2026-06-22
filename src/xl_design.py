@@ -39,6 +39,29 @@ class XD:
     _SIDE = Side(style="thin", color="D3D1C7")
     HAIR = Border(left=_SIDE, right=_SIDE, top=_SIDE, bottom=_SIDE)
 
+    # ── Registre des familles d'onglets (palette verrouillée) ──
+    SHEETS = {
+        "general":        SheetStyle("08335E", "0C447C", "E6F1FB", "⬢"),
+        "dashboard":      SheetStyle("0E4474", "1763A8", "E3EFFA", "◉"),
+        "description":    SheetStyle("1C5E92", "2E86C8", "E7F2FB", "✎"),
+        "planning":       SheetStyle("074E60", "0A6E88", "DEEFF3", "◷"),
+        "donnees_entree": SheetStyle("0A6149", "0F8A66", "E1F5EE", "⤓"),
+        "activites":      SheetStyle("084434", "0C5E49", "E1F5EE", "✔"),
+        "livrables":      SheetStyle("386114", "4F8A1E", "EBF3DE", "▣"),
+        "oil":            SheetStyle("791F1F", "A32D2D", "FCEBEB", "⚑"),
+        "kpi":            SheetStyle("3C3489", "534AB7", "EEEDFE", "▲"),
+        "orga":           SheetStyle("4D4C47", "6B6A64", "F1EFE8", "❖"),
+        "manifeste":      SheetStyle("1C1C1A", "2C2C2A", "F1EFE8", "⚙"),
+    }
+
+    @classmethod
+    def sheet(cls, key):
+        return cls.SHEETS[key]
+
+    @classmethod
+    def tab_colors(cls):
+        return {k: v.header for k, v in cls.SHEETS.items()}
+
     # ── Primitives ─────────────────────────────────────────────
     @staticmethod
     def fnt(size=10, bold=False, color="2C2C2A", italic=False):

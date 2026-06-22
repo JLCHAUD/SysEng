@@ -35,3 +35,34 @@ class TestPrimitives:
         assert XD.center().horizontal == "center"
         assert XD.center().wrap_text is True
         assert XD.left().horizontal == "left"
+
+
+class TestRegistreOnglets:
+    def test_onze_familles(self):
+        assert len(XD.SHEETS) == 11
+
+    def test_cles_attendues(self):
+        attendues = {"general", "dashboard", "description", "planning",
+                     "donnees_entree", "activites", "livrables", "oil",
+                     "kpi", "orga", "manifeste"}
+        assert set(XD.SHEETS) == attendues
+
+    def test_triple_activites(self):
+        s = XD.sheet("activites")
+        assert s.banner == "084434"
+        assert s.header == "0C5E49"
+        assert s.accent == "E1F5EE"
+        assert s.glyph == "✔"
+
+    def test_triple_oil_rouge(self):
+        assert XD.sheet("oil").header == "A32D2D"
+
+    def test_cle_inconnue_leve(self):
+        import pytest
+        with pytest.raises(KeyError):
+            XD.sheet("inexistant")
+
+    def test_tab_colors_mappe_le_ton_moyen(self):
+        tc = XD.tab_colors()
+        assert tc["general"] == "0C447C"
+        assert tc["kpi"] == "534AB7"
