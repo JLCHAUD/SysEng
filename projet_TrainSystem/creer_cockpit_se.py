@@ -10,7 +10,7 @@ Usage :
 """
 import argparse
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -67,6 +67,88 @@ def lire_uo_du_repertoire(dossier: Path) -> list[dict]:
     return uo_list
 
 
+# ─── Onglet Agenda ───────────────────────────────────────────────────────────
+
+def _agenda_section(ws, title: str, start_row: int,
+                    uo_list: list[dict], bg_key: str = "planning") -> int:
+    """Section agenda (titre + en-têtes + 1 ligne jaune par UO). Retourne la prochaine ligne libre."""
+    XD.section_box(ws, title, start_row, 1, start_row, 6, bg_key)
+    ws.merge_cells(start_row=start_row, start_column=1,
+                   end_row=start_row, end_column=6)
+    start_row += 1
+
+    headers = ["UO ID", "Activité", "Priorité", "Date échéance", "Statut", "Action"]
+    XD.table_header(ws, start_row, headers, bg_key)
+    start_row += 1
+
+    for uo in uo_list:
+        ws.cell(row=start_row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
+        ws.cell(row=start_row, column=1).alignment = XD.left()
+        ws.cell(row=start_row, column=1).border = XD.HAIR
+        for col in range(2, 7):
+            c = ws.cell(row=start_row, column=col, value="")
+            c.fill = XD.fill(XD.INPUT)
+            c.border = XD.HAIR
+            c.alignment = XD.center()
+        ws.row_dimensions[start_row].height = 18
+        start_row += 1
+
+    if not uo_list:
+        ws.merge_cells(start_row=start_row, start_column=1,
+                       end_row=start_row, end_column=6)
+        c = ws.cell(row=start_row, column=1, value="Aucune UO")
+        c.font = XD.fnt(9, color=XD.GREY_D, italic=True)
+        c.fill = XD.fill(XD.GREY_L)
+        c.alignment = XD.center()
+        start_row += 1
+
+    return start_row
+
+
+def _agenda_po(ws, start_row: int, uo_list: list[dict]) -> int:
+    """Section Points ouverts / Actions. Retourne la prochaine ligne libre."""
+    XD.section_box(ws, "⚡  Points ouverts / Actions", start_row, 1, start_row, 6, "oil")
+    ws.merge_cells(start_row=start_row, start_column=1,
+                   end_row=start_row, end_column=6)
+    start_row += 1
+
+    headers = ["UO ID", "Description action", "Responsable", "Date limite", "Nb points", "Statut"]
+    XD.table_header(ws, start_row, headers, "oil")
+    start_row += 1
+
+    for uo in uo_list:
+        ws.cell(row=start_row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
+        ws.cell(row=start_row, column=1).alignment = XD.left()
+        ws.cell(row=start_row, column=1).border = XD.HAIR
+        for col in range(2, 7):
+            c = ws.cell(row=start_row, column=col, value="")
+            c.fill = XD.fill(XD.INPUT)
+            c.border = XD.HAIR
+            c.alignment = XD.center()
+        ws.row_dimensions[start_row].height = 18
+        start_row += 1
+
+    return start_row
+
+
+def _sheet_agenda(wb: Workbook, se_name: str, uo_list: list[dict]):
+    """Onglet Agenda — vue semaine + 30j + points ouverts. Lignes jaunes à remplir par le SE."""
+    ws = wb.create_sheet("Agenda")
+    ws.sheet_view.showGridLines = False
+    XD.banner(ws, "planning", f"Agenda — {se_name}",
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=6)
+
+    row = 3
+    row = _agenda_section(ws, "📅  Semaine en cours", row, uo_list)
+    row += 1
+    row = _agenda_section(ws, "📋  Prochaines échéances (30 jours)", row, uo_list)
+    row += 1
+    _agenda_po(ws, row, uo_list)
+
+    for col, w in zip("ABCDEF", [14, 38, 12, 16, 18, 30]):
+        ws.column_dimensions[col].width = w
+
+
 # ─── Génération du cockpit ────────────────────────────────────────────────────
 
 def generer_cockpit(se_name: str, uo_list: list[dict],
@@ -76,6 +158,7 @@ def generer_cockpit(se_name: str, uo_list: list[dict],
     wb.remove(wb.active)
 
     _sheet_mes_uos(wb, se_name, uo_list)
+    _sheet_agenda(wb, se_name, uo_list)
     _sheet_manifeste(wb, se_name, uo_list, pilote_id)
 
     safe = se_name.replace(" ", "_")
