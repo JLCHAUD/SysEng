@@ -79,3 +79,31 @@ class XD:
     @staticmethod
     def left():
         return Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    @classmethod
+    def banner(cls, ws, key, title, subtitle="", se="", n_cols=10, height=30):
+        """Bannière 1 ligne : glyphe + titre à gauche, sous-titre · SE à droite.
+        Pose aussi tabColor = ton moyen de la famille."""
+        s = cls.sheet(key)
+        ws.sheet_properties.tabColor = s.header
+        for c in range(1, n_cols + 1):
+            ws.cell(row=1, column=c).fill = cls.fill(s.banner)
+
+        t = ws.cell(row=1, column=1, value=f"{s.glyph}  {title}")
+        t.font = cls.fnt(14, bold=True, color=cls.WHITE)
+        t.alignment = Alignment(vertical="center", indent=1)
+        left_end = max(n_cols - 3, 1)
+        if left_end > 1:
+            ws.merge_cells(start_row=1, start_column=1, end_row=1,
+                           end_column=left_end)
+
+        right_parts = [p for p in (subtitle, se) if p]
+        if right_parts and n_cols > left_end + 1:
+            r = ws.cell(row=1, column=left_end + 1,
+                        value="   ·   ".join(right_parts))
+            r.font = cls.fnt(10, color=cls.WHITE)
+            r.alignment = Alignment(horizontal="right", vertical="center",
+                                    indent=1)
+            ws.merge_cells(start_row=1, start_column=left_end + 1,
+                           end_row=1, end_column=n_cols)
+        ws.row_dimensions[1].height = height

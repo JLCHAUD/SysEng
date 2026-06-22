@@ -1,4 +1,5 @@
 """Tests TDD pour le module de design system xl_design."""
+from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border
 
 from src.xl_design import XD
@@ -66,3 +67,38 @@ class TestRegistreOnglets:
         tc = XD.tab_colors()
         assert tc["general"] == "0C447C"
         assert tc["kpi"] == "534AB7"
+
+
+class TestBanner:
+    def _ws(self):
+        wb = Workbook()
+        return wb.active
+
+    def test_tab_color_pose_ton_moyen(self):
+        ws = self._ws()
+        XD.banner(ws, "activites", "UO L09U1 — Activités", n_cols=10)
+        assert ws.sheet_properties.tabColor.rgb.endswith("0C5E49")
+
+    def test_titre_avec_glyphe_en_a1(self):
+        ws = self._ws()
+        XD.banner(ws, "activites", "UO L09U1 — Activités", n_cols=10)
+        assert "✔" in str(ws["A1"].value)
+        assert "Activités" in str(ws["A1"].value)
+
+    def test_fond_banniere_fonce(self):
+        ws = self._ws()
+        XD.banner(ws, "activites", "T", n_cols=10)
+        assert ws["A1"].fill.fgColor.rgb.endswith("084434")
+
+    def test_sous_titre_et_se_a_droite(self):
+        ws = self._ws()
+        XD.banner(ws, "activites", "T", subtitle="Clim", se="J. Dujardin", n_cols=10)
+        valeurs = [ws.cell(row=1, column=c).value for c in range(1, 11)]
+        joined = " ".join(str(v) for v in valeurs if v)
+        assert "Clim" in joined
+        assert "J. Dujardin" in joined
+
+    def test_hauteur_ligne1(self):
+        ws = self._ws()
+        XD.banner(ws, "activites", "T", n_cols=10, height=30)
+        assert ws.row_dimensions[1].height == 30
