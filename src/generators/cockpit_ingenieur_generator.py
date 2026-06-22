@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule
+from openpyxl.formatting.rule import CellIsRule, FormulaRule
 
 from src.models import UOInstance
 from src.xl_design import XD
@@ -42,36 +42,37 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
     ws = wb.create_sheet("Mes UOs")
     ws.sheet_view.showGridLines = False
 
+    # Spine santé col A (hors tableau nommé)
+    ws.column_dimensions["A"].width = 2.5
+
     XD.banner(ws, "general", f"Mes UOs — {engineer_name}",
-              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=9)
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=10)
 
-    ws.merge_cells("A2:C2")
-    ws["A2"].value = f"UOs actives : {len(uo_list)}"
-    ws["A2"].fill = XD.fill(XD.sheet("general").accent)
-    ws["A2"].font = XD.fnt(11, bold=True)
-    ws["A2"].alignment = XD.center()
-    ws["A2"].border = XD.HAIR
+    ws.merge_cells("B2:D2")
+    ws["B2"].value = f"UOs actives : {len(uo_list)}"
+    ws["B2"].fill = XD.fill(XD.sheet("general").accent)
+    ws["B2"].font = XD.fnt(11, bold=True)
+    ws["B2"].alignment = XD.center()
+    ws["B2"].border = XD.HAIR
 
-    ws.merge_cells("D2:F2")
-    ws["D2"].value = f"Charge totale : {sum(u.total_hours for u in uo_list)}h"
-    ws["D2"].fill = XD.fill(XD.sheet("general").accent)
-    ws["D2"].font = XD.fnt(11, bold=True)
-    ws["D2"].alignment = XD.center()
-    ws["D2"].border = XD.HAIR
+    ws.merge_cells("E2:G2")
+    ws["E2"].value = f"Charge totale : {sum(u.total_hours for u in uo_list)}h"
+    ws["E2"].fill = XD.fill(XD.sheet("general").accent)
+    ws["E2"].font = XD.fnt(11, bold=True)
+    ws["E2"].alignment = XD.center()
+    ws["E2"].border = XD.HAIR
 
-    ws.merge_cells("A4:I4")
-    sec = ws["A4"]
+    ws.merge_cells("B4:J4")
+    sec = ws["B4"]
     sec.value = "Toutes mes UO"
     sec.fill = XD.fill(XD.sheet("general").header)
     sec.font = XD.fnt(11, bold=True, color=XD.WHITE)
     sec.alignment = XD.center()
 
-    # A=UO ID  B=Type  C=Système  D=Projet  E=Charge(h)  F=% Avancement  G=H réalisées  H=Date fin  I=Alerte
+    # B=UO ID  C=Type  D=Système  E=Projet  F=Charge(h)  G=% Avancement  H=H réalisées  I=Date fin  J=Alerte
     headers = ["UO ID", "Type UO", "Système", "Projet", "Charge (h)",
                "% Avancement", "H réalisées", "Date fin", "Alerte"]
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=5, column=col, value=h)
-    XD.table_header(ws, 5, headers, "general")
+    XD.table_header(ws, 5, headers, "general", col_start=2)
 
     for i, uo in enumerate(uo_list):
         row = 6 + i
@@ -79,7 +80,7 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         sys_name = uo.system.name if uo.system else uo.system_id
         proj_name = uo.project.name if uo.project else uo.project_id
 
-        id_cell = ws.cell(row=row, column=1, value=uo.id)
+        id_cell = ws.cell(row=row, column=2, value=uo.id)
         id_cell.font = XD.fnt(11, color="0563C1")
         id_cell.alignment = XD.left()
         id_cell.border = XD.HAIR
@@ -88,43 +89,43 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         uo_path = uo_dir / f"{uo.id}_{uo_type_file}_{uo_sys_file}.xlsx"
         id_cell.hyperlink = str(uo_path)
 
-        ws.cell(row=row, column=2, value=type_name)
-        ws.cell(row=row, column=3, value=sys_name)
-        ws.cell(row=row, column=4, value=proj_name)
-        ws.cell(row=row, column=5, value=uo.total_hours)
+        ws.cell(row=row, column=3, value=type_name)
+        ws.cell(row=row, column=4, value=sys_name)
+        ws.cell(row=row, column=5, value=proj_name)
+        ws.cell(row=row, column=6, value=uo.total_hours)
 
-        avanc_cell = ws.cell(row=row, column=6, value=0.0)
+        avanc_cell = ws.cell(row=row, column=7, value=0.0)
         avanc_cell.number_format = "0%"
         avanc_cell.fill = XD.fill(XD.INPUT)
         avanc_cell.border = XD.HAIR
         avanc_cell.alignment = XD.center()
 
-        h_cell = ws.cell(row=row, column=7, value=0.0)
+        h_cell = ws.cell(row=row, column=8, value=0.0)
         h_cell.fill = XD.fill(XD.INPUT)
         h_cell.border = XD.HAIR
         h_cell.alignment = XD.center()
 
-        date_cell = ws.cell(row=row, column=8, value=uo.end_date)
+        date_cell = ws.cell(row=row, column=9, value=uo.end_date)
         date_cell.number_format = "DD/MM/YYYY"
         date_cell.border = XD.HAIR
         date_cell.alignment = XD.center()
 
         alert_formula = (
-            f'=IF(G{row}>E{row},"⚠ Dérive heures",'
-            f'IF(AND(H{row}<>"",H{row}<TODAY()+7),"⏰ Échéance proche","✅ OK"))'
+            f'=IF(H{row}>F{row},"⚠ Dérive heures",'
+            f'IF(AND(I{row}<>"",I{row}<TODAY()+7),"⏰ Échéance proche","✅ OK"))'
         )
-        ws.cell(row=row, column=9, value=alert_formula)
+        ws.cell(row=row, column=10, value=alert_formula)
 
-        # style_data_row replacement for cols 2-5 and 8-9
+        # style_data_row replacement for cols 3-6 and 9-10
         alternate = (i % 2 == 1)
         bg = XD.sheet("general").accent if alternate else XD.WHITE
-        for c in range(2, 6):
+        for c in range(3, 7):
             cell = ws.cell(row=row, column=c)
             cell.fill = XD.fill(bg)
             cell.font = XD.fnt(11)
             cell.alignment = XD.left()
             cell.border = XD.HAIR
-        for c in range(8, 10):
+        for c in range(9, 11):
             cell = ws.cell(row=row, column=c)
             cell.fill = XD.fill(bg)
             cell.font = XD.fnt(11)
@@ -133,7 +134,7 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
 
     last_row = 5 + len(uo_list)
     if uo_list:
-        alert_range = f"I6:I{last_row}"
+        alert_range = f"J6:J{last_row}"
         ws.conditional_formatting.add(
             alert_range,
             CellIsRule(operator="equal", formula=['"⚠ Dérive heures"'],
@@ -152,13 +153,27 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
 
     # Table nommée pour GET_TABLE(Mes UOs, tbl_mes_uos)
     if uo_list:
-        tbl_ref = f"A5:I{last_row}"
+        tbl_ref = f"B5:J{last_row}"
         XD.named_table(ws, "tbl_mes_uos", tbl_ref, "general")
 
-    for col, w in {"A": 12, "B": 30, "C": 18, "D": 20, "E": 13,
-                   "F": 16, "G": 14, "H": 14, "I": 22}.items():
+    # Spine santé col A (hors tableau nommé)
+    ws.cell(row=5, column=1).fill = XD.fill(XD.sheet("general").banner)
+    if uo_list:
+        spine_rng = f"A6:A{last_row}"
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$J6="⚠ Dérive heures"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_ALERT)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$J6="⏰ Échéance proche"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_WATCH)))
+        ws.conditional_formatting.add(spine_rng, FormulaRule(
+            formula=['$J6="✅ OK"'], stopIfTrue=True,
+            fill=XD.fill(XD.SPINE_DONE)))
+
+    for col, w in {"A": 2.5, "B": 12, "C": 30, "D": 18, "E": 20, "F": 13,
+                   "G": 16, "H": 14, "I": 14, "J": 22}.items():
         ws.column_dimensions[col].width = w
-    ws.freeze_panes = "A6"
+    ws.freeze_panes = "B6"
 
 
 def _sheet_agenda(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
