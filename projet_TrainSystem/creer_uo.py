@@ -75,18 +75,20 @@ def load_catalogue(uo_type):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _write_table(ws, name, headers, rows, widths=None, start_row=T, family="general"):
+def _write_table(ws, name, headers, rows, widths=None, start_row=T, family="general", col_start=1):
     """Ecrit entetes + donnees via XD, enregistre le tableau Excel nomme."""
-    XD.table_header(ws, start_row, headers, family)
+    XD.table_header(ws, start_row, headers, family, col_start=col_start)
     ws.row_dimensions[start_row].height = 22
     for ri, rd in enumerate(rows, start_row + 1):
         for ci, h in enumerate(headers, 1):
-            c = ws.cell(row=ri, column=ci, value=rd.get(h))
+            c = ws.cell(row=ri, column=col_start + ci - 1, value=rd.get(h))
             c.border = XD.HAIR
             c.font = XD.fnt(10)
         ws.row_dimensions[ri].height = 20
     last = start_row + max(len(rows), 1)
-    ref = f"A{start_row}:{get_column_letter(len(headers))}{last}"
+    start_col_letter = get_column_letter(col_start)
+    end_col_letter = get_column_letter(col_start + len(headers) - 1)
+    ref = f"{start_col_letter}{start_row}:{end_col_letter}{last}"
     XD.named_table(ws, name, ref, family)
     if widths:
         for col, w in widths.items():
@@ -222,27 +224,30 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
                  "applicable": "OUI", "poids": a.get("poids") or 1,
                  "statut": "A_FAIRE", "avancement": 0, "heures_consommees": 0}
                 for a in cat_acts]
-    _write_table(ws, "tbl_activites", act_headers, act_rows,
-                 widths={"A": 10, "B": 46, "C": 11, "D": 8, "E": 15, "F": 11,
-                         "G": 12, "H": 17, "I": 13, "J": 32},
-                 family="activites")
+    ws.column_dimensions["A"].width = 2.5
+    dr_s, dr_e = _write_table(ws, "tbl_activites", act_headers, act_rows,
+                               widths={"A": 2.5, "B": 10, "C": 46, "D": 11, "E": 8,
+                                       "F": 15, "G": 11, "H": 12, "I": 17, "J": 13,
+                                       "K": 32},
+                               family="activites",
+                               col_start=2)
     n = len(act_rows)
-    dr_s, dr_e = T + 1, T + n
     for r in range(dr_s, dr_e + 1):
-        ws.cell(row=r, column=5).value = (
-            f'=IF(C{r}="OUI",D{r}/SUMIF($C${dr_s}:$C${dr_e},"OUI"'
-            f',$D${dr_s}:$D${dr_e})*heures_vendues,0)')
-        ws.cell(row=r, column=9).value = f"=(1-G{r}/100)*E{r}"
-        ws.cell(row=r, column=5).number_format = "0.00"
-        ws.cell(row=r, column=9).number_format = "0.00"
-    _dv(ws, "list", '"OUI,NON"', f"C{T+1}:C{T+60}")
-    _dv(ws, "list", '"A_FAIRE,EN_COURS,TERMINEE,STAND_BY"', f"F{T+1}:F{T+60}")
+        ws.cell(row=r, column=6).value = (
+            f'=IF(D{r}="OUI",E{r}/SUMIF($D${dr_s}:$D${dr_e},"OUI"'
+            f',$E${dr_s}:$E${dr_e})*heures_vendues,0)')
+        ws.cell(row=r, column=10).value = f"=(1-H{r}/100)*F{r}"
+        ws.cell(row=r, column=6).number_format = "0.00"
+        ws.cell(row=r, column=10).number_format = "0.00"
+    _dv(ws, "list", '"OUI,NON"', f"D{T+1}:D{T+60}")
+    _dv(ws, "list", '"A_FAIRE,EN_COURS,TERMINEE,STAND_BY"', f"G{T+1}:G{T+60}")
     ws.conditional_formatting.add(
-        f"G{T+1}:G{T+n}",
+        f"H{T+1}:H{T+n}",
         DataBarRule(start_type="num", start_value=0, end_type="num",
                     end_value=100, color=XD.sheet("activites").header, showValue=True))
-    XD.statut_cf(ws, f"F{T+1}:F{T+n}")
-    ws.freeze_panes = f"A{T+1}"
+    XD.statut_cf(ws, f"G{T+1}:G{T+n}")
+    XD.health_spine(ws, "activites", header_row=T, row_start=T+1, row_end=dr_e, status_col=7)
+    ws.freeze_panes = f"B{T+1}"
 
     # ── Livrables ─────────────────────────────────────────────────────────────
     ws = wb.create_sheet("Livrables")
@@ -334,7 +339,7 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
          "=heures_vendues",            "0",
          "Lu depuis General (formule Excel)"),
         ("Reste à faire total (h)",     "kpi_raf",
-         f"=SUM(Activites!I{T+1}:I{T+60})", "0.00",
+         f"=SUM(Activites!J{T+1}:J{T+60})", "0.00",
          "Somme colonne reste_a_faire (formule Excel)"),
         ("Heures estimées à terminaison (EAC)", "kpi_eac",
          "=kpi_h_conso+kpi_raf",      "0.00",
