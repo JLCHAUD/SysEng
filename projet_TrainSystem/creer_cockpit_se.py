@@ -100,7 +100,10 @@ def _sheet_mes_uos(wb: Workbook, se_name: str, uo_list: list[dict]):
     for i, uo in enumerate(uo_list):
         row = row_h + 1 + i
         XD.data_row(ws, row, i, 1, 8, "general")
-        ws.cell(row=row, column=1, value=uo["file_id"]).font = XD.fnt(color="0563C1")
+        ws.cell(row=row, column=1).alignment = XD.left()
+        for col in range(2, 9):
+            ws.cell(row=row, column=col).alignment = XD.center()
+        ws.cell(row=row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
         ws.cell(row=row, column=2, value=uo["systeme"])
         ws.cell(row=row, column=3, value=uo["projet"])
         ws.cell(row=row, column=4, value=uo["heures"])
