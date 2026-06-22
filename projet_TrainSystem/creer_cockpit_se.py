@@ -17,8 +17,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from src.xl_design import XD
 
 HERE = Path(__file__).parent
 
@@ -67,25 +67,6 @@ def lire_uo_du_repertoire(dossier: Path) -> list[dict]:
     return uo_list
 
 
-# ─── Helpers style ────────────────────────────────────────────────────────────
-
-def _fill(hex_color: str) -> PatternFill:
-    return PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
-
-def _fnt(size=10, bold=False, color="000000", italic=False) -> Font:
-    return Font(name="Segoe UI", size=size, bold=bold, color=color, italic=italic)
-
-def _center() -> Alignment:
-    return Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-def _left() -> Alignment:
-    return Alignment(horizontal="left", vertical="center", wrap_text=True)
-
-def _thin_border() -> Border:
-    s = Side(style="thin", color="BFBFBF")
-    return Border(left=s, right=s, top=s, bottom=s)
-
-
 # ─── Génération du cockpit ────────────────────────────────────────────────────
 
 def generer_cockpit(se_name: str, uo_list: list[dict],
@@ -107,68 +88,33 @@ def _sheet_mes_uos(wb: Workbook, se_name: str, uo_list: list[dict]):
     ws = wb.create_sheet("Mes UOs")
     ws.sheet_view.showGridLines = False
 
-    # Bannière
-    ws.merge_cells("A1:J1")
-    c = ws["A1"]
-    c.value = f"Cockpit Ingenieur — {se_name}   |   {date.today().strftime('%d/%m/%Y')}"
-    c.fill = _fill("0C447C")
-    c.font = _fnt(13, bold=True, color="FFFFFF")
-    c.alignment = _center()
-    ws.row_dimensions[1].height = 30
+    XD.banner(ws, "general",
+              f"Cockpit Ingénieur — {se_name}",
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=8)
 
-    # En-têtes table
     headers = ["UO ID", "Système", "Projet", "Charge (h)",
                "% Avancement", "H réalisées", "Date fin", "Alerte"]
     row_h = 3
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=row_h, column=col, value=h)
-        cell.fill = _fill("1F3864")
-        cell.font = _fnt(9.5, bold=True, color="FFFFFF")
-        cell.alignment = _center()
-        cell.border = _thin_border()
-    ws.row_dimensions[row_h].height = 20
+    XD.table_header(ws, row_h, headers, "general")
 
-    # Lignes UO
     for i, uo in enumerate(uo_list):
         row = row_h + 1 + i
-        bg = "F2F2F2" if i % 2 else "FFFFFF"
-
-        ws.cell(row=row, column=1, value=uo["file_id"]).font = _fnt(9.5, color="0563C1")
+        XD.data_row(ws, row, i, 1, 8, "general")
+        ws.cell(row=row, column=1, value=uo["file_id"]).font = XD.fnt(color="0563C1")
         ws.cell(row=row, column=2, value=uo["systeme"])
         ws.cell(row=row, column=3, value=uo["projet"])
         ws.cell(row=row, column=4, value=uo["heures"])
-
-        # Colonnes jaunes (saisie ingénieur)
         for col in (5, 6):
             c = ws.cell(row=row, column=col, value=0)
-            c.fill = _fill("FFF2CC")
-            c.border = _thin_border()
-            c.alignment = _center()
+            c.fill = XD.fill(XD.INPUT)
+            c.border = XD.HAIR
+            c.alignment = XD.center()
         ws.cell(row=row, column=5).number_format = "0%"
 
-        ws.cell(row=row, column=7, value="")   # Date fin
-        ws.cell(row=row, column=8, value="")   # Alerte
-
-        for col in range(1, 9):
-            c = ws.cell(row=row, column=col)
-            if col not in (5, 6):
-                c.fill = _fill(bg)
-            c.border = _thin_border()
-            if col not in (1,):
-                c.alignment = _center()
-            else:
-                c.alignment = _left()
-
-    # Table nommée (requise pour GET_TABLE dans le manifeste)
     last_row = row_h + len(uo_list)
     if uo_list:
-        tbl = Table(displayName="tbl_mes_uos",
-                    ref=f"A{row_h}:H{last_row}")
-        tbl.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium2", showRowStripes=True)
-        ws.add_table(tbl)
+        XD.named_table(ws, "tbl_mes_uos", f"A{row_h}:H{last_row}", "general")
 
-    # Largeurs colonnes
     for col, w in zip("ABCDEFGH", [20, 18, 22, 12, 16, 14, 14, 22]):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = f"A{row_h + 1}"
@@ -184,16 +130,16 @@ def _sheet_manifeste(wb: Workbook, se_name: str,
     def w(row, instr, comment=""):
         c = ws.cell(row=row, column=1, value=instr)
         bold = any(instr.startswith(k) for k in ("DEF ", "PUSH ", "PULL ", "LIST "))
-        c.font = Font(name="Calibri", size=9.5, bold=bold, color="1F3864" if bold else "000000")
-        c.alignment = Alignment(horizontal="left")
+        c.font = XD.fnt(9.5, bold=bold, color="0C447C" if bold else "2C2C2A")
+        c.alignment = XD.left()
         if comment:
-            cc = ws.cell(row=row, column=3, value=comment)
-            cc.font = Font(name="Calibri", size=9, color="666666", italic=True)
+            ws.cell(row=row, column=3, value=comment).font = XD.fnt(9, color="5F5E5A", italic=True)
 
     safe = se_name.replace(" ", "_")
 
     ws["A1"] = "MANIFESTE_V=1"
-    ws["A1"].font = Font(name="Calibri", size=10, bold=True, color="1F3864")
+    ws["A1"].font = XD.fnt(10, bold=True, color="0C447C")
+    ws.sheet_properties.tabColor = XD.sheet("manifeste").header
 
     r = 3
     w(r, "FILE_TYPE: cockpit_ingenieur",  "Type de fichier ExoSync"); r += 1
