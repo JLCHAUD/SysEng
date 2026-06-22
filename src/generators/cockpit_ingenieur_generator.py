@@ -6,15 +6,9 @@ from typing import List
 
 from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from src.models import UOInstance
-from src.styles import (
-    BLUE_DARK, BLUE_MID, BLUE_LIGHT, GREEN_LIGHT, ORANGE_LIGHT, RED_LIGHT,
-    YELLOW_LIGHT, WHITE, GREY_LIGHT, THIN_BORDER,
-    solid_fill, header_font, body_font, center, left,
-    style_header_row, style_data_row, set_column_widths, freeze_top_row,
-)
+from src.xl_design import XD
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output" / "cockpits"
 UO_DIR = Path(__file__).parent.parent.parent / "output" / "UOs"
@@ -48,41 +42,36 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
     ws = wb.create_sheet("Mes UOs")
     ws.sheet_view.showGridLines = False
 
-    ws.merge_cells("A1:I1")
-    t = ws["A1"]
-    t.value = f"Mes UOs — {engineer_name}   |   {date.today().strftime('%d/%m/%Y')}"
-    t.fill = solid_fill(BLUE_DARK)
-    t.font = header_font(size=13)
-    t.alignment = center()
-    ws.row_dimensions[1].height = 30
+    XD.banner(ws, "general", f"Mes UOs — {engineer_name}",
+              subtitle=date.today().strftime('%d/%m/%Y'), n_cols=9)
 
     ws.merge_cells("A2:C2")
     ws["A2"].value = f"UOs actives : {len(uo_list)}"
-    ws["A2"].fill = solid_fill(BLUE_LIGHT)
-    ws["A2"].font = body_font(bold=True)
-    ws["A2"].alignment = center()
-    ws["A2"].border = THIN_BORDER
+    ws["A2"].fill = XD.fill(XD.sheet("general").accent)
+    ws["A2"].font = XD.fnt(11, bold=True)
+    ws["A2"].alignment = XD.center()
+    ws["A2"].border = XD.HAIR
 
     ws.merge_cells("D2:F2")
     ws["D2"].value = f"Charge totale : {sum(u.total_hours for u in uo_list)}h"
-    ws["D2"].fill = solid_fill(BLUE_LIGHT)
-    ws["D2"].font = body_font(bold=True)
-    ws["D2"].alignment = center()
-    ws["D2"].border = THIN_BORDER
+    ws["D2"].fill = XD.fill(XD.sheet("general").accent)
+    ws["D2"].font = XD.fnt(11, bold=True)
+    ws["D2"].alignment = XD.center()
+    ws["D2"].border = XD.HAIR
 
     ws.merge_cells("A4:I4")
     sec = ws["A4"]
     sec.value = "Toutes mes UO"
-    sec.fill = solid_fill(BLUE_MID)
-    sec.font = header_font()
-    sec.alignment = center()
+    sec.fill = XD.fill(XD.sheet("general").header)
+    sec.font = XD.fnt(11, bold=True, color=XD.WHITE)
+    sec.alignment = XD.center()
 
     # A=UO ID  B=Type  C=Système  D=Projet  E=Charge(h)  F=% Avancement  G=H réalisées  H=Date fin  I=Alerte
     headers = ["UO ID", "Type UO", "Système", "Projet", "Charge (h)",
                "% Avancement", "H réalisées", "Date fin", "Alerte"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=5, column=col, value=h)
-    style_header_row(ws, 5, 1, 9, color=BLUE_MID)
+    XD.table_header(ws, 5, headers, "general")
 
     for i, uo in enumerate(uo_list):
         row = 6 + i
@@ -91,9 +80,9 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         proj_name = uo.project.name if uo.project else uo.project_id
 
         id_cell = ws.cell(row=row, column=1, value=uo.id)
-        id_cell.font = body_font(color="0563C1")
-        id_cell.alignment = left()
-        id_cell.border = THIN_BORDER
+        id_cell.font = XD.fnt(11, color="0563C1")
+        id_cell.alignment = XD.left()
+        id_cell.border = XD.HAIR
         uo_type_file = uo.uo_type.id if uo.uo_type else uo.uo_type_id
         uo_sys_file = uo.system.id if uo.system else uo.system_id
         uo_path = uo_dir / f"{uo.id}_{uo_type_file}_{uo_sys_file}.xlsx"
@@ -106,19 +95,19 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
 
         avanc_cell = ws.cell(row=row, column=6, value=0.0)
         avanc_cell.number_format = "0%"
-        avanc_cell.fill = solid_fill(YELLOW_LIGHT)
-        avanc_cell.border = THIN_BORDER
-        avanc_cell.alignment = center()
+        avanc_cell.fill = XD.fill(XD.INPUT)
+        avanc_cell.border = XD.HAIR
+        avanc_cell.alignment = XD.center()
 
         h_cell = ws.cell(row=row, column=7, value=0.0)
-        h_cell.fill = solid_fill(YELLOW_LIGHT)
-        h_cell.border = THIN_BORDER
-        h_cell.alignment = center()
+        h_cell.fill = XD.fill(XD.INPUT)
+        h_cell.border = XD.HAIR
+        h_cell.alignment = XD.center()
 
         date_cell = ws.cell(row=row, column=8, value=uo.end_date)
         date_cell.number_format = "DD/MM/YYYY"
-        date_cell.border = THIN_BORDER
-        date_cell.alignment = center()
+        date_cell.border = XD.HAIR
+        date_cell.alignment = XD.center()
 
         alert_formula = (
             f'=IF(G{row}>E{row},"⚠ Dérive heures",'
@@ -126,8 +115,21 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         )
         ws.cell(row=row, column=9, value=alert_formula)
 
-        style_data_row(ws, row, 2, 5, alternate=(i % 2 == 1))
-        style_data_row(ws, row, 8, 9, alternate=(i % 2 == 1))
+        # style_data_row replacement for cols 2-5 and 8-9
+        alternate = (i % 2 == 1)
+        bg = XD.sheet("general").accent if alternate else XD.WHITE
+        for c in range(2, 6):
+            cell = ws.cell(row=row, column=c)
+            cell.fill = XD.fill(bg)
+            cell.font = XD.fnt(11)
+            cell.alignment = XD.left()
+            cell.border = XD.HAIR
+        for c in range(8, 10):
+            cell = ws.cell(row=row, column=c)
+            cell.fill = XD.fill(bg)
+            cell.font = XD.fnt(11)
+            cell.alignment = XD.left()
+            cell.border = XD.HAIR
 
     last_row = 5 + len(uo_list)
     if uo_list:
@@ -135,33 +137,27 @@ def _sheet_mes_uos(wb: Workbook, engineer_name: str, uo_list: List[UOInstance], 
         ws.conditional_formatting.add(
             alert_range,
             CellIsRule(operator="equal", formula=['"⚠ Dérive heures"'],
-                       fill=solid_fill(RED_LIGHT)),
+                       fill=XD.fill(XD.RED_L)),
         )
         ws.conditional_formatting.add(
             alert_range,
             CellIsRule(operator="equal", formula=['"⏰ Échéance proche"'],
-                       fill=solid_fill(ORANGE_LIGHT)),
+                       fill=XD.fill(XD.AMBER_L)),
         )
         ws.conditional_formatting.add(
             alert_range,
             CellIsRule(operator="equal", formula=['"✅ OK"'],
-                       fill=solid_fill(GREEN_LIGHT)),
+                       fill=XD.fill(XD.GREEN_L)),
         )
 
     # Table nommée pour GET_TABLE(Mes UOs, tbl_mes_uos)
     if uo_list:
         tbl_ref = f"A5:I{last_row}"
-        tbl = Table(displayName="tbl_mes_uos", ref=tbl_ref)
-        tbl.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium2", showFirstColumn=False,
-            showLastColumn=False, showRowStripes=True, showColumnStripes=False,
-        )
-        ws.add_table(tbl)
+        XD.named_table(ws, "tbl_mes_uos", tbl_ref, "general")
 
-    set_column_widths(ws, {
-        "A": 12, "B": 30, "C": 18, "D": 20, "E": 13,
-        "F": 16, "G": 14, "H": 14, "I": 22,
-    })
+    for col, w in {"A": 12, "B": 30, "C": 18, "D": 20, "E": 13,
+                   "F": 16, "G": 14, "H": 14, "I": 22}.items():
+        ws.column_dimensions[col].width = w
     ws.freeze_panes = "A6"
 
 
@@ -171,13 +167,9 @@ def _sheet_agenda(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
     today = date.today()
 
     # ── Titre ──────────────────────────────────────────────────────────────────
-    ws.merge_cells("A1:F1")
-    t = ws["A1"]
-    t.value = f"Agenda — {engineer_name}   |   Semaine du {today.strftime('%d/%m/%Y')}"
-    t.fill = solid_fill(BLUE_DARK)
-    t.font = header_font(size=13)
-    t.alignment = center()
-    ws.row_dimensions[1].height = 30
+    XD.banner(ws, "planning",
+              f"Agenda — {engineer_name}   |   Semaine du {today.strftime('%d/%m/%Y')}",
+              n_cols=6)
 
     current_row = 3
 
@@ -185,7 +177,7 @@ def _sheet_agenda(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
     current_row = _agenda_section(
         ws, "📅  Semaine en cours", current_row,
         uo_list, today, today + timedelta(days=7),
-        color=BLUE_MID,
+        color=XD.sheet("general").header,
     )
 
     current_row += 1
@@ -194,7 +186,7 @@ def _sheet_agenda(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
     current_row = _agenda_section(
         ws, "📋  Prochaines échéances (30 jours)", current_row,
         uo_list, today + timedelta(days=8), today + timedelta(days=30),
-        color=BLUE_LIGHT, header_text_color="1F3864",
+        color=XD.sheet("general").accent, header_text_color="1F3864",
     )
 
     current_row += 1
@@ -202,31 +194,32 @@ def _sheet_agenda(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
     # ── Section : Points ouverts ──────────────────────────────────────────────
     current_row = _agenda_points_ouverts(ws, current_row, uo_list)
 
-    set_column_widths(ws, {
-        "A": 12, "B": 35, "C": 12, "D": 16, "E": 18, "F": 30,
-    })
+    for col, w in {"A": 12, "B": 35, "C": 12, "D": 16, "E": 18, "F": 30}.items():
+        ws.column_dimensions[col].width = w
 
 
 def _agenda_section(
     ws, title: str, start_row: int,
     uo_list: List[UOInstance], date_from: date, date_to: date,
-    color: str = BLUE_MID, header_text_color: str = "FFFFFF",
+    color: str = None, header_text_color: str = "FFFFFF",
 ) -> int:
     """Affiche une section agenda filtrée par horizon de dates. Retourne la prochaine ligne libre."""
+    if color is None:
+        color = XD.sheet("general").header
     ws.merge_cells(f"A{start_row}:F{start_row}")
     sec = ws[f"A{start_row}"]
     sec.value = title
-    sec.fill = solid_fill(color)
-    sec.font = header_font(color=header_text_color)
-    sec.alignment = left()
+    sec.fill = XD.fill(color)
+    sec.font = XD.fnt(11, bold=True, color=header_text_color)
+    sec.alignment = XD.left()
     start_row += 1
 
     headers = ["UO ID", "Activité", "Priorité", "Date échéance", "Statut", "Action"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=h)
-    style_header_row(ws, start_row, 1, 6, color=BLUE_LIGHT)
+    XD.table_header(ws, start_row, headers, "general")
     for col in range(1, 7):
-        ws.cell(row=start_row, column=col).font = body_font(bold=True, color="1F3864")
+        ws.cell(row=start_row, column=col).font = XD.fnt(11, bold=True, color="1F3864")
     start_row += 1
 
     row = start_row
@@ -251,15 +244,23 @@ def _agenda_section(
             ws.cell(row=row, column=5, value=statut_val)
             ws.cell(row=row, column=6, value="")
 
-            style_data_row(ws, row, 1, 6, alternate=(row % 2 == 0))
+            # style_data_row replacement for cols 1-6
+            alternate = (row % 2 == 0)
+            bg = XD.sheet("general").accent if alternate else XD.WHITE
+            for c in range(1, 7):
+                cell = ws.cell(row=row, column=c)
+                cell.fill = XD.fill(bg)
+                cell.font = XD.fnt(11)
+                cell.alignment = XD.left()
+                cell.border = XD.HAIR
             row += 1
 
     if row == start_row:
         ws.merge_cells(f"A{row}:F{row}")
         ws[f"A{row}"].value = "Aucune activité dans cette période"
-        ws[f"A{row}"].fill = solid_fill("F9F9F9")
-        ws[f"A{row}"].font = body_font(color="999999")
-        ws[f"A{row}"].alignment = center()
+        ws[f"A{row}"].fill = XD.fill("F9F9F9")
+        ws[f"A{row}"].font = XD.fnt(11, color="999999")
+        ws[f"A{row}"].alignment = XD.center()
         row += 1
 
     return row
@@ -270,27 +271,27 @@ def _agenda_points_ouverts(ws, start_row: int, uo_list: List[UOInstance]) -> int
     ws.merge_cells(f"A{start_row}:F{start_row}")
     sec = ws[f"A{start_row}"]
     sec.value = "⚡  Points ouverts / Actions"
-    sec.fill = solid_fill(ORANGE_LIGHT)
-    sec.font = header_font(color="C00000")
-    sec.alignment = left()
+    sec.fill = XD.fill(XD.AMBER_L)
+    sec.font = XD.fnt(11, bold=True, color="C00000")
+    sec.alignment = XD.left()
     start_row += 1
 
     headers = ["UO ID", "Description action", "Responsable", "Date limite", "Nb points", "Statut"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=h)
-    style_header_row(ws, start_row, 1, 6, color=BLUE_LIGHT)
+    XD.table_header(ws, start_row, headers, "general")
     for col in range(1, 7):
-        ws.cell(row=start_row, column=col).font = body_font(bold=True, color="1F3864")
+        ws.cell(row=start_row, column=col).font = XD.fnt(11, bold=True, color="1F3864")
     start_row += 1
 
     for uo in uo_list:
         ws.cell(row=start_row, column=1, value=uo.id)
         for col in range(2, 7):
             c = ws.cell(row=start_row, column=col, value="")
-            c.fill = solid_fill(YELLOW_LIGHT)
-            c.border = THIN_BORDER
-        ws.cell(row=start_row, column=1).border = THIN_BORDER
-        ws.cell(row=start_row, column=1).alignment = left()
+            c.fill = XD.fill(XD.INPUT)
+            c.border = XD.HAIR
+        ws.cell(row=start_row, column=1).border = XD.HAIR
+        ws.cell(row=start_row, column=1).alignment = XD.left()
         start_row += 1
 
     return start_row
@@ -303,23 +304,24 @@ def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]
     """
     ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = XD.sheet("manifeste").header
 
     safe_name = engineer_name.replace(" ", "_")
 
     def _mxl_row(row: int, instr: str, ancre: str = "", comment: str = ""):
         cell_a = ws.cell(row=row, column=1, value=instr)
-        cell_a.font = body_font(size=9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ")))
-        cell_a.alignment = left()
+        cell_a.font = XD.fnt(9.5, bold=instr.startswith(("DEF ", "PUSH ", "PULL ")))
+        cell_a.alignment = XD.left()
         if ancre:
-            ws.cell(row=row, column=2, value=ancre).font = body_font(size=9, color="888888")
+            ws.cell(row=row, column=2, value=ancre).font = XD.fnt(9, color="888888")
         if comment:
             c = ws.cell(row=row, column=3, value=comment)
-            c.font = body_font(size=9, color="666666")
-            c.fill = solid_fill("F9F9F9")
+            c.font = XD.fnt(9, color="666666")
+            c.fill = XD.fill("F9F9F9")
 
     # Ligne 1 : version
     ws["A1"] = "MANIFESTE_V=1"
-    ws["A1"].font = body_font(bold=True, color="1F3864")
+    ws["A1"].font = XD.fnt(11, bold=True, color="1F3864")
     # Ligne 2 intentionnellement vide (skippée par parser.py)
 
     # Métadonnées
@@ -346,4 +348,5 @@ def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]
     _mxl_row(r, f"PUSH $mes_uos -> cockpit.{safe_name}.mes_uos",
              comment="Remonte les saisies ingénieur vers le store central ExoSync")
 
-    set_column_widths(ws, {"A": 65, "B": 18, "C": 60})
+    for col, w in {"A": 65, "B": 18, "C": 60}.items():
+        ws.column_dimensions[col].width = w
