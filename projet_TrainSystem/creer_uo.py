@@ -449,61 +449,85 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
         fnt(10, color=GREY_D, italic=True)
 
     # ── _Manifeste ────────────────────────────────────────────────────────────
+    # Col A = instruction MXL (lue par le parser), col C = commentaire français
+    # (ignoré par le parser, sert à lire ce que fait chaque instruction).
     ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
-    ws.column_dimensions["A"].width = 95
+    ws.column_dimensions["A"].width = 70
+    ws.column_dimensions["C"].width = 60
     ws.sheet_properties.tabColor = TAB["_Manifeste"]
     ws["A1"] = "MANIFESTE_V=1"
+    ws["A1"].font = fnt(11, bold=True, color=NAVY_D)
+    ws["C1"] = "Commentaire (non interprété — aide à la lecture)"
+    ws["C1"].font = fnt(9, color=GREY_D, italic=True)
     ws["A2"] = "instruction"
     ws["A2"].font = Font(bold=True)
+
+    # (instruction, commentaire). Section/ligne vide → commentaire "".
+    se_name = getattr(args, "se", "") if args else ""
     manifeste = [
-        "FILE_TYPE: uo_instance",
-        f"FILE_ID: {code}",
-        "",
-        "# ── Lecture des donnees locales ─────────────────────────────",
-        "DEF $act = GET_TABLE(Activites, tbl_activites)",
-        "DEF $oil = GET_TABLE(OIL, tbl_oil)",
-        "DEF $liv = GET_TABLE(Livrables, tbl_livrables)",
-        "",
-        "# ── Sous-ensembles ──────────────────────────────────────────",
-        'DEF $actifs = COMPUTE(FILTER($act, applicable = "OUI"))',
-        'DEF $po_ouv = COMPUTE(FILTER($oil, statut = "OUVERT"))',
-        "",
-        "# ── KPI ─────────────────────────────────────────────────────",
-        "DEF $avancement = COMPUTE(MEAN_WEIGHTED($actifs.avancement, $actifs.poids))",
-        "DEF $h_conso = COMPUTE(SUM($actifs.heures_consommees))",
-        'DEF $po_ouverts = COMPUTE(COUNT_IF($oil.statut, "OUVERT"))',
-        'DEF $po_fermes = COMPUTE(COUNT_IF($oil.statut, "CLOS"))',
-        'DEF $po_critiques = COMPUTE(COUNT_IF($po_ouv.criticite, "HAUTE"))',
-        'DEF $po_fournisseur = COMPUTE(COUNT_IF($po_ouv.en_action, "FOURNISSEUR"))',
-        'DEF $po_expert = COMPUTE(COUNT_IF($po_ouv.en_action, "EXPERT"))',
-        "",
-        "# ── Regles de qualite ───────────────────────────────────────",
-        "VALIDATE $actifs.avancement : RANGE(0, 100)",
-        'VALIDATE $act.applicable : IN("OUI", "NON")',
-        'VALIDATE $oil.statut : IN("OUVERT", "CLOS")',
-        "",
-        "# ── Affichage local (onglet KPI) ────────────────────────────",
-        "BIND $avancement -> KPI.kpi_avancement",
-        "BIND $h_conso -> KPI.kpi_h_conso",
-        "BIND $po_ouverts -> KPI.kpi_po_ouverts",
-        "BIND $po_fermes -> KPI.kpi_po_fermes",
-        "BIND $po_critiques -> KPI.kpi_po_critiques",
-        "BIND $po_fournisseur -> KPI.kpi_po_fournisseur",
-        "BIND $po_expert -> KPI.kpi_po_expert",
-        "",
-        "# ── Publication vers l'ecosysteme ───────────────────────────",
-        f"PUSH $avancement -> uo.{code}.avancement",
-        f"PUSH $h_conso -> uo.{code}.heures_consommees",
-        f"PUSH $po_ouverts -> uo.{code}.po_ouverts",
-        f"PUSH $po_fermes -> uo.{code}.po_fermes",
-        f"PUSH $po_critiques -> uo.{code}.po_critiques",
-        f"PUSH $actifs -> uo.{code}.activites",
-        f"PUSH $oil -> uo.{code}.points_ouverts",
-        f"PUSH $liv -> uo.{code}.livrables",
+        ("FILE_TYPE: uo_instance",                 "Type de fichier dans l'écosystème ExoSync"),
+        (f"FILE_ID: {code}",                       "Identifiant unique de cette UO (clé du store)"),
+        (f"ingenieur: {se_name}" if se_name else "", "Ingénieur Système responsable de cette UO"),
+        ("", ""),
+        ("# ── Lecture des donnees locales ─────────────────────────────", ""),
+        ("DEF $act = GET_TABLE(Activites, tbl_activites)",  "Charge le tableau des activités"),
+        ("DEF $oil = GET_TABLE(OIL, tbl_oil)",              "Charge l'Open Items List (points ouverts)"),
+        ("DEF $liv = GET_TABLE(Livrables, tbl_livrables)",  "Charge le tableau des livrables"),
+        ("", ""),
+        ("# ── Sous-ensembles ──────────────────────────────────────────", ""),
+        ('DEF $actifs = COMPUTE(FILTER($act, applicable = "OUI"))',
+         "Active uniquement les activités applicables (applicable = OUI)"),
+        ('DEF $po_ouv = COMPUTE(FILTER($oil, statut = "OUVERT"))',
+         "Sous-ensemble des points ouverts encore OUVERTS"),
+        ("", ""),
+        ("# ── KPI ─────────────────────────────────────────────────────", ""),
+        ("DEF $avancement = COMPUTE(MEAN_WEIGHTED($actifs.avancement, $actifs.poids))",
+         "Avancement global : moyenne pondérée par les poids des activités applicables"),
+        ("DEF $h_conso = COMPUTE(SUM($actifs.heures_consommees))",
+         "Total des heures consommées sur les activités applicables"),
+        ('DEF $po_ouverts = COMPUTE(COUNT_IF($oil.statut, "OUVERT"))',
+         "Nombre de points OIL au statut OUVERT"),
+        ('DEF $po_fermes = COMPUTE(COUNT_IF($oil.statut, "CLOS"))',
+         "Nombre de points OIL au statut CLOS"),
+        ('DEF $po_critiques = COMPUTE(COUNT_IF($po_ouv.criticite, "HAUTE"))',
+         "Points ouverts de criticité HAUTE"),
+        ('DEF $po_fournisseur = COMPUTE(COUNT_IF($po_ouv.en_action, "FOURNISSEUR"))',
+         "Points ouverts dont la balle est chez le fournisseur"),
+        ('DEF $po_expert = COMPUTE(COUNT_IF($po_ouv.en_action, "EXPERT"))',
+         "Points ouverts dont la balle est chez l'expert"),
+        ("", ""),
+        ("# ── Regles de qualite ───────────────────────────────────────", ""),
+        ("VALIDATE $actifs.avancement : RANGE(0, 100)",
+         "Bloque la sync si un avancement sort de l'intervalle 0-100"),
+        ('VALIDATE $act.applicable : IN("OUI", "NON")',
+         "La colonne applicable ne peut valoir que OUI ou NON"),
+        ('VALIDATE $oil.statut : IN("OUVERT", "CLOS")',
+         "Le statut OIL ne peut valoir que OUVERT ou CLOS"),
+        ("", ""),
+        ("# ── Affichage local (onglet KPI) ────────────────────────────", ""),
+        ("BIND $avancement -> KPI.kpi_avancement",       "Écrit l'avancement dans l'onglet KPI"),
+        ("BIND $h_conso -> KPI.kpi_h_conso",             "Écrit les heures consommées dans KPI"),
+        ("BIND $po_ouverts -> KPI.kpi_po_ouverts",       "Écrit le nombre de points ouverts dans KPI"),
+        ("BIND $po_fermes -> KPI.kpi_po_fermes",         "Écrit le nombre de points fermés dans KPI"),
+        ("BIND $po_critiques -> KPI.kpi_po_critiques",   "Écrit le nombre de points critiques dans KPI"),
+        ("BIND $po_fournisseur -> KPI.kpi_po_fournisseur", "Écrit le compteur 'balle fournisseur' dans KPI"),
+        ("BIND $po_expert -> KPI.kpi_po_expert",         "Écrit le compteur 'balle expert' dans KPI"),
+        ("", ""),
+        ("# ── Publication vers l'ecosysteme ───────────────────────────", ""),
+        (f"PUSH $avancement -> uo.{code}.avancement",        "Publie l'avancement vers le store central"),
+        (f"PUSH $h_conso -> uo.{code}.heures_consommees",    "Publie les heures consommées vers le store"),
+        (f"PUSH $po_ouverts -> uo.{code}.po_ouverts",        "Publie le nombre de points ouverts"),
+        (f"PUSH $po_fermes -> uo.{code}.po_fermes",          "Publie le nombre de points fermés"),
+        (f"PUSH $po_critiques -> uo.{code}.po_critiques",    "Publie le nombre de points critiques"),
+        (f"PUSH $actifs -> uo.{code}.activites",             "Publie la table des activités applicables"),
+        (f"PUSH $oil -> uo.{code}.points_ouverts",           "Publie la table des points ouverts (OIL)"),
+        (f"PUSH $liv -> uo.{code}.livrables",                "Publie la table des livrables"),
     ]
-    for i, line in enumerate(manifeste, 3):
-        ws.cell(row=i, column=1, value=line)
+    for i, (instr, comment) in enumerate(manifeste, 3):
+        ws.cell(row=i, column=1, value=instr)
+        if comment:
+            ws.cell(row=i, column=3, value=comment).font = fnt(9, color=GREY_D, italic=True)
 
     return wb
 

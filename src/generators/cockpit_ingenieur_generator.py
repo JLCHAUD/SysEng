@@ -25,6 +25,7 @@ def generate_cockpit_ingenieur(
     all_uo_instances: List[UOInstance],
     output_dir: Path = OUTPUT_DIR,
     uo_dir: Path = UO_DIR,
+    pilote_id: str = "",
 ) -> Path:
     """Génère le cockpit agenda pour un ingénieur système."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -35,7 +36,7 @@ def generate_cockpit_ingenieur(
 
     _sheet_mes_uos(wb, engineer_name, uo_list, uo_dir)
     _sheet_agenda(wb, engineer_name, uo_list)
-    _sheet_manifeste(wb, engineer_name, uo_list)
+    _sheet_manifeste(wb, engineer_name, uo_list, pilote_id=pilote_id)
 
     safe = engineer_name.replace(" ", "_")
     filepath = output_dir / f"Cockpit_{safe}.xlsx"
@@ -295,7 +296,8 @@ def _agenda_points_ouverts(ws, start_row: int, uo_list: List[UOInstance]) -> int
     return start_row
 
 
-def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]):
+def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance],
+                     pilote_id: str = ""):
     """Génère l'onglet _Manifeste au format MXL mono-colonne.
     Col A = instruction MXL, col B = ancre, col C = commentaire français.
     """
@@ -321,20 +323,27 @@ def _sheet_manifeste(wb: Workbook, engineer_name: str, uo_list: List[UOInstance]
     # Ligne 2 intentionnellement vide (skippée par parser.py)
 
     # Métadonnées
-    _mxl_row(3, "FILE_TYPE: cockpit_ingenieur",     comment="Type de fichier ExoSync")
-    _mxl_row(4, f"FILE_ID: Cockpit_{safe_name}",    comment="Identifiant unique du cockpit")
-    _mxl_row(5, f"ingenieur: {engineer_name}",      comment="Nom de l'ingénieur propriétaire")
+    r = 3
+    _mxl_row(r, "FILE_TYPE: cockpit_ingenieur",  comment="Type de fichier ExoSync"); r += 1
+    _mxl_row(r, f"FILE_ID: Cockpit_{safe_name}", comment="Identifiant unique du cockpit"); r += 1
+    _mxl_row(r, f"ingenieur: {engineer_name}",   comment="Nom de l'ingénieur propriétaire"); r += 1
+    if pilote_id:
+        _mxl_row(r, f"pilote_id: {pilote_id}",
+                 comment="Pilote responsable — permet au dashboard de découvrir ce cockpit")
+        r += 1
 
+    r += 1  # ligne vide de séparation
     # Définition de la table
-    _mxl_row(7, "DEF $mes_uos = GET_TABLE(Mes UOs, tbl_mes_uos)",
-             comment="Référence à la table des UOs de l'ingénieur")
-    _mxl_row(8, "COL $mes_uos.avancement : WRITE=engineer",
-             comment="% avancement saisi par l'ingénieur (zone jaune)")
-    _mxl_row(9, "COL $mes_uos.heures_realisees : WRITE=engineer",
-             comment="Heures réalisées saisies par l'ingénieur (zone jaune)")
+    _mxl_row(r, "DEF $mes_uos = GET_TABLE(Mes UOs, tbl_mes_uos)",
+             comment="Référence à la table des UOs de l'ingénieur"); r += 1
+    _mxl_row(r, "COL $mes_uos.avancement : WRITE=engineer",
+             comment="% avancement saisi par l'ingénieur (zone jaune)"); r += 1
+    _mxl_row(r, "COL $mes_uos.heures_realisees : WRITE=engineer",
+             comment="Heures réalisées saisies par l'ingénieur (zone jaune)"); r += 1
 
+    r += 1  # ligne vide
     # Export vers store
-    _mxl_row(11, f"PUSH $mes_uos -> cockpit.{safe_name}.mes_uos",
+    _mxl_row(r, f"PUSH $mes_uos -> cockpit.{safe_name}.mes_uos",
              comment="Remonte les saisies ingénieur vers le store central ExoSync")
 
-    set_column_widths(ws, {"A": 60, "B": 18, "C": 55})
+    set_column_widths(ws, {"A": 65, "B": 18, "C": 60})

@@ -192,7 +192,7 @@ class TestDashboardManifeste:
         assert ws["A5"].value == f"pilote_id: {acteur.id}"
 
     def test_list_dynamic_presente(self, tmp_path):
-        """Une instruction LIST mes_uos TYPE=uo_instance WHERE pilote_id=... doit exister."""
+        """Une instruction LIST mes_cockpits TYPE=cockpit_ingenieur WHERE pilote_id=... doit exister."""
         from src.generators.dashboard_metier_generator import generate_dashboard_metier
         acteur = _make_pilote_metier()
         store = JsonStore(tmp_path / "store.json")
@@ -201,11 +201,11 @@ class TestDashboardManifeste:
         ws = wb["_Manifeste"]
         instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
         assert any(
-            str(v).startswith("LIST mes_uos TYPE=uo_instance") for v in instrs if v
+            str(v).startswith("LIST mes_cockpits TYPE=cockpit_ingenieur") for v in instrs if v
         )
 
     def test_collect_presente(self, tmp_path):
-        """Une instruction COLLECT ... FROM mes_uos doit exister."""
+        """Une instruction COLLECT tbl_mes_uos FROM mes_cockpits doit exister."""
         from src.generators.dashboard_metier_generator import generate_dashboard_metier
         acteur = _make_pilote_metier()
         store = JsonStore(tmp_path / "store.json")
@@ -214,7 +214,7 @@ class TestDashboardManifeste:
         ws = wb["_Manifeste"]
         instrs = [ws.cell(row=r, column=1).value for r in range(1, 20)]
         assert any(
-            str(v).startswith("COLLECT") and "FROM mes_uos" in str(v)
+            str(v).startswith("COLLECT") and "FROM mes_cockpits" in str(v)
             for v in instrs if v
         )
 

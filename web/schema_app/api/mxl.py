@@ -1,25 +1,7 @@
 """Génère le template MXL d'une Classe (N1).
 
-Contrairement au générateur N2 (qui produit le MXL d'un Post instance),
-ce générateur produit le *template manifeste* qu'un architecte placerait
-dans une feuille _Manifeste pour un fichier de cette Classe.
-
-Sortie type pour la Classe `uo_instance` :
-  FILE_TYPE  uo_instance
-  FILE_ID    UO_INSTANCE_ID
-
-  # -- Champs scalaires --
-  DEF $project_id = GET_CELL(_Manifeste, project_id)
-    COL $project_id : HEADER="Projet"
-
-  # -- Tables standard --
-  DEF $activites = GET_TABLE(Activites, TabActivites)
-    COL $activites.id        : KEY
-    COL $activites.label     : HEADER="Activité"
-    COL $activites.hours     : WRITE=ingenieur_sys
-
-  # -- PUSH --
-  PUSH $activites -> uo.{id}.activites
+Produit le *template Manifeste* que l'on placerait dans une feuille _Manifeste
+pour un fichier de cette Classe. Délègue la génération à web.mxl_service.
 """
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -27,23 +9,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 from web.schema_app.services.config_service import load_file_types, load_tables, load_relations
+from web.mxl_service import build_class_mxl_lines
 
 router = APIRouter()
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _col_line(var: str, col_name: str, is_key: bool, header: str, write: str) -> str:
-    parts = []
-    if is_key:
-        parts.append("KEY")
-    if write:
-        parts.append(f"WRITE={write}")
-    if header and header != col_name:
-        parts.append(f'HEADER="{header}"')
-    if not parts:
-        return ""
-    return f"  COL {var}.{col_name} : {' '.join(parts)}"
 
 
 def _generate_class_mxl(class_id: str) -> str:
@@ -52,106 +20,20 @@ def _generate_class_mxl(class_id: str) -> str:
         raise HTTPException(404, f"Classe '{class_id}' introuvable")
 
     ft = ft_all[class_id]
-    push_prefix = ft.get("push_prefix", "")
-    min_fields = ft.get("min_fields", [])
 
-    # Tables std liées à cette Classe dans tables.json
-    tables_data = load_tables().get("tables", {})
     std_tables = [
-        t for t in tables_data.values()
+        t for t in load_tables().get("tables", {}).values()
         if t.get("file_id") == f"__class__{class_id}"
     ]
 
-    lines: list[str] = []
-
-    # ── En-tête ────────────────────────────────────────────────────────────────
     placeholder_id = class_id.upper() + "_ID"
-    default_style = ft.get("default_style", "default")
-    lines += [
-        f"FILE_TYPE  {class_id}",
-        f"FILE_ID    {placeholder_id}",
-        f"VERSION    1",
-        f"STYLE:     {default_style}",
-        "",
-    ]
-
-    # ── Champs scalaires (min_fields → DEF GET_CELL) ───────────────────────────
-    if min_fields:
-        lines.append("# -- Champs scalaires --")
-        for field in min_fields:
-            fname = field.get("name", "")
-            label = field.get("label", fname)
-            ftype = field.get("field_type", "string")
-            pushable = field.get("pushable", False)
-            var = "$" + fname
-
-            lines.append(f"DEF {var} = GET_CELL(_Manifeste, {fname})")
-            attrs = []
-            if label and label != fname:
-                attrs.append(f'HEADER="{label}"')
-            if ftype not in ("string", ""):
-                attrs.append(f"TYPE={ftype}")
-            if attrs:
-                lines.append(f"  COL {var} : {' '.join(attrs)}")
-
-            if pushable and push_prefix:
-                store_key = push_prefix.rstrip(".") + "." + fname
-                lines.append(f"  PUSH {var} -> {store_key}")
-
-            lines.append("")
-
-    # ── Tables standard (std_tables → DEF GET_TABLE + COL) ────────────────────
-    if std_tables:
-        lines.append("# -- Tables standard --")
-    for tbl in std_tables:
-        tname = tbl.get("table_name", "")
-        sheet = tbl.get("sheet", tname)
-        var_name = tname[3:] if tname.startswith("Tab") else tname
-        var = "$" + var_name[0].lower() + var_name[1:] if var_name else "$table"
-
-        lines.append(f"DEF {var} = GET_TABLE({sheet}, {tname})")
-        for col in tbl.get("columns", []):
-            cname = col.get("name", "")
-            cl = _col_line(var, cname, col.get("is_key", False),
-                           col.get("header", ""), col.get("write", ""))
-            if cl:
-                lines.append(cl)
-
-        # PUSH auto si push_prefix défini
-        if push_prefix:
-            seg = var_name[0].lower() + var_name[1:]
-            store_key = push_prefix.rstrip(".") + "." + seg
-            lines.append(f"PUSH {var} -> {store_key}")
-
-        lines.append("")
-
-    # ── Flux entrants (Tissage N1) → patrons PULL commentés ──────────────────
-    relations = load_relations()
-    # Cette classe est-elle parente (dashboard) qui consomme des classes enfants ?
-    flux_sortants = [
-        r for r in relations
-        if r.get("parent_class") == class_id and r.get("flux")
-    ]
-    if flux_sortants:
-        lines.append("")
-        lines.append("# ── Flux N1 (patrons définis en Schéma N1) ───────────────────────────────")
-        for rel in flux_sortants:
-            child     = rel["child_class"]
-            qualifier = rel.get("qualifier", "TYPICAL")
-            lines.append(f"# Relation {qualifier} : {class_id} ↔ {child}")
-            for fx in rel.get("flux", []):
-                table  = fx.get("table", "")
-                mode   = fx.get("mode", "PULL")
-                source = fx.get("source", "child")
-                if source == "child":
-                    if mode == "COLLECT":
-                        lines.append(f"# COLLECT {child}.*.{table} -> FILL_TABLE({{sheet}}, {table}) MODE=APPEND")
-                    else:  # PULL
-                        lines.append(f"# PULL {child}.{{source_id}}.{table} -> FILL_TABLE({{sheet}}, {table}) MODE=OVERWRITE")
-                else:  # source == "parent"
-                    lines.append(f"# PUSH {table} -> {child}.{{target_id}}.{table}")
-            lines.append("#")
-
+    lines = build_class_mxl_lines(
+        class_id   = class_id,
+        file_id    = placeholder_id,
+        ft         = ft,
+        std_tables = std_tables,
+        relations  = load_relations(),
+    )
     return "\n".join(lines).strip()
 
 

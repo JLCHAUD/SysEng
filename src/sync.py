@@ -26,12 +26,25 @@ ROOT = Path(__file__).parent.parent
 ORDRE_TYPES = [
     "referentiel_uo",
     "referentiel_projet",
+    "referentiel_acteurs",
     "uo_instance",
     "cockpit",
+    "cockpit_ingenieur",
+    "cockpit_metier",
+    "cockpit_pole",
     "pilote",
+    "dashboard_pilote",
     "consolidation",
     "client",
 ]
+
+
+def _ordre_type(file_type: str) -> int:
+    """Position d'un type de fichier dans l'ordre de synchronisation."""
+    try:
+        return ORDRE_TYPES.index(file_type)
+    except ValueError:
+        return 99
 
 
 # ─── Vérification de verrouillage ────────────────────────────────────────────
@@ -115,7 +128,7 @@ def _sync_fichier(entree: EntreeRegistre, force: bool = False) -> dict:
             if ast.errors:
                 for err in ast.errors:
                     log.append(f"[WARN] Parse L{err.line_num}: {err.message}")
-            exec_result = execute_ast(ast, chemin, Store)
+            exec_result = execute_ast(ast, chemin, Store, ecosystem=Ecosystem)
             log.extend(exec_result.errors)
             log.append(
                 f"[OK] PULL={len(exec_result.pulled)} "
@@ -135,6 +148,7 @@ def _sync_fichier(entree: EntreeRegistre, force: bool = False) -> dict:
                 file_type=entree.type_fichier,
                 status=status_eco,
                 manifest_version=ast.header.version,
+                manifest_metadata=ast.header.manifest_metadata,
             )
             Ecosystem.record_edges_from_ast(ast, file_id=entree.id)
     except Exception as e:
@@ -171,13 +185,7 @@ def synchroniser(
         entrees = [e for e in entrees if e.type_fichier in types]
 
     # Trier par ordre de traitement
-    def _ordre(e: EntreeRegistre) -> int:
-        try:
-            return ORDRE_TYPES.index(e.type_fichier)
-        except ValueError:
-            return 99
-
-    entrees.sort(key=_ordre)
+    entrees.sort(key=lambda e: _ordre_type(e.type_fichier))
 
     resultats = []
     for entree in entrees:
@@ -208,6 +216,168 @@ def synchroniser(
     print(f"Rapport : {rapport_path}")
 
     return rapport_path
+
+
+# ─── Synchronisation par scan de répertoire ──────────────────────────────────
+
+class _EcosystemLocal:
+    """Proxy Exomap pointant vers un ecosystem.json local au répertoire scruté.
+
+    execute_ast n'utilise que get_files_by_type() pour résoudre LIST DYNAMIC ;
+    on redirige cet appel vers le fichier ecosystem du dossier courant pour que
+    la découverte ne voie que les fichiers réellement présents dans ce dossier.
+    """
+
+    def __init__(self, ecosystem_path: Path):
+        self._path = ecosystem_path
+
+    def get_files_by_type(self, file_type, filters=None):
+        return Ecosystem.get_files_by_type(file_type, filters, path=self._path)
+
+
+def synchroniser_repertoire(dossier, force: bool = False) -> Path:
+    """
+    Synchronise tous les fichiers Excel d'un répertoire, sans registre JSON.
+
+    Le moteur scrute le dossier, découvre chaque .xlsx via son _Manifeste
+    (FILE_TYPE / FILE_ID), trie par ordre de dépendance et exécute la chaîne
+    PUSH/PULL/BIND. Le store et l'Exomap vivent dans le dossier scruté : un
+    nouveau fichier est pris automatiquement, un fichier supprimé est ignoré.
+
+    Args:
+        dossier: répertoire à scruter
+        force: ignorer la vérification de verrouillage
+
+    Retourne le chemin du rapport JSON généré.
+    """
+    from src.store import JsonStore
+
+    dossier = Path(dossier)
+    debut = datetime.now()
+
+    # Store et Exomap locaux au répertoire — reconstruction complète à chaque scan.
+    # Le store repart de zéro : les clés orphelines (fichiers supprimés) disparaissent
+    # automatiquement puisqu'elles ne seront pas re-poussées.
+    store_local = JsonStore(dossier / "store.json")
+    store_local.clear()
+    eco_path = dossier / "ecosystem.json"
+    if eco_path.exists():
+        eco_path.unlink()  # reconstruction complète à chaque scan
+    eco_proxy = _EcosystemLocal(eco_path)
+
+    # ── Découverte : lister les .xlsx porteurs d'un _Manifeste ────────────────
+    decouverts = []  # (chemin, file_id, file_type, ast)
+    for chemin in sorted(dossier.glob("*.xlsx")):
+        if chemin.name.startswith("~$"):
+            continue  # fichier temporaire Excel
+        try:
+            ast = parse_file(chemin)
+        except Exception:
+            ast = None
+        if ast is None or not ast.header.file_type:
+            continue  # pas de _Manifeste exploitable → ignoré silencieusement
+
+        file_id = ast.header.file_id or chemin.stem
+        file_type = ast.header.file_type
+        decouverts.append((chemin, file_id, file_type, ast))
+
+        # Pré-peupler l'Exomap pour que LIST DYNAMIC résolve quel que soit l'ordre
+        Ecosystem.record_file_sync(
+            file_id=file_id,
+            path_str=str(chemin),
+            file_type=file_type,
+            status="pending",
+            manifest_version=ast.header.version,
+            manifest_metadata=ast.header.manifest_metadata,
+            ecosystem_path=eco_path,
+        )
+        Ecosystem.record_edges_from_ast(ast, file_id=file_id, ecosystem_path=eco_path)
+
+    # ── Tri par ordre de dépendance (type lu dans le _Manifeste) ──────────────
+    decouverts.sort(key=lambda d: _ordre_type(d[2]))
+
+    # ── Exécution ─────────────────────────────────────────────────────────────
+    resultats = []
+    for chemin, file_id, file_type, ast in decouverts:
+        print(f"  Synchro {file_id} ({file_type})...")
+        res = _sync_fichier_chemin(
+            chemin, file_id, file_type, ast,
+            store_local, eco_proxy, eco_path, force=force,
+        )
+        resultats.append(res)
+        for line in res["log"]:
+            print(f"    {line}")
+
+    fin = datetime.now()
+    rapport_path = _generer_rapport(resultats, debut, fin)
+
+    nb_ok = sum(1 for r in resultats if r["statut"] == "ok")
+    nb_skip = sum(1 for r in resultats if r["statut"] == "skip_verrouille")
+    nb_err = sum(1 for r in resultats if r["statut"] == "erreur")
+    print(f"\nSynchro terminee : {nb_ok} OK / {nb_skip} skips / {nb_err} erreurs")
+    print(f"Rapport : {rapport_path}")
+
+    return rapport_path
+
+
+def _sync_fichier_chemin(
+    chemin: Path,
+    file_id: str,
+    file_type: str,
+    ast,
+    store,
+    eco_proxy: "_EcosystemLocal",
+    eco_path: Path,
+    force: bool = False,
+) -> dict:
+    """Synchronise un fichier déjà parsé (mode scan de répertoire)."""
+    log: List[str] = []
+    resultat = {
+        "id": file_id,
+        "chemin": str(chemin),
+        "type": file_type,
+        "statut": "ok",
+        "log": log,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+    }
+
+    if not force and _est_verrouille(chemin):
+        resultat["statut"] = "skip_verrouille"
+        log.append(f"[SKIP] Fichier ouvert/verrouillé : {chemin.name}")
+        return resultat
+
+    try:
+        if ast.errors:
+            for err in ast.errors:
+                log.append(f"[WARN] Parse L{err.line_num}: {err.message}")
+
+        exec_result = execute_ast(ast, chemin, store, ecosystem=eco_proxy)
+        log.extend(exec_result.errors)
+        log.append(
+            f"[OK] PULL={len(exec_result.pulled)} "
+            f"PUSH={len(exec_result.pushed)} "
+            f"BIND={len(exec_result.bound)} "
+            f"skip={len(exec_result.skipped)} "
+            f"err={len(exec_result.errors)}"
+        )
+        if exec_result.errors:
+            resultat["statut"] = "erreur"
+
+        # Mettre à jour l'Exomap local avec le statut réel
+        Ecosystem.record_file_sync(
+            file_id=file_id,
+            path_str=str(chemin),
+            file_type=file_type,
+            status="error" if exec_result.errors else "ok",
+            manifest_version=ast.header.version,
+            manifest_metadata=ast.header.manifest_metadata,
+            ecosystem_path=eco_path,
+        )
+    except Exception as e:
+        resultat["statut"] = "erreur"
+        log.append(f"[ERREUR] Exception inattendue : {e}")
+
+    return resultat
 
 
 # ─── Audit d'onboarding ───────────────────────────────────────────────────────

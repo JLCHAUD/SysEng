@@ -4,7 +4,6 @@ import click
 from pathlib import Path
 
 from src.config_loader import load_uo_instances, load_registre
-from src.generators.uo_generator import generate_uo_file
 from src.generators.cockpit_generator import generate_cockpit
 from src.generators.consolidation_generator import generate_consolidation
 from src.generators.creator_generator import generate_creator
@@ -17,29 +16,8 @@ def cli():
 
 
 # ─── Génération ───────────────────────────────────────────────────────────────
-
-@cli.command("generate-uo")
-@click.option("--uo-id", required=True, help="ID de l'UO (ex: UO-001)")
-def cmd_generate_uo(uo_id: str):
-    """Genere le fichier Excel pour une UO specifique."""
-    instances = load_uo_instances()
-    target = next((uo for uo in instances if uo.id == uo_id), None)
-    if not target:
-        click.echo(f"[ERREUR] UO '{uo_id}' introuvable. IDs: {[uo.id for uo in instances]}")
-        raise SystemExit(1)
-    path = generate_uo_file(target)
-    click.echo(f"[OK] {path}")
-
-
-@cli.command("generate-all-uo")
-def cmd_generate_all_uo():
-    """Genere les fichiers Excel pour toutes les UO."""
-    instances = load_uo_instances()
-    for uo in instances:
-        path = generate_uo_file(uo)
-        click.echo(f"[OK] {uo.id} ({uo.statut.value}{'*' if uo.degrade else ''}) -> {path.name}")
-    click.echo(f"\n{len(instances)} fichier(s) UO genere(s).")
-
+# Note : la génération des UO se fait désormais via projet_TrainSystem/creer_uo.py
+# (modèle L09U1, 11 feuilles). L'ancien generate_uo_file a été retiré.
 
 @cli.command("generate-cockpit")
 @click.option("--engineer", required=True, help="Nom de l'ingenieur")
@@ -75,17 +53,11 @@ def cmd_generate_consolidation():
 
 @cli.command("generate-all")
 def cmd_generate_all():
-    """Genere tous les fichiers (UO + cockpits + consolidation)."""
-    click.echo(">> Generation de tous les fichiers...\n")
+    """Genere les cockpits + consolidation (UO via creer_uo.py)."""
+    click.echo(">> Generation des cockpits + consolidation...\n")
     instances = load_uo_instances()
 
-    click.echo("Fichiers UO :")
-    for uo in instances:
-        path = generate_uo_file(uo)
-        degrade = "*" if uo.degrade else ""
-        click.echo(f"  [OK] {uo.id}{degrade} ({uo.statut.value}) -> {path.name}")
-
-    click.echo("\nCockpits :")
+    click.echo("Cockpits :")
     engineers = sorted(set(uo.engineer_name for uo in instances))
     for eng in engineers:
         path = generate_cockpit(eng, instances)

@@ -169,6 +169,14 @@ class WorkspaceConfig(BaseModel):
 
 ---
 
+## Documentation à mettre à jour
+
+- **Obsidian vault** : `20-Projets/ExoSync/Conversations/CONV-08-Web-N2-Registry-Populator.md`
+  — ajouter une section "Évolutions (2026-05-20c)" avec le nouveau modèle de répertoires
+  (3 chemins, propriétaires, flux de création automatique)
+
+---
+
 ## Fichiers modifiés
 
 | Fichier | Modification |

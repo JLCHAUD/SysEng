@@ -59,9 +59,9 @@ def _generate_mxl(file_id: str) -> str:
 
     # ── En-tête ───────────────────────────────────────────────────────────────
     lines += [
-        f"FILE_TYPE  {file_rec.get('type_fichier') or 'libre'}",
-        f"FILE_ID    {file_id}",
-        f"VERSION    1",
+        f"FILE_TYPE: {file_rec.get('type_fichier') or 'libre'}",
+        f"FILE_ID:   {file_id}",
+        "VERSION:   1",
         "",
     ]
 

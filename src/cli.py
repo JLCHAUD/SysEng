@@ -10,7 +10,6 @@ Commandes disponibles :
     sync      Synchronise un ou plusieurs fichiers Excel
     status    Affiche le contenu du store central
     store     Opérations bas-niveau sur le store (get / set / clear)
-    generate  Génère les fichiers Excel depuis le registre (uo_instances.json)
 """
 import argparse
 import json
@@ -44,12 +43,35 @@ def _header(title: str) -> None:
 # ─── Commande : sync ──────────────────────────────────────────────────────────
 
 def cmd_sync(args: argparse.Namespace) -> int:
-    """Lance la synchronisation via sync.synchroniser()."""
+    """Lance la synchronisation via sync.synchroniser() ou sync.synchroniser_repertoire()."""
+    force = args.force
+
+    # Mode scan de répertoire : aucun registre, découverte automatique des .xlsx
+    if args.dir:
+        from src.sync import synchroniser_repertoire
+        dossier = Path(args.dir)
+        _header("ExoSync — Synchronisation (scan de répertoire)")
+        print(f"  Répertoire : {dossier}")
+        if not dossier.is_dir():
+            _err(f"Répertoire introuvable : {dossier}")
+            return 1
+        try:
+            rapport_path = synchroniser_repertoire(dossier, force=force)
+            try:
+                display = rapport_path.relative_to(ROOT)
+            except ValueError:
+                display = rapport_path
+            _ok(f"Rapport sauvegardé : {display}")
+            return 0
+        except Exception as exc:
+            _err(f"Erreur inattendue : {exc}")
+            return 1
+
+    # Mode registre (rétro-compat)
     from src.sync import synchroniser
 
     ids   = args.id   or None
     types = args.type or None
-    force = args.force
 
     _header("ExoSync — Synchronisation")
     if ids:
@@ -202,40 +224,6 @@ def cmd_lineage(args: argparse.Namespace) -> int:
         pass  # pas bloquant
 
     return 0
-
-
-# ─── Commande : generate ──────────────────────────────────────────────────────
-
-def cmd_generate(args: argparse.Namespace) -> int:
-    """Génère les fichiers Excel des UO depuis uo_instances.json."""
-    from src.config_loader import load_uo_instances
-    from src.generators.uo_generator import generate_uo_file, OUTPUT_DIR
-
-    _header("ExoSync — Génération des fichiers UO")
-
-    instances = load_uo_instances()
-    if args.id:
-        instances = [uo for uo in instances if uo.id in args.id]
-        if not instances:
-            _err(f"Aucune UO trouvée pour : {args.id}")
-            return 1
-
-    output_dir = Path(args.output) if args.output else OUTPUT_DIR
-
-    generated = []
-    errors     = []
-    for uo in instances:
-        try:
-            path = generate_uo_file(uo, output_dir=output_dir)
-            _ok(f"{uo.id} → {path.relative_to(ROOT)}")
-            generated.append(path)
-        except Exception as exc:
-            _err(f"{uo.id} : {exc}")
-            errors.append(uo.id)
-
-    print()
-    print(f"  {len(generated)} fichier(s) genere(s), {len(errors)} erreur(s)")
-    return 0 if not errors else 1
 
 
 # ─── Commande : doctor ────────────────────────────────────────────────────────
@@ -422,7 +410,8 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 exemples :
-  python -m src sync                        # synchronise tout
+  python -m src sync --dir projet_TrainSystem  # scrute un dossier (sans registre)
+  python -m src sync                        # synchronise tout (registre)
   python -m src sync --id UO-001 UO-002    # synchronise 2 fichiers
   python -m src sync --type uo_instance    # synchronise par type
   python -m src status                     # affiche le store
@@ -430,8 +419,6 @@ exemples :
   python -m src store get uo.UO-001.avancement
   python -m src store set uo.UO-001.avancement 75.0
   python -m src store clear
-  python -m src generate                   # génère tous les fichiers UO
-  python -m src generate --id UO-001      # génère un seul fichier
 """,
     )
 
@@ -440,6 +427,10 @@ exemples :
 
     # ── sync ──────────────────────────────────────────────────────────────────
     p_sync = sub.add_parser("sync", help="Synchronise les fichiers Excel")
+    p_sync.add_argument(
+        "--dir", metavar="DOSSIER",
+        help="Scrute un répertoire et synchronise tous ses .xlsx (sans registre)"
+    )
     p_sync.add_argument(
         "--id", nargs="+", metavar="ID",
         help="IDs des fichiers à synchroniser (ex: UO-001 UO-002)"
@@ -486,17 +477,6 @@ exemples :
     p_lin.add_argument(
         "--json", action="store_true",
         help="Sortie JSON brute"
-    )
-
-    # ── generate ──────────────────────────────────────────────────────────────
-    p_gen = sub.add_parser("generate", help="Genere les fichiers Excel UO")
-    p_gen.add_argument(
-        "--id", nargs="+", metavar="ID",
-        help="IDs des UO a generer (genere tout si absent)"
-    )
-    p_gen.add_argument(
-        "--output", metavar="DIR",
-        help="Repertoire de sortie (defaut: output/UOs/)"
     )
 
     # ── doctor ────────────────────────────────────────────────────────────────
@@ -551,9 +531,6 @@ def main(argv=None) -> int:
 
     if args.command == "lineage":
         return cmd_lineage(args)
-
-    if args.command == "generate":
-        return cmd_generate(args)
 
     if args.command == "doctor":
         return cmd_doctor(args)

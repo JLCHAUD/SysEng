@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from openpyxl import Workbook
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from src.models import ProfilActeur, TypeFiltre, UOInstance
 from src.store import JsonStore
@@ -45,6 +46,7 @@ def generate_dashboard_metier(
     wb.remove(wb.active)
 
     _sheet_synthese(wb, acteur, uo_list, store)
+    _sheet_vue_synthese(wb)
     _sheet_par_ingenieur(wb, acteur, uo_list, store)
     _sheet_alertes(wb, uo_list, store)
     _sheet_manifeste_dashboard(wb, acteur, uo_list)
@@ -163,6 +165,28 @@ def _sheet_synthese(wb: Workbook, acteur: ProfilActeur,
         "F": 13, "G": 16, "H": 14, "I": 14, "J": 22,
     })
     ws.freeze_panes = "A6"
+
+
+def _sheet_vue_synthese(wb: Workbook):
+    """Feuille réceptrice du COLLECT — tbl_vue_synthese remplie par ExoSync."""
+    ws = wb.create_sheet("Vue Synthèse")
+    ws.sheet_view.showGridLines = False
+
+    # En-têtes alignés sur tbl_mes_uos pour que COLLECT fusionne correctement
+    headers = ["_source_file_id", "ingenieur", "UO ID", "Type UO", "Système",
+               "Projet", "Charge (h)", "% Avancement", "H réalisées", "Date fin", "Alerte"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col, value=h)
+    # Ligne vide d'initialisation (table doit avoir au moins 1 ligne de données)
+    ws.cell(row=2, column=1, value="(vide — rempli par ExoSync)")
+
+    tbl = Table(displayName="tbl_vue_synthese", ref=f"A1:{chr(64+len(headers))}2")
+    tbl.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2", showRowStripes=True,
+    )
+    ws.add_table(tbl)
+    set_column_widths(ws, {"A": 22, "B": 22, "C": 18, "D": 28, "E": 18,
+                           "F": 20, "G": 13, "H": 16, "I": 14, "J": 14, "K": 22})
 
 
 def _sheet_par_ingenieur(wb: Workbook, acteur: ProfilActeur,
@@ -347,14 +371,20 @@ def _sheet_manifeste_dashboard(wb: Workbook, acteur, uo_list: List[UOInstance]):
     # Ligne 2 intentionnellement vide
 
     # Métadonnées
-    _mxl_row(3, "FILE_TYPE: dashboard_pilote",       comment="Type de fichier ExoSync")
-    _mxl_row(4, f"FILE_ID: Dashboard_{acteur.id}",   comment="Identifiant unique du dashboard")
-    _mxl_row(5, f"pilote_id: {acteur.id}",            comment="Identifiant du pilote propriétaire")
+    _mxl_row(3, "FILE_TYPE: dashboard_pilote",      comment="Type de fichier ExoSync")
+    _mxl_row(4, f"FILE_ID: Dashboard_{acteur.id}",  comment="Identifiant unique du dashboard")
+    _mxl_row(5, f"pilote_id: {acteur.id}",           comment="Identifiant du pilote propriétaire")
 
-    # Découverte automatique des UOs
-    _mxl_row(7, f"LIST mes_uos TYPE=uo_instance WHERE pilote_id={acteur.id}",
-             comment="Découverte automatique des UOs dont ce pilote est responsable")
-    _mxl_row(8, "COLLECT Activites FROM mes_uos INTO vue_synthese",
-             comment="Agrégation de toutes les activités des UOs de l'équipe")
+    # Découverte des cockpits de l'équipe via pilote_id
+    _mxl_row(7, f"LIST mes_cockpits TYPE=cockpit_ingenieur WHERE pilote_id={acteur.id}",
+             comment="Découverte des cockpits ingénieur de l'équipe de ce pilote")
+    _mxl_row(8, "COLLECT tbl_mes_uos FROM mes_cockpits INTO tbl_vue_synthese",
+             comment="Agrégation de toutes les UOs de tous les cockpits de l'équipe")
 
-    set_column_widths(ws, {"A": 65, "B": 18, "C": 55})
+    # Lecture + publication de la synthèse agrégée
+    _mxl_row(10, "DEF $synthese = GET_TABLE(Vue Synthèse, tbl_vue_synthese)",
+              comment="Relit la table agrégée après COLLECT")
+    _mxl_row(11, f"PUSH $synthese -> dashboard.{acteur.id}.synthese",
+              comment="Publie la vue consolidée de l'équipe dans le store central")
+
+    set_column_widths(ws, {"A": 70, "B": 18, "C": 60})
