@@ -6,6 +6,8 @@ Voir docs/superpowers/specs/2026-06-22-design-system-excel-design.md.
 from dataclasses import dataclass
 
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils.cell import range_boundaries
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 @dataclass(frozen=True)
@@ -130,3 +132,23 @@ class XD:
             cell.fill = cls.fill(bg)
             cell.font = cls.fnt(10)
             cell.border = cls.HAIR
+
+    @classmethod
+    def named_table(cls, ws, display_name, ref, key):
+        """Table Excel nommée (pour GET_TABLE/COLLECT) avec STYLE CLAIR sans
+        en-tête imposé + coloration manuelle de l'en-tête au ton de l'onglet.
+        L'AutoFilter natif d'Excel est actif automatiquement."""
+        s = cls.sheet(key)
+        tbl = Table(displayName=display_name, ref=ref)
+        tbl.tableStyleInfo = TableStyleInfo(
+            name="TableStyleLight15", showRowStripes=True,
+            showFirstColumn=False, showLastColumn=False,
+            showColumnStripes=False,
+        )
+        ws.add_table(tbl)
+        min_col, min_row, max_col, _ = range_boundaries(ref)
+        for c in range(min_col, max_col + 1):
+            cell = ws.cell(row=min_row, column=c)
+            cell.fill = cls.fill(s.header)
+            cell.font = cls.fnt(10, bold=True, color=cls.WHITE)
+            cell.alignment = cls.center()

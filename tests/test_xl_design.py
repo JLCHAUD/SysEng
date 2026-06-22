@@ -124,3 +124,31 @@ class TestTableHeaderEtDataRow:
         ws = self._ws()
         XD.data_row(ws, 7, 1, 1, 3, "activites")
         assert ws.cell(row=7, column=1).fill.fgColor.rgb.endswith("E1F5EE")
+
+
+class TestNamedTable:
+    def _ws_avec_donnees(self):
+        ws = Workbook().active
+        ws["A5"] = "id"
+        ws["B5"] = "désignation"
+        ws["C5"] = "statut"
+        ws["A6"] = "ACT-1"
+        ws["B6"] = "x"
+        ws["C6"] = "A_FAIRE"
+        return ws
+
+    def test_table_nommee_creee(self):
+        ws = self._ws_avec_donnees()
+        XD.named_table(ws, "tbl_test", "A5:C6", "activites")
+        assert "tbl_test" in ws.tables
+
+    def test_style_clair(self):
+        ws = self._ws_avec_donnees()
+        XD.named_table(ws, "tbl_test", "A5:C6", "activites")
+        assert ws.tables["tbl_test"].tableStyleInfo.name == "TableStyleLight15"
+
+    def test_entete_colore_manuellement(self):
+        ws = self._ws_avec_donnees()
+        XD.named_table(ws, "tbl_test", "A5:C6", "activites")
+        assert ws.cell(row=5, column=1).fill.fgColor.rgb.endswith("0C5E49")
+        assert ws.cell(row=5, column=1).font.color.rgb.endswith("FFFFFF")
