@@ -33,3 +33,15 @@ def test_cockpit_has_agenda_sheet(tmp_path):
     assert any("Semaine" in s for s in all_str)
     assert any("30" in s for s in all_str)
     assert any("ouverts" in s.lower() or "action" in s.lower() for s in all_str)
+
+
+# ── Tâche 1 : table toujours créée ───────────────────────────────────────────
+
+def test_cockpit_vide_has_table(tmp_path):
+    """Un cockpit généré sans UO doit quand même avoir tbl_mes_uos."""
+    out = generer_cockpit("Test Ingenieur", [], "USR004", tmp_path)
+    wb = load_workbook(str(out))
+    ws = wb["Mes UOs"]
+    assert "tbl_mes_uos" in ws.tables
+    tbl = ws.tables["tbl_mes_uos"]
+    assert tbl.ref == "A3:H3"   # header seul, 0 lignes de données

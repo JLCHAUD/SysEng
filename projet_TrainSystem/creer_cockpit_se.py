@@ -198,8 +198,8 @@ def _sheet_mes_uos(wb: Workbook, se_name: str, uo_list: list[dict]):
         ws.cell(row=row, column=5).number_format = "0%"
 
     last_row = row_h + len(uo_list)
-    if uo_list:
-        XD.named_table(ws, "tbl_mes_uos", f"A{row_h}:H{last_row}", "general")
+    tbl_ref = f"A{row_h}:H{last_row}" if uo_list else f"A{row_h}:H{row_h}"
+    XD.named_table(ws, "tbl_mes_uos", tbl_ref, "general")
 
     for col, w in zip("ABCDEFGH", [20, 18, 22, 12, 16, 14, 14, 22]):
         ws.column_dimensions[col].width = w
@@ -246,6 +246,24 @@ def _sheet_manifeste(wb: Workbook, se_name: str,
       "Remonte la table UOs (avec avancements) vers le store central ExoSync")
 
 
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _cockpit_has_saisies(xlsx_path: Path) -> bool:
+    """Retourne True si une cellule des colonnes 5 ou 6 de tbl_mes_uos est non nulle."""
+    try:
+        wb = load_workbook(str(xlsx_path), data_only=True, read_only=True)
+        if "Mes UOs" not in wb.sheetnames:
+            return False
+        ws = wb["Mes UOs"]
+        for row in ws.iter_rows(min_row=4, max_row=ws.max_row,
+                                min_col=5, max_col=6, values_only=True):
+            if any(v is not None and v != 0 for v in row):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -257,6 +275,8 @@ def main():
                    help="Filtrer un seul ingénieur (optionnel)")
     p.add_argument("--output", default=str(HERE),
                    help="Répertoire de sortie (défaut: projet_TrainSystem)")
+    p.add_argument("--safe", action="store_true",
+                   help="Ne régénère que les cockpits sans saisies (cols 5-6 nulles)")
     args = p.parse_args()
 
     output_dir = Path(args.output)
@@ -278,6 +298,11 @@ def main():
 
     print(f"UOs trouvées : {len(uo_list)}")
     for se_name, uos in sorted(par_ingenieur.items()):
+        if args.safe:
+            out_path = output_dir / f"Cockpit_{se_name.replace(' ', '_')}.xlsx"
+            if out_path.exists() and _cockpit_has_saisies(out_path):
+                print(f"  [SKIP --safe] {out_path.name} (saisies détectées)")
+                continue
         out = generer_cockpit(se_name, uos, args.pilote, output_dir)
         print(f"  [OK] {out.name}  ({len(uos)} UO, pilote_id={args.pilote})")
 
