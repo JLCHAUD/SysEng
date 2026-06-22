@@ -5,6 +5,7 @@ Voir docs/superpowers/specs/2026-06-22-design-system-excel-design.md.
 """
 from dataclasses import dataclass
 
+from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.cell import range_boundaries
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -152,3 +153,34 @@ class XD:
             cell.fill = cls.fill(s.header)
             cell.font = cls.fnt(10, bold=True, color=cls.WHITE)
             cell.alignment = cls.center()
+
+    @classmethod
+    def statut_cf(cls, ws, rng):
+        """Badges colorés par statut d'activité/livrable."""
+        rules = [
+            ("TERMINEE", cls.GREEN_L, cls.GREEN_D),
+            ("VALIDE",   cls.GREEN_L, cls.GREEN_D),
+            ("LIVRE",    cls.BLUE_L,  cls.NAVY_D),
+            ("EN_COURS", cls.BLUE_L,  cls.NAVY_D),
+            ("A_FAIRE",  cls.GREY_L,  cls.GREY_D),
+            ("STAND_BY", cls.AMBER_L, cls.AMBER_D),
+        ]
+        for val, bg, fg in rules:
+            ws.conditional_formatting.add(rng, CellIsRule(
+                operator="equal", formula=[f'"{val}"'],
+                fill=cls.fill(bg),
+                font=cls.fnt(10, bold=True, color=fg)))
+
+    @classmethod
+    def criticite_cf(cls, ws, rng):
+        """Badges colorés par criticité OIL."""
+        rules = [
+            ("HAUTE",   cls.RED_L,   cls.RED_D),
+            ("MOYENNE", cls.AMBER_L, cls.AMBER_D),
+            ("BASSE",   cls.GREEN_L, cls.GREEN_D),
+        ]
+        for val, bg, fg in rules:
+            ws.conditional_formatting.add(rng, CellIsRule(
+                operator="equal", formula=[f'"{val}"'],
+                fill=cls.fill(bg),
+                font=cls.fnt(10, bold=True, color=fg)))

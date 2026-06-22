@@ -152,3 +152,15 @@ class TestNamedTable:
         XD.named_table(ws, "tbl_test", "A5:C6", "activites")
         assert ws.cell(row=5, column=1).fill.fgColor.rgb.endswith("0C5E49")
         assert ws.cell(row=5, column=1).font.color.rgb.endswith("FFFFFF")
+
+
+class TestBadgesConditionnels:
+    def test_statut_cf_ajoute_des_regles(self):
+        ws = Workbook().active
+        XD.statut_cf(ws, "F6:F20")
+        assert len(ws.conditional_formatting) >= 1
+
+    def test_criticite_cf_ajoute_des_regles(self):
+        ws = Workbook().active
+        XD.criticite_cf(ws, "G6:G20")
+        assert len(ws.conditional_formatting) >= 1
