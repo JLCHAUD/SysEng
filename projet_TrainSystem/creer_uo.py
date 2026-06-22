@@ -14,7 +14,7 @@ Le code se decompose : L{lot}U{uo}-{PROJET}-{SYSTEME}
 
 L'assembleur :
   1. lit Catalogue_UO_TrainSystem.xlsx (filtre uo_type)
-  2. genere le classeur 11 feuilles avec Design B (bandeau marine/teal/amber)
+  2. genere le classeur 11 feuilles avec Design XD (banniere 1 ligne)
   3. pre-remplit Activites / Livrables / Donnees_Entree depuis le catalogue
   4. genere le _Manifeste MXL avec les bonnes cles uo.<code>.*
 """
@@ -30,41 +30,19 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.formatting.rule import CellIsRule, DataBarRule
+from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from design_b import (
-    NAVY_D, NAVY, BLUE, GREY_D, GREY_B, AMBER_L, AMBER_D, RED_L, RED_D, WHITE,
-    TEAL, AMB_B,
-    F, HAIR,
-    fnt, fill, add_table as _add_table,
-    statut_cf, criticite_cf,
-    banner_B, banner_teal, banner_amber,
-    section_box, kpi_card_B,
-)
+from src.xl_design import XD
 
 CATALOGUE = HERE / "Catalogue_UO_TrainSystem.xlsx"
 RE_CODE = re.compile(r"^(L\d{2}U\d)(?:-([A-Za-z0-9]+))?(?:-([A-Za-z0-9]+))?$")
 
-# Banner occupe les lignes 1-4. Contenu (tableaux / KV) démarre à la ligne T.
-T = 5
-
-# Couleurs distinctes par onglet (override du tabColor posé par le banner)
-TAB = {
-    "General":          "0C447C",  # marine foncé
-    "Description_Besoin": "2E75B6",  # bleu moyen
-    "Donnees_Entree":   "1D7068",  # vert-teal sombre
-    "Activites":        "0F6E56",  # teal
-    "Livrables":        "4F7A28",  # vert olive
-    "OIL":              "BA7517",  # ambre
-    "KPI":              "7030A0",  # violet
-    "Dashboard":        "185FA5",  # bleu marine moyen
-    "Planning":         "4472C4",  # bleu cornflower
-    "Orga":             "70AD47",  # vert sauge
-    "_Manifeste":       "808080",  # gris
-}
+# Banniere XD occupe la ligne 1 (hauteur=30). Contenu demarre a la ligne T.
+T = 2
 
 
 # ─── Lecture du catalogue ─────────────────────────────────────────────────────
@@ -97,36 +75,23 @@ def load_catalogue(uo_type):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _tab(ws):
-    """Applique la couleur d'onglet définie dans TAB (override du banner)."""
-    color = TAB.get(ws.title, "808080")
-    ws.sheet_properties.tabColor = color
-
-
-def _write_table(ws, name, headers, rows, widths=None, start_row=T,
-                 header_color=NAVY_D):
-    """Écrit entêtes + données, style Design B, enregistre le tableau Excel."""
-    hr = start_row
-    for ci, h in enumerate(headers, 1):
-        c = ws.cell(row=hr, column=ci, value=h)
-        c.fill = fill(header_color)
-        c.font = fnt(10, bold=True, color=WHITE)
-        c.alignment = Alignment(horizontal="center", vertical="center",
-                                wrap_text=True)
-        c.border = HAIR
-    ws.row_dimensions[hr].height = 22
-    for ri, rd in enumerate(rows, hr + 1):
+def _write_table(ws, name, headers, rows, widths=None, start_row=T, family="general"):
+    """Ecrit entetes + donnees via XD, enregistre le tableau Excel nomme."""
+    XD.table_header(ws, start_row, headers, family)
+    ws.row_dimensions[start_row].height = 22
+    for ri, rd in enumerate(rows, start_row + 1):
         for ci, h in enumerate(headers, 1):
             c = ws.cell(row=ri, column=ci, value=rd.get(h))
-            c.border = HAIR
-            c.font = fnt(10)
+            c.border = XD.HAIR
+            c.font = XD.fnt(10)
         ws.row_dimensions[ri].height = 20
-    last = hr + max(len(rows), 1)
-    _add_table(ws, name, f"A{hr}:{get_column_letter(len(headers))}{last}")
+    last = start_row + max(len(rows), 1)
+    ref = f"A{start_row}:{get_column_letter(len(headers))}{last}"
+    XD.named_table(ws, name, ref, family)
     if widths:
         for col, w in widths.items():
             ws.column_dimensions[col].width = w
-    return hr + 1, last  # (data_start_row, data_end_row)
+    return start_row + 1, last  # (data_start_row, data_end_row)
 
 
 def named(wb, name, sheet, cell):
@@ -140,6 +105,30 @@ def _dv(ws, type_, formula, rng):
     dv.add(rng)
 
 
+def _kpi_card(ws, col, label, value, sub, border_color, value_color, row):
+    """Carte KPI 4 lignes : cadre colore, label, grande valeur, sous-titre."""
+    XD.card_border(ws, row, col, row + 3, col + 2, color=border_color)
+    for rr in range(row, row + 4):
+        for cc in range(col, col + 3):
+            ws.cell(row=rr, column=cc).fill = XD.fill(XD.WHITE)
+    XD.card_border(ws, row, col, row + 3, col + 2, color=border_color)
+    lab = ws.cell(row=row + 1, column=col, value=label)
+    lab.font = XD.fnt(9, bold=True, color=XD.GREY_D)
+    lab.alignment = XD.center()
+    ws.merge_cells(start_row=row + 1, start_column=col,
+                   end_row=row + 1, end_column=col + 2)
+    val = ws.cell(row=row + 2, column=col, value=value)
+    val.font = XD.fnt(20, bold=True, color=value_color)
+    val.alignment = XD.center()
+    ws.merge_cells(start_row=row + 2, start_column=col,
+                   end_row=row + 2, end_column=col + 2)
+    s = ws.cell(row=row + 3, column=col, value=sub)
+    s.font = XD.fnt(8.5, color=XD.GREY_D)
+    s.alignment = Alignment(horizontal="center", vertical="top")
+    ws.merge_cells(start_row=row + 3, start_column=col,
+                   end_row=row + 3, end_column=col + 2)
+
+
 # ─── Construction de l'instance ───────────────────────────────────────────────
 
 def build_instance(code, uo_type, projet_code, systeme_code, args):
@@ -150,18 +139,16 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     parts = [args.projet or projet_code or "", args.systeme or systeme_code or ""]
     proj_line = "  ·  ".join(p for p in parts if p)
     se = args.se or ""
-    bkw = dict(title=uo_title, project_line=proj_line, se=se)
 
     # ── General ──────────────────────────────────────────────────────────────
-    # Col A = marge étroite ; cols B,C = libellé / valeur
+    # Col A = marge etroite ; cols B,C = libelle / valeur
     ws = wb.active
     ws.title = "General"
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 2
     ws.column_dimensions["B"].width = 26
     ws.column_dimensions["C"].width = 52
-    banner_B(ws, "Fiche générale", 8, **bkw)
-    _tab(ws)
+    XD.banner(ws, "general", uo_title, subtitle=proj_line, se=se, n_cols=8)
     kv = [
         ("Pôle",                   "Train Système"),
         ("Lot",                    f"LOT {info['lot']} — {info['lot_libelle']}"),
@@ -174,47 +161,45 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
         ("Date de création",       datetime.date.today().isoformat()),
     ]
     for i, (k, v) in enumerate(kv, T + 1):
-        ws.cell(row=i, column=2, value=k).font = fnt(10, bold=True, color=NAVY_D)
-        ws.cell(row=i, column=3, value=v).font = fnt(10)
+        ws.cell(row=i, column=2, value=k).font = XD.fnt(10, bold=True, color=XD.NAVY_D)
+        ws.cell(row=i, column=3, value=v).font = XD.fnt(10)
         ws.row_dimensions[i].height = 20
     # "Heures vendues" = index 7 (0-based) → ligne T+1+7 = T+8, colonne C
     named(wb, "heures_vendues", "General", f"C{T + 8}")
 
     # ── Description_Besoin ───────────────────────────────────────────────────
-    # Col A = marge étroite ; col B = texte large
+    # Col A = marge etroite ; col B = texte large
     ws = wb.create_sheet("Description_Besoin")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 2
     ws.column_dimensions["B"].width = 108
-    banner_B(ws, "Cahier des charges", 6, **bkw)
-    _tab(ws)
+    XD.banner(ws, "description", uo_title, subtitle=proj_line, se=se, n_cols=6)
     r = T + 2
     for act in cat_acts:
         c = ws.cell(row=r, column=2,
                     value=f"{act['id']} : {act['designation']}")
-        c.font = fnt(11, bold=True, color=NAVY_D)
+        c.font = XD.fnt(11, bold=True, color=XD.NAVY_D)
         r += 1
         for line in (act.get("description") or "").split("\n"):
             if line.strip():
                 c = ws.cell(row=r, column=2, value="   " + line)
-                c.font = fnt(10)
+                c.font = XD.fnt(10)
                 c.alignment = Alignment(wrap_text=True)
                 r += 1
         r += 1
     if info.get("criteres_acceptation"):
         ws.cell(row=r, column=2,
-                value="Critères d'acceptation").font = fnt(11, bold=True,
-                                                            color=NAVY_D)
+                value="Critères d'acceptation").font = XD.fnt(11, bold=True,
+                                                               color=XD.NAVY_D)
         r += 1
         for line in str(info["criteres_acceptation"]).split("\n"):
-            ws.cell(row=r, column=2, value="   " + line).font = fnt(10)
+            ws.cell(row=r, column=2, value="   " + line).font = XD.fnt(10)
             r += 1
 
     # ── Donnees_Entree ───────────────────────────────────────────────────────
     ws = wb.create_sheet("Donnees_Entree")
     ws.sheet_view.showGridLines = False
-    banner_teal(ws, "Données d'entrée", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "donnees_entree", uo_title, subtitle=proj_line, se=se, n_cols=10)
     _write_table(ws, "tbl_donnees_entree",
         ["id", "designation", "type", "origine", "pic", "statut",
          "date_reception", "maturite", "date_update", "commentaire"],
@@ -223,14 +208,13 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
          for i, d in enumerate(cat_des, 1)],
         widths={"A": 9, "B": 50, "C": 10, "D": 10, "F": 12, "G": 13,
                 "H": 9, "I": 12, "J": 28},
-        header_color=TAB["Donnees_Entree"])
+        family="donnees_entree")
     _dv(ws, "list", '"NA,EN_ATTENTE,RECUE"', f"F{T+1}:F{T+80}")
 
     # ── Activites ────────────────────────────────────────────────────────────
     ws = wb.create_sheet("Activites")
     ws.sheet_view.showGridLines = False
-    banner_teal(ws, "Activités", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "activites", uo_title, subtitle=proj_line, se=se, n_cols=10)
     act_headers = ["id", "designation", "applicable", "poids", "heures_allouees",
                    "statut", "avancement", "heures_consommees", "reste_a_faire",
                    "commentaire"]
@@ -241,7 +225,7 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     _write_table(ws, "tbl_activites", act_headers, act_rows,
                  widths={"A": 10, "B": 46, "C": 11, "D": 8, "E": 15, "F": 11,
                          "G": 12, "H": 17, "I": 13, "J": 32},
-                 header_color=TEAL)
+                 family="activites")
     n = len(act_rows)
     dr_s, dr_e = T + 1, T + n
     for r in range(dr_s, dr_e + 1):
@@ -253,19 +237,17 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
         ws.cell(row=r, column=9).number_format = "0.00"
     _dv(ws, "list", '"OUI,NON"', f"C{T+1}:C{T+60}")
     _dv(ws, "list", '"A_FAIRE,EN_COURS,TERMINEE,STAND_BY"', f"F{T+1}:F{T+60}")
-    from openpyxl.formatting.rule import DataBarRule
     ws.conditional_formatting.add(
         f"G{T+1}:G{T+n}",
         DataBarRule(start_type="num", start_value=0, end_type="num",
-                    end_value=100, color=BLUE, showValue=True))
-    statut_cf(ws, f"F{T+1}:F{T+n}")
+                    end_value=100, color=XD.sheet("activites").header, showValue=True))
+    XD.statut_cf(ws, f"F{T+1}:F{T+n}")
     ws.freeze_panes = f"A{T+1}"
 
     # ── Livrables ─────────────────────────────────────────────────────────────
     ws = wb.create_sheet("Livrables")
     ws.sheet_view.showGridLines = False
-    banner_teal(ws, "Livrables", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "livrables", uo_title, subtitle=proj_line, se=se, n_cols=10)
     liv_rows = [{"id": f"LIV-{i:03d}", "designation": l["designation"],
                  "statut": "A_FAIRE"}
                 for i, l in enumerate(cat_livs, 1)]
@@ -275,15 +257,14 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
         liv_rows,
         widths={"A": 9, "B": 50, "C": 8, "D": 16, "E": 14, "F": 10,
                 "G": 11, "H": 13, "I": 13, "J": 28},
-        header_color=TAB["Livrables"])
+        family="livrables")
     _dv(ws, "list", '"A_FAIRE,EN_COURS,LIVRE,VALIDE"', f"G{T+1}:G{T+60}")
-    statut_cf(ws, f"G{T+1}:G{T+len(liv_rows)}")
+    XD.statut_cf(ws, f"G{T+1}:G{T+len(liv_rows)}")
 
     # ── OIL ──────────────────────────────────────────────────────────────────
     ws = wb.create_sheet("OIL")
     ws.sheet_view.showGridLines = False
-    banner_amber(ws, "Points ouverts — OIL", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "oil", uo_title, subtitle=proj_line, se=se, n_cols=10)
     _write_table(ws, "tbl_oil",
         ["id", "titre", "description", "en_action", "domaine", "criticite",
          "statut", "date_ouverture", "date_besoin", "journal"],
@@ -292,32 +273,30 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
           "statut": "CLOS", "journal": ""}],
         widths={"A": 8, "B": 34, "C": 44, "D": 13, "E": 12, "F": 11,
                 "G": 9, "H": 13, "I": 12, "J": 50},
-        header_color=AMB_B)
+        family="oil")
     _dv(ws, "list", '"SE,FOURNISSEUR,EXPERT,AT,CLIENT,AUTRE"', f"D{T+1}:D{T+60}")
     _dv(ws, "list", '"BASSE,MOYENNE,HAUTE"', f"F{T+1}:F{T+60}")
     _dv(ws, "list", '"OUVERT,CLOS"', f"G{T+1}:G{T+60}")
-    criticite_cf(ws, f"F{T+1}:F{T+60}")
-    from openpyxl.formatting.rule import CellIsRule
+    XD.criticite_cf(ws, f"F{T+1}:F{T+60}")
     ws.conditional_formatting.add(f"G{T+1}:G{T+60}", CellIsRule(
         operator="equal", formula=['"OUVERT"'],
-        fill=fill(RED_L), font=Font(name=F, size=10, bold=True, color=RED_D)))
+        fill=XD.fill(XD.RED_L), font=XD.fnt(10, bold=True, color=XD.RED_D)))
     ws.conditional_formatting.add(f"G{T+1}:G{T+60}", CellIsRule(
         operator="equal", formula=['"CLOS"'],
-        fill=fill("EAF3DE"), font=Font(name=F, size=10, color="27500A")))
+        fill=XD.fill(XD.GREEN_L), font=XD.fnt(10, color=XD.GREEN_D)))
 
     # ── KPI ──────────────────────────────────────────────────────────────────
-    # Col A = marge ; cols B,C,D = libellé / valeur / description
+    # Col A = marge ; cols B,C,D = libelle / valeur / description
     ws = wb.create_sheet("KPI")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 2
     ws.column_dimensions["B"].width = 36
     ws.column_dimensions["C"].width = 14
     ws.column_dimensions["D"].width = 64
-    banner_B(ws, "KPI", 8, **bkw)
-    _tab(ws)
+    XD.banner(ws, "kpi", uo_title, subtitle=proj_line, se=se, n_cols=8)
 
-    section_box(ws, "KPI calculés par ExoSync (ne pas saisir manuellement)",
-                T, 2, T + 7, 4)
+    XD.section_box(ws, "KPI calculés par ExoSync (ne pas saisir manuellement)",
+                   T, 2, T + 7, 4, "kpi")
     exo_kpis = [
         ("Avancement UO (%)",           "kpi_avancement",     "0.00",
          "Moyenne des avancements pondérée par les poids (activités applicables)"),
@@ -336,19 +315,19 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     ]
     r = T + 1
     for label, nm, fmt, desc in exo_kpis:
-        ws.cell(row=r, column=2, value=label).font = fnt(10, bold=True,
-                                                          color=NAVY_D)
+        ws.cell(row=r, column=2, value=label).font = XD.fnt(10, bold=True,
+                                                             color=XD.NAVY_D)
         named(wb, nm, "KPI", f"C{r}")   # valeur en colonne C
         ws.cell(row=r, column=3).number_format = fmt
-        ws.cell(row=r, column=4, value=desc).font = fnt(9, color=GREY_D,
-                                                         italic=True)
+        ws.cell(row=r, column=4, value=desc).font = XD.fnt(9, color=XD.GREY_D,
+                                                            italic=True)
         ws.row_dimensions[r].height = 20
         r += 1
-    # r = T+8 ; ligne T+8 = espaceur ; section Excel démarre à T+9
+    # r = T+8 ; ligne T+8 = espaceur ; section Excel demarre a T+9
     r += 1
-    section_box(ws,
-                "Indicateurs Excel (formules — s'actualisent à l'ouverture)",
-                r, 2, r + 5, 4)
+    XD.section_box(ws,
+                   "Indicateurs Excel (formules — s'actualisent à l'ouverture)",
+                   r, 2, r + 5, 4, "kpi")
     r += 1
     excel_kpis = [
         ("Heures vendues",              "kpi_h_vendues",
@@ -369,13 +348,13 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
          "ROUGE si point critique · ORANGE si point ouvert · VERT sinon"),
     ]
     for label, nm, formula, fmt, desc in excel_kpis:
-        ws.cell(row=r, column=2, value=label).font = fnt(10, bold=True,
-                                                          color=NAVY_D)
+        ws.cell(row=r, column=2, value=label).font = XD.fnt(10, bold=True,
+                                                             color=XD.NAVY_D)
         ws.cell(row=r, column=3, value=formula)
         ws.cell(row=r, column=3).number_format = fmt
         named(wb, nm, "KPI", f"C{r}")   # valeur en colonne C
-        ws.cell(row=r, column=4, value=desc).font = fnt(9, color=GREY_D,
-                                                         italic=True)
+        ws.cell(row=r, column=4, value=desc).font = XD.fnt(9, color=XD.GREY_D,
+                                                            italic=True)
         ws.row_dimensions[r].height = 20
         r += 1
 
@@ -385,8 +364,7 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     ws.column_dimensions["A"].width = 2
     for i in range(2, 18):
         ws.column_dimensions[get_column_letter(i)].width = 8.5
-    banner_B(ws, "Cockpit de pilotage", 16, **bkw)
-    _tab(ws)
+    XD.banner(ws, "dashboard", uo_title, subtitle=proj_line, se=se, n_cols=16)
 
     ROW1, ROW2 = T + 1, T + 6
     for rr in range(ROW1, ROW1 + 4):
@@ -396,35 +374,35 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
 
     cards_r1 = [
         (2,  "AVANCEMENT UO",  '=ROUND(kpi_avancement,1)&" %"',
-         "pondéré par poids",   "B5D4F4", NAVY_D),
+         "pondéré par poids",   "B5D4F4", XD.NAVY_D),
         (6,  "HEURES",
          '=ROUND(kpi_h_conso,0)&" / "&heures_vendues&" h"',
          "consommées",          "D3D1C7", "2C2C2A"),
         (10, "POINTS OUVERTS", "=kpi_po_ouverts",
-         "au statut OUVERT",    "FAC775", AMBER_D),
+         "au statut OUVERT",    "FAC775", XD.AMBER_D),
         (14, "PTS CRITIQUES",  "=kpi_po_critiques",
-         "criticité HAUTE",     "FCEBEB", RED_D),
+         "criticité HAUTE",     "FCEBEB", XD.RED_D),
     ]
     cards_r2 = [
         (2,  "SANTÉ",          "=kpi_sante",
-         "",                    "F5F4F0", NAVY_D),
+         "",                    "F5F4F0", XD.NAVY_D),
         (6,  "EAC (h)",        "=ROUND(kpi_eac,0)",
          "estimé à terminaison","D3D1C7", "2C2C2A"),
         (10, "DÉRIVE (h)",     "=ROUND(kpi_derive,0)",
-         "EAC − heures vendues","F5F4F0", GREY_D),
+         "EAC − heures vendues","F5F4F0", XD.GREY_D),
         (14, "BALLE FOURN.",   "=kpi_po_fournisseur",
-         "pts chez fournisseur","FAEEDA", AMBER_D),
+         "pts chez fournisseur","FAEEDA", XD.AMBER_D),
     ]
     for col, label, value, sub, bc, vc in cards_r1:
-        kpi_card_B(ws, col, label, value, sub, bc, vc, row=ROW1)
+        _kpi_card(ws, col, label, value, sub, bc, vc, row=ROW1)
     for col, label, value, sub, bc, vc in cards_r2:
-        kpi_card_B(ws, col, label, value, sub, bc, vc, row=ROW2)
+        _kpi_card(ws, col, label, value, sub, bc, vc, row=ROW2)
 
     note_row = ROW2 + 5
     note = ws.cell(row=note_row, column=2,
                    value="Cette feuille est libre — l'ingénieur la complète "
                          "(elle ne lit que l'onglet KPI).")
-    note.font = fnt(9, color=GREY_D, italic=True)
+    note.font = XD.fnt(9, color=XD.GREY_D, italic=True)
     ws.merge_cells(start_row=note_row, start_column=2,
                    end_row=note_row, end_column=16)
 
@@ -432,36 +410,34 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     ws = wb.create_sheet("Planning")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 2
-    banner_B(ws, "Planning", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "planning", uo_title, subtitle=proj_line, se=se, n_cols=10)
     ws.cell(row=T + 2, column=2,
             value="Réservé : visualisation planning.").font = \
-        fnt(10, color=GREY_D, italic=True)
+        XD.fnt(10, color=XD.GREY_D, italic=True)
 
     # ── Orga ──────────────────────────────────────────────────────────────────
     ws = wb.create_sheet("Orga")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 2
-    banner_B(ws, "Organisation", 10, **bkw)
-    _tab(ws)
+    XD.banner(ws, "orga", uo_title, subtitle=proj_line, se=se, n_cols=10)
     ws.cell(row=T + 2, column=2,
             value="Organisation projet (à renseigner depuis le Catalogue Projets).").font = \
-        fnt(10, color=GREY_D, italic=True)
+        XD.fnt(10, color=XD.GREY_D, italic=True)
 
     # ── _Manifeste ────────────────────────────────────────────────────────────
-    # Col A = instruction MXL (lue par le parser), col C = commentaire français
-    # (ignoré par le parser, sert à lire ce que fait chaque instruction).
+    # Col A = instruction MXL (lue par le parser), col C = commentaire francais
+    # (ignore par le parser, sert a lire ce que fait chaque instruction).
     ws = wb.create_sheet("_Manifeste")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 70
     ws.column_dimensions["C"].width = 60
-    ws.sheet_properties.tabColor = TAB["_Manifeste"]
+    ws.sheet_properties.tabColor = XD.sheet("manifeste").header
     ws["A1"] = "MANIFESTE_V=1"
-    ws["A1"].font = fnt(11, bold=True, color=NAVY_D)
+    ws["A1"].font = XD.fnt(11, bold=True, color=XD.NAVY_D)
     ws["C1"] = "Commentaire (non interprété — aide à la lecture)"
-    ws["C1"].font = fnt(9, color=GREY_D, italic=True)
+    ws["C1"].font = XD.fnt(9, color=XD.GREY_D, italic=True)
     ws["A2"] = "instruction"
-    ws["A2"].font = Font(bold=True)
+    ws["A2"].font = XD.fnt(10, bold=True)
 
     # (instruction, commentaire). Section/ligne vide → commentaire "".
     se_name = getattr(args, "se", "") if args else ""
@@ -527,7 +503,7 @@ def build_instance(code, uo_type, projet_code, systeme_code, args):
     for i, (instr, comment) in enumerate(manifeste, 3):
         ws.cell(row=i, column=1, value=instr)
         if comment:
-            ws.cell(row=i, column=3, value=comment).font = fnt(9, color=GREY_D, italic=True)
+            ws.cell(row=i, column=3, value=comment).font = XD.fnt(9, color=XD.GREY_D, italic=True)
 
     return wb
 
