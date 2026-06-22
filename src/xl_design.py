@@ -184,3 +184,42 @@ class XD:
                 operator="equal", formula=[f'"{val}"'],
                 fill=cls.fill(bg),
                 font=cls.fnt(10, bold=True, color=fg)))
+
+    @classmethod
+    def traffic_light(cls, ws, row, col, value, thresholds=(0.5, 0.8)):
+        """Cellule au fond rouge/ambre/vert selon value et les seuils."""
+        lo, hi = thresholds
+        color = cls.RED_L if value < lo else (cls.AMBER_L if value < hi
+                                              else cls.GREEN_L)
+        cell = ws.cell(row=row, column=col)
+        cell.fill = cls.fill(color)
+        cell.border = cls.HAIR
+        cell.alignment = cls.center()
+        return cell
+
+    @classmethod
+    def card_border(cls, ws, r1, c1, r2, c2, color=None):
+        """Encadre une zone rectangulaire d'une bordure fine."""
+        thin = Side(style="thin", color=color or cls.GREY_B)
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                cell = ws.cell(row=r, column=c)
+                old = cell.border
+                cell.border = Border(
+                    left=thin if c == c1 else old.left,
+                    right=thin if c == c2 else old.right,
+                    top=thin if r == r1 else old.top,
+                    bottom=thin if r == r2 else old.bottom,
+                )
+
+    @classmethod
+    def section_box(cls, ws, title, r1, c1, r2, c2, key):
+        """Bande de titre (accent de l'onglet) + cadre fin."""
+        s = cls.sheet(key)
+        for c in range(c1, c2 + 1):
+            ws.cell(row=r1, column=c).fill = cls.fill(s.accent)
+        tc = ws.cell(row=r1, column=c1, value=title)
+        tc.font = cls.fnt(11, bold=True, color=s.banner)
+        tc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.row_dimensions[r1].height = 20
+        cls.card_border(ws, r1, c1, r2, c2)

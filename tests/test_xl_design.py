@@ -164,3 +164,30 @@ class TestBadgesConditionnels:
         ws = Workbook().active
         XD.criticite_cf(ws, "G6:G20")
         assert len(ws.conditional_formatting) >= 1
+
+
+class TestTrafficEtCadres:
+    def test_traffic_rouge_sous_50(self):
+        ws = Workbook().active
+        XD.traffic_light(ws, 6, 3, 0.3)
+        assert ws.cell(row=6, column=3).fill.fgColor.rgb.endswith("FCEBEB")
+
+    def test_traffic_ambre_entre_50_80(self):
+        ws = Workbook().active
+        XD.traffic_light(ws, 6, 3, 0.65)
+        assert ws.cell(row=6, column=3).fill.fgColor.rgb.endswith("FAEEDA")
+
+    def test_traffic_vert_au_dessus_80(self):
+        ws = Workbook().active
+        XD.traffic_light(ws, 6, 3, 0.9)
+        assert ws.cell(row=6, column=3).fill.fgColor.rgb.endswith("EAF3DE")
+
+    def test_card_border_pose_un_cadre(self):
+        ws = Workbook().active
+        XD.card_border(ws, 2, 2, 4, 4)
+        assert ws.cell(row=2, column=2).border.top.style == "thin"
+
+    def test_section_box_titre_et_fond(self):
+        ws = Workbook().active
+        XD.section_box(ws, "Titre section", 2, 2, 5, 4, "kpi")
+        assert ws.cell(row=2, column=2).value == "Titre section"
