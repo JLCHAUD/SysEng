@@ -107,3 +107,26 @@ class XD:
             ws.merge_cells(start_row=1, start_column=left_end + 1,
                            end_row=1, end_column=n_cols)
         ws.row_dimensions[1].height = height
+
+    @classmethod
+    def table_header(cls, ws, row, headers, key, col_start=1):
+        """En-tête de tableau coloré au ton moyen de l'onglet, texte blanc."""
+        s = cls.sheet(key)
+        for i, h in enumerate(headers):
+            c = ws.cell(row=row, column=col_start + i, value=h)
+            c.fill = cls.fill(s.header)
+            c.font = cls.fnt(10, bold=True, color=cls.WHITE)
+            c.alignment = cls.center()
+            c.border = cls.HAIR
+        ws.row_dimensions[row].height = 20
+
+    @classmethod
+    def data_row(cls, ws, row, i, col_start, col_end, key):
+        """Ligne de données : alternance blanc (i pair) / accent (i impair)."""
+        s = cls.sheet(key)
+        bg = s.accent if i % 2 else cls.WHITE
+        for c in range(col_start, col_end + 1):
+            cell = ws.cell(row=row, column=c)
+            cell.fill = cls.fill(bg)
+            cell.font = cls.fnt(10)
+            cell.border = cls.HAIR

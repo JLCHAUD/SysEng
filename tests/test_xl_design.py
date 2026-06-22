@@ -102,3 +102,25 @@ class TestBanner:
         ws = self._ws()
         XD.banner(ws, "activites", "T", n_cols=10, height=30)
         assert ws.row_dimensions[1].height == 30
+
+
+class TestTableHeaderEtDataRow:
+    def _ws(self):
+        return Workbook().active
+
+    def test_header_au_ton_onglet(self):
+        ws = self._ws()
+        XD.table_header(ws, 5, ["id", "désignation", "statut"], "activites")
+        assert ws.cell(row=5, column=1).fill.fgColor.rgb.endswith("0C5E49")
+        assert ws.cell(row=5, column=1).font.color.rgb.endswith("FFFFFF")
+        assert ws.cell(row=5, column=2).value == "désignation"
+
+    def test_data_row_paire_blanche(self):
+        ws = self._ws()
+        XD.data_row(ws, 6, 0, 1, 3, "activites")
+        assert ws.cell(row=6, column=1).fill.fgColor.rgb.endswith("FFFFFF")
+
+    def test_data_row_impaire_accent(self):
+        ws = self._ws()
+        XD.data_row(ws, 7, 1, 1, 3, "activites")
+        assert ws.cell(row=7, column=1).fill.fgColor.rgb.endswith("E1F5EE")
