@@ -203,3 +203,36 @@ def test_assembler_end_to_end(tmp_path):
     )
     assert result2["uo_status"] == "skipped"
     assert result2["cockpit_status"] == "skipped"
+
+
+# ── Liens hypertextes ────────────────────────────────────────────────────────
+
+def test_mes_uos_hyperlinks(tmp_path):
+    """Les cellules UO ID de tbl_mes_uos doivent avoir un lien vers le fichier UO."""
+    out = generer_cockpit("Test SE", [
+        {"file_id": "L09U1-CFL2400-CLIM", "systeme": "Clim",
+         "projet": "CFL", "heures": 200}
+    ], "USR004", tmp_path)
+    wb = load_workbook(str(out))
+    ws = wb["Mes UOs"]
+    cell = ws.cell(row=4, column=1)
+    assert cell.hyperlink is not None
+    target = cell.hyperlink.target if hasattr(cell.hyperlink, "target") else str(cell.hyperlink)
+    assert "L09U1-CFL2400-CLIM.xlsx" in target
+
+
+def test_ajouter_uo_hyperlink(tmp_path):
+    """ajouter_uo_au_cockpit doit poser un hyperlink sur la cellule UO ID."""
+    from assembler import ajouter_uo_au_cockpit
+
+    cockpit = generer_cockpit("Test SE", [], "USR004", tmp_path)
+    ajouter_uo_au_cockpit(cockpit, {
+        "file_id": "L09U1-CFL2400-CLIM", "systeme": "Clim",
+        "projet": "CFL", "heures": 200
+    })
+    wb = load_workbook(str(cockpit))
+    ws = wb["Mes UOs"]
+    cell = ws.cell(row=4, column=1)
+    assert cell.hyperlink is not None
+    target = cell.hyperlink.target if hasattr(cell.hyperlink, "target") else str(cell.hyperlink)
+    assert "L09U1-CFL2400-CLIM.xlsx" in target

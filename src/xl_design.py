@@ -75,9 +75,9 @@ class XD:
 
     # ── Primitives ─────────────────────────────────────────────
     @staticmethod
-    def fnt(size=10, bold=False, color="2C2C2A", italic=False):
+    def fnt(size=10, bold=False, color="2C2C2A", italic=False, underline=False):
         return Font(name=XD.FONT_FAMILY, size=size, bold=bold, color=color,
-                    italic=italic)
+                    italic=italic, underline="single" if underline else None)
 
     @staticmethod
     def fill(hex_color):

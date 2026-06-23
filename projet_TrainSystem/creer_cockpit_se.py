@@ -82,9 +82,11 @@ def _agenda_section(ws, title: str, start_row: int,
     start_row += 1
 
     for uo in uo_list:
-        ws.cell(row=start_row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
-        ws.cell(row=start_row, column=1).alignment = XD.left()
-        ws.cell(row=start_row, column=1).border = XD.HAIR
+        c1 = ws.cell(row=start_row, column=1, value=uo["file_id"])
+        c1.hyperlink = f"{uo['file_id']}.xlsx"
+        c1.font = XD.fnt(9.5, color="0563C1", underline=True)
+        c1.alignment = XD.left()
+        c1.border = XD.HAIR
         for col in range(2, 7):
             c = ws.cell(row=start_row, column=col, value="")
             c.fill = XD.fill(XD.INPUT)
@@ -117,9 +119,11 @@ def _agenda_po(ws, start_row: int, uo_list: list[dict]) -> int:
     start_row += 1
 
     for uo in uo_list:
-        ws.cell(row=start_row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
-        ws.cell(row=start_row, column=1).alignment = XD.left()
-        ws.cell(row=start_row, column=1).border = XD.HAIR
+        c1 = ws.cell(row=start_row, column=1, value=uo["file_id"])
+        c1.hyperlink = f"{uo['file_id']}.xlsx"
+        c1.font = XD.fnt(9.5, color="0563C1", underline=True)
+        c1.alignment = XD.left()
+        c1.border = XD.HAIR
         for col in range(2, 7):
             c = ws.cell(row=start_row, column=col, value="")
             c.fill = XD.fill(XD.INPUT)
@@ -186,7 +190,9 @@ def _sheet_mes_uos(wb: Workbook, se_name: str, uo_list: list[dict]):
         ws.cell(row=row, column=1).alignment = XD.left()
         for col in range(2, 9):
             ws.cell(row=row, column=col).alignment = XD.center()
-        ws.cell(row=row, column=1, value=uo["file_id"]).font = XD.fnt(9.5, color="0563C1")
+        c1 = ws.cell(row=row, column=1, value=uo["file_id"])
+        c1.hyperlink = f"{uo['file_id']}.xlsx"
+        c1.font = XD.fnt(9.5, color="0563C1", underline=True)
         ws.cell(row=row, column=2, value=uo["systeme"])
         ws.cell(row=row, column=3, value=uo["projet"])
         ws.cell(row=row, column=4, value=uo["heures"])

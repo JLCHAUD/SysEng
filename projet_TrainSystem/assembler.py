@@ -29,8 +29,9 @@ RE_CODE = re.compile(r"^(L\d{2}U\d)(?:-([A-Za-z0-9]+))?(?:-([A-Za-z0-9]+))?$")
 def _fill(hex_color: str) -> PatternFill:
     return PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
 
-def _fnt(size=10, bold=False, color="000000") -> Font:
-    return Font(name="Segoe UI", size=size, bold=bold, color=color)
+def _fnt(size=10, bold=False, color="000000", underline=False) -> Font:
+    return Font(name="Segoe UI", size=size, bold=bold, color=color,
+                underline="single" if underline else None)
 
 def _thin_border() -> Border:
     s = Side(style="thin", color="D3D1C7")
@@ -104,7 +105,9 @@ def ajouter_uo_au_cockpit(cockpit_path: Path, uo: dict) -> str:
         c.fill = _fill(bg)
         c.border = _thin_border()
         c.alignment = _left() if col == 1 else _center()
-        c.font = _fnt(9.5, color="0563C1" if col == 1 else "000000")
+        c.font = _fnt(9.5, color="0563C1" if col == 1 else "000000",
+                      underline=(col == 1))
+    ws.cell(row=new_row, column=1).hyperlink = f"{file_id}.xlsx"
 
     # Cols 5-6 : jaunes, vides (zones ingénieur)
     for col in (5, 6):
