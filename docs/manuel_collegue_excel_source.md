@@ -1,6 +1,7 @@
 # Manuel pour toi — travailler sur les fichiers Excel du projet ExoSync
 
-Ce document est écrit pour toi, pas pour ton LLM. Il t'explique, situation
+Ce document est écrit pour toi, pas pour ton LLM (ton assistant IA — l'outil
+de conversation avec lequel tu vas travailler). Il t'explique, situation
 par situation, quel fichier ouvrir, quel texte coller dans ton assistant IA,
 où mettre sa réponse, comment vérifier que ça marche, et comment sauvegarder
 ton travail. Chaque terme technique est expliqué la première fois qu'il
