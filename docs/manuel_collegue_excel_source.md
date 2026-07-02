@@ -289,3 +289,45 @@ lisant ? Si oui, c'est bon.
 
 Pas besoin d'attendre une réponse pour continuer à travailler sur autre
 chose — ton entrée sera relue périodiquement.
+
+---
+
+## Dépannage — les blocages typiques
+
+### "Les tests ne passent pas, `pytest` affiche des erreurs"
+
+Copie le message d'erreur complet (tout ce qui s'affiche après le mot
+"FAILED" ou "Error"), colle-le dans le chat de ton LLM avec la question
+"voici l'erreur que j'obtiens en lançant pytest, comment je la corrige ?".
+Ne panique pas : dans ce projet, un test qui échoue au milieu du travail est
+normal, ça fait partie du processus habituel — ce n'est pas le signe que tu
+as fait quelque chose de grave.
+
+### "Je ne sais pas quoi copier-coller, je suis perdue"
+
+Reviens au tableau "Qu'est-ce que tu veux faire aujourd'hui ?" au début de
+ce document, trouve la ligne qui ressemble le plus à ta situation, et suis
+la fiche indiquée pas à pas, dans l'ordre — sans sauter d'étape.
+
+### "J'ai cassé quelque chose, comment revenir en arrière ?"
+
+Si tu n'as encore rien sauvegardé avec `git commit` (voir Fiche 5), tape
+dans le terminal :
+
+```
+git checkout -- nom_du_fichier
+```
+
+en remplaçant `nom_du_fichier` par le nom exact du fichier à annuler. Cette
+commande remet ce fichier précis exactement comme il était à ta dernière
+sauvegarde, sans toucher aux autres fichiers. Si tu as un doute sur ce qu'il
+faut taper, arrête-toi et demande de l'aide plutôt que d'essayer une
+commande que tu ne comprends pas complètement.
+
+### "Comment je vérifie que mon fichier Excel est bien généré correctement ?"
+
+Après avoir lancé `python -m src sync --dir projet_TrainSystem`, ouvre le
+fichier `.xlsx` concerné directement dans Excel — il se trouve dans le
+dossier `projet_TrainSystem/` — et regarde à l'œil si le changement que tu
+voulais est bien visible. C'est la vérification la plus simple et la plus
+fiable : si tu vois ce que tu attendais, c'est bon.
