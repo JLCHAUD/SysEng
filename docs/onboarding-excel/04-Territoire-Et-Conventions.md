@@ -12,6 +12,11 @@ données neutre : il définit les objets partagés (UO, activités, acteurs...)
 entre le moteur et les générateurs — une modification y a un impact que le
 binôme cœur doit valider.
 
+Tout fichier non listé explicitement ici (par exemple `src/store.py`,
+`src/sync.py`, `src/ecosystem.py`, le dossier `web/`, ou un script
+`projet_TrainSystem/` qui n'est pas un `creer_*.py`) est par défaut côté
+"cœur" — pas de modification directe, escalade si besoin via `ESCALADES.md`.
+
 ## Deux niveaux d'intervention
 
 1. **Modification manuelle d'un `_Manifeste`** dans un fichier Excel déjà
@@ -43,6 +48,11 @@ def test_avancement_visible_dans_synthese(tmp_path):
 Avant toute modification : lancer `pytest` pour confirmer que tout passe.
 Après toute modification : écrire le test qui décrit le comportement attendu,
 le voir échouer, implémenter, le voir passer.
+
+Exception : pour tester des primitives de style isolées (comme dans
+`tests/test_xl_design.py`), un `openpyxl.Workbook()` construit en mémoire
+suffit — pas besoin de `tmp_path`/`load_workbook` si le test n'exerce pas un
+générateur complet de bout en bout.
 
 ## Workflow Git
 
