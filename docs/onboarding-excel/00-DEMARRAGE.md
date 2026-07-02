@@ -42,8 +42,9 @@ pytest          # doit passer à 0 échec avant de commencer à modifier quoi qu
 python -m src sync --dir projet_TrainSystem   # synchronise après une modification
 ```
 
-Python 3.14 requis. Dépendances principales : `openpyxl` (lecture/écriture
-Excel), `pytest` (tests), `click` (CLI).
+Python 3.11+ requis (voir README.md et la matrice CI du dépôt). Dépendances
+principales : `openpyxl` (lecture/écriture Excel), `pytest` (tests), `click`
+(CLI).
 
 **Important** : tous les fichiers `.xlsx` du dépôt sont dans `.gitignore`.
 Une modification manuelle d'un `_Manifeste` directement dans Excel n'est
