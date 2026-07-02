@@ -16,9 +16,9 @@ apparaît — tu n'as besoin de rien connaître à l'avance.
    terminal", ou équivalent selon ton système).
 3. Tape `pytest` puis appuie sur Entrée. Cette commande lance tous les tests
    automatiques du projet — c'est une vérification de routine, pas quelque
-   chose que tu dois comprendre en détail. Si tu vois à la fin une ligne avec
-   le mot "passed" en vert et aucun "failed", tout va bien, tu peux
-   continuer.
+   chose que tu dois comprendre en détail. Si tu vois à la fin une ligne qui
+   se termine par un nombre suivi de "passed", sans le mot "failed" nulle
+   part, tout va bien, tu peux continuer.
 4. Si cette commande ne fonctionne pas du tout (message "commande introuvable"
    par exemple), c'est que ton environnement n'est pas encore installé —
    demande de l'aide avant d'aller plus loin, ce manuel suppose que
@@ -96,11 +96,13 @@ Remplace tout ce qui est entre crochets `[ ]` par ta situation réelle avant
 de coller ce texte — n'oublie pas d'enlever les crochets.
 
 **Où mettre la réponse** : ouvre le fichier Excel concerné dans Excel, va
-sur la feuille `_Manifeste`, trouve la première ligne vide en colonne A
-(juste sous la dernière instruction déjà écrite), colle la ou les lignes que
-ton LLM t'a données — une instruction par ligne, dans la colonne A. Si le
-LLM te propose aussi un commentaire explicatif, mets-le en colonne C, sur la
-même ligne que l'instruction.
+sur la feuille `_Manifeste`, trouve la dernière ligne qui commence par une
+instruction MXL (`DEF`, `COL`, `PUSH`, `PULL`, `BIND`, `VALIDATE`, `LIST`
+ou `COLLECT` — pas une ligne d'en-tête comme `FILE_TYPE` ou `ingenieur`), et
+colle la ou les lignes que ton LLM t'a données juste en dessous — une
+instruction par ligne, dans la colonne A. Si le LLM te propose aussi un
+commentaire explicatif, mets-le en colonne C, sur la même ligne que
+l'instruction.
 
 **Comment vérifier** : ouvre un terminal dans le dossier du projet, tape
 `python -m src sync --dir projet_TrainSystem` puis Entrée. Si un message
@@ -142,8 +144,9 @@ un éditeur de texte ou VS Code, trouve la ligne indiquée, remplace-la par le
 code donné par le LLM, sauvegarde (Ctrl+S).
 
 **Comment vérifier** : dans un terminal, dans le dossier du projet, tape
-`pytest` puis Entrée. Si tu vois "passed" en vert à la fin sans mention de
-"failed", c'est bon signe. Si tu vois des erreurs, copie le message
-d'erreur complet et retourne voir ton LLM avec.
+`pytest` puis Entrée. Si tu vois à la fin une ligne qui se termine par un
+nombre suivi de "passed", sans le mot "failed" nulle part, c'est bon signe.
+Si tu vois des erreurs, copie le message d'erreur complet et retourne voir
+ton LLM avec.
 
 **Sauvegarder dans Git** : va à la Fiche 5.
