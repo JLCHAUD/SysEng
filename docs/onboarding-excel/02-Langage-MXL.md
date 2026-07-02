@@ -276,8 +276,7 @@ PUSH $actifs -> uo.L09U1-CFL2400-CLIM.activites
 
 | Erreur | Solution |
 |---|---|
-| `PUSH` sur une variable sans `DEF` préalable | Toujours `DEF` avant de `PUSH` |
-| `COL` écrit avant le `DEF GET_TABLE` correspondant | `DEF` en premier, `COL` ensuite |
+| `PUSH` sur une variable sans `DEF` préalable | Ignoré silencieusement (pas d'erreur de sync) — toujours `DEF` avant `PUSH` pour éviter de perdre une donnée sans t'en rendre compte |
 | Penser que `BIND` est une formule Excel live | `BIND` écrit une valeur figée au moment du sync — relancer un sync pour rafraîchir |
 | Modifier un `_Manifeste` à la main en pensant que c'est versionné | Les `.xlsx` sont gitignorés — seul le générateur Python qui l'écrit est versionné |
 | Utiliser une fonction `COMPUTE` inexistante | Le sync échoue avec une erreur explicite listant la fonction inconnue — vérifier la liste ci-dessus avant d'escalader |
