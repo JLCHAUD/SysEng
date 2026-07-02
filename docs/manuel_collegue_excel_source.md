@@ -303,6 +303,16 @@ Ne panique pas : dans ce projet, un test qui échoue au milieu du travail est
 normal, ça fait partie du processus habituel — ce n'est pas le signe que tu
 as fait quelque chose de grave.
 
+### "`pytest` (ou une autre commande) n'est pas reconnu"
+
+Ça arrive souvent sous Windows quand tu n'as pas les droits administrateur :
+l'installation se fait quand même, mais dans un dossier que Windows ne
+trouve pas automatiquement. Solution simple : au lieu de taper `pytest`
+tout seul, tape `python -m pytest` (ça marche aussi pour les autres
+commandes, par exemple `python -m pip install ...`). Si ça affiche bien un
+résultat, tu peux utiliser `python -m` devant chaque commande de ce genre
+dans tout le reste de ce manuel.
+
 ### "Je ne sais pas quoi copier-coller, je suis perdue"
 
 Reviens au tableau "Qu'est-ce que tu veux faire aujourd'hui ?" au début de
