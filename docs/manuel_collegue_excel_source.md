@@ -212,8 +212,9 @@ LLM — ce sont des commandes que tu tapes toi-même dans le terminal.
    puis Entrée. La ligne qui commence par une étoile `*` est ta branche
    actuelle. Si c'est écrit `* master`, ne committe pas directement dessus —
    crée d'abord une branche pour ton travail : `git checkout -b
-   nom-court-de-ton-travail` (remplace par un nom qui décrit ce que tu fais,
-   par exemple `git checkout -b ajoute-colonne-priorite`, sans espace ni
+   feature/nom-court-de-ton-travail` (remplace par un nom qui décrit ce que
+   tu fais, en gardant le préfixe `feature/` utilisé par le projet — par
+   exemple `git checkout -b feature/ajoute-colonne-priorite`, sans espace ni
    accent). Une fois sur ta propre branche, continue avec les étapes
    ci-dessous.
 
