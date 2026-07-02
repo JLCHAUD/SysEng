@@ -208,6 +208,15 @@ LLM — ce sont des commandes que tu tapes toi-même dans le terminal.
 
 **Les commandes, une par une** (tape chacune puis Entrée, dans l'ordre) :
 
+0. Avant de committer, vérifie sur quelle branche tu es : tape `git branch`
+   puis Entrée. La ligne qui commence par une étoile `*` est ta branche
+   actuelle. Si c'est écrit `* master`, ne committe pas directement dessus —
+   crée d'abord une branche pour ton travail : `git checkout -b
+   nom-court-de-ton-travail` (remplace par un nom qui décrit ce que tu fais,
+   par exemple `git checkout -b ajoute-colonne-priorite`, sans espace ni
+   accent). Une fois sur ta propre branche, continue avec les étapes
+   ci-dessous.
+
 1. `git status`
    Ça affiche la liste des fichiers que tu as modifiés depuis ta dernière
    sauvegarde. Vérifie que tu reconnais bien tous les fichiers listés — si
@@ -231,6 +240,13 @@ LLM — ce sont des commandes que tu tapes toi-même dans le terminal.
 4. `git push`
    Ça envoie ta sauvegarde vers le serveur partagé (GitHub), pour que le
    reste de l'équipe puisse la voir.
+
+Une fois ta branche poussée, préviens la personne qui gère le dépôt
+principal (ou crée toi-même une Pull Request sur le site GitHub du projet
+si tu sais le faire) : c'est une demande officielle pour que ton travail
+soit relu puis intégré à `master`. Tant que ce n'est pas fait, ton travail
+reste sur ta branche, séparé du reste — c'est normal et voulu, ça permet
+une relecture avant que ça touche le travail de toute l'équipe.
 
 **Comment vérifier** : après `git push`, tape `git status` une dernière
 fois. Si tu vois "nothing to commit, working tree clean" et "Your branch is
