@@ -60,7 +60,7 @@ UO1, projet CFL2400, système climatisation).
 
 | Brique | Contenu | État |
 |---|---|---|
-| Noyau moteur | Parser + executor MXL | ✅ fait, 415 tests passants |
+| Noyau moteur | Parser + executor MXL | ✅ fait, 426 tests passants |
 | Modèle UO réel | UO type Train System, catalogue 5 lots × 2 UO | ✅ fait |
 | Pyramide interne | Cockpit ingénieur + dashboard métier fonctionnels | ✅ fait |
 | Design system Excel | Charte graphique centralisée (`src/xl_design.py`) | ✅ fait |
