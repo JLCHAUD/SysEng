@@ -150,3 +150,122 @@ Si tu vois des erreurs, copie le message d'erreur complet et retourne voir
 ton LLM avec.
 
 **Sauvegarder dans Git** : va à la Fiche 5.
+
+---
+
+## Fiche 4 — Modifier un générateur Python
+
+**Ce que tu veux faire** : tu dois ajouter une fonctionnalité plus
+importante à un générateur — par exemple une nouvelle colonne dans un
+tableau, une nouvelle feuille, un nouveau calcul.
+
+**Fichiers à ouvrir et copier** : les 3 fichiers suivants, un par un, dans
+cet ordre — copie le contenu du premier, colle-le dans le chat, puis
+directement en dessous colle le contenu du deuxième, puis du troisième
+(un retour à la ligne entre chaque, rien d'autre) :
+
+1. `docs/onboarding-excel/02-Langage-MXL.md`
+2. `docs/onboarding-excel/03-Design-System-XD.md`
+3. `docs/onboarding-excel/04-Territoire-Et-Conventions.md`
+
+**Prompt à coller** (après les 3 fichiers collés à la suite) :
+
+> Voici trois documents de référence du projet ExoSync : le langage MXL, le
+> système de mise en forme, et les conventions de développement. Je veux
+> modifier le générateur [NOM DU FICHIER, par exemple
+> `cockpit_ingenieur_generator.py`] pour [DÉCRIS PRÉCISÉMENT LE CHANGEMENT].
+> Le projet suit le principe TDD (écrire le test avant le code) : propose-moi
+> d'abord le test qui vérifie ce comportement, puis le code qui le fait
+> passer, en respectant les conventions du troisième document.
+
+**Où mettre la réponse** : ton LLM va te proposer du code de test ET du code
+d'implémentation, dans deux blocs séparés. Ouvre les deux fichiers concernés
+(un dans le dossier `tests/`, un dans `src/generators/` ou
+`projet_TrainSystem/`), colle chaque morceau de code au bon endroit
+(le LLM te dira dans quel fichier va chaque morceau), sauvegarde les deux
+fichiers.
+
+**Comment vérifier** : dans un terminal, tape `pytest` puis Entrée. Regarde
+d'abord que ton nouveau test apparaît bien dans la liste affichée (cherche le
+nom que ton LLM lui a donné). S'il y a écrit "failed" à côté de ce nom,
+retourne voir ton LLM avec le message d'erreur exact copié-collé.
+
+**Sauvegarder dans Git** : va à la Fiche 5 — c'est le cas typique où tu as
+plusieurs fichiers à sauvegarder en même temps (le fichier de test et le
+fichier de code).
+
+---
+
+## Fiche 5 — Sauvegarder son travail (Git)
+
+**Ce que tu veux faire** : tu as terminé une modification (code ou
+`_Manifeste`) et les vérifications de la fiche précédente sont bonnes. Tu
+veux l'enregistrer officiellement dans le projet, pour que le reste de
+l'équipe en profite aussi.
+
+Cette fiche ne demande pas de fichier de contexte ni de prompt pour ton
+LLM — ce sont des commandes que tu tapes toi-même dans le terminal.
+
+**Les commandes, une par une** (tape chacune puis Entrée, dans l'ordre) :
+
+1. `git status`
+   Ça affiche la liste des fichiers que tu as modifiés depuis ta dernière
+   sauvegarde. Vérifie que tu reconnais bien tous les fichiers listés — si
+   un fichier inconnu apparaît, arrête-toi et demande de l'aide.
+
+2. `git add nom_du_fichier`
+   À répéter pour chaque fichier modifié (remplace `nom_du_fichier` par le
+   chemin exact affiché par `git status`, par exemple
+   `src/generators/cockpit_ingenieur_generator.py`). Cette commande prépare
+   le fichier pour la sauvegarde, sans encore l'enregistrer définitivement.
+
+3. `git commit -m "description courte de ce que tu as fait"`
+   Ça enregistre officiellement tes modifications, avec un message qui
+   explique ce que tu as changé. Écris ce message toi-même, en une phrase
+   simple (par exemple : `git commit -m "ajoute colonne priorite dans le
+   cockpit"`).
+
+4. `git push`
+   Ça envoie ta sauvegarde vers le serveur partagé (GitHub), pour que le
+   reste de l'équipe puisse la voir.
+
+**Comment vérifier** : après `git push`, tape `git status` une dernière
+fois. Si tu vois "nothing to commit, working tree clean" et "Your branch is
+up to date", tout est bien sauvegardé.
+
+---
+
+## Fiche 6 — Signaler un besoin qui dépasse ton périmètre (escalade)
+
+**Ce que tu veux faire** : ton LLM te dit qu'il ne peut pas faire ce que tu
+demandes parce que ça touche au "cœur du moteur" (les fichiers
+`src/parser.py`, `src/executor.py` ou `src/models.py`), ou tu as
+l'impression que ce que tu veux faire n'est tout simplement pas possible
+avec les outils actuels du projet.
+
+**Fichier à ouvrir et copier** : `docs/onboarding-excel/05-Escalade.md`
+d'abord — pas pour le coller à un LLM, mais pour toi : lis-le et regarde le
+tableau d'exemples dedans, pour confirmer que ta situation est bien une
+"vraie" escalade et pas quelque chose que tu peux résoudre toi-même.
+
+Cette fiche ne demande pas de prompt pour ton LLM — c'est toi qui écris
+directement l'entrée.
+
+**Où écrire** : ouvre le fichier `ESCALADES.md`, qui se trouve à la racine
+du projet (pas dans le dossier `docs/`). Ajoute une nouvelle entrée tout en
+haut de la section "Entrées", en suivant exactement le modèle déjà présent
+dans ce même fichier (les parties "Contexte", "Ce qui manque", "Ce que je
+voudrais écrire", "Contournement actuel").
+
+**Comment vérifier** : relis ton entrée une fois écrite — est-ce qu'une
+personne qui ne connaît pas ta situation comprendrait ton besoin juste en la
+lisant ? Si oui, c'est bon.
+
+**Sauvegarder dans Git** :
+
+1. `git add ESCALADES.md`
+2. `git commit -m "besoin : resume court de ton besoin"`
+3. `git push`
+
+Pas besoin d'attendre une réponse pour continuer à travailler sur autre
+chose — ton entrée sera relue périodiquement.
