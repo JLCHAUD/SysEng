@@ -221,9 +221,12 @@ LLM — ce sont des commandes que tu tapes toi-même dans le terminal.
 
 3. `git commit -m "description courte de ce que tu as fait"`
    Ça enregistre officiellement tes modifications, avec un message qui
-   explique ce que tu as changé. Écris ce message toi-même, en une phrase
-   simple (par exemple : `git commit -m "ajoute colonne priorite dans le
-   cockpit"`).
+   explique ce que tu as changé. Le projet utilise un format précis :
+   `type(scope): description`, où `type` est souvent `feat` (nouvelle
+   fonctionnalité), `fix` (correction) ou `docs` (documentation), et `scope`
+   est la partie du projet concernée. Écris ce message toi-même en suivant
+   ce format (par exemple : `git commit -m "feat(cockpit): ajoute colonne
+   priorite"`).
 
 4. `git push`
    Ça envoie ta sauvegarde vers le serveur partagé (GitHub), pour que le
@@ -264,7 +267,7 @@ lisant ? Si oui, c'est bon.
 **Sauvegarder dans Git** :
 
 1. `git add ESCALADES.md`
-2. `git commit -m "besoin : resume court de ton besoin"`
+2. `git commit -m "docs(escalade): resume court de ton besoin"`
 3. `git push`
 
 Pas besoin d'attendre une réponse pour continuer à travailler sur autre
