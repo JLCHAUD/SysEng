@@ -22,7 +22,8 @@ apparaît — tu n'as besoin de rien connaître à l'avance.
 4. Si cette commande ne fonctionne pas du tout (message "commande introuvable"
    par exemple), c'est que ton environnement n'est pas encore installé —
    demande de l'aide avant d'aller plus loin, ce manuel suppose que
-   l'installation de base (Python, les outils du projet) est déjà faite.
+   l'installation de base (Python — le langage de programmation utilisé par
+   ce projet — et les outils du projet) est déjà faite.
 
 ## Qu'est-ce que tu veux faire aujourd'hui ?
 
